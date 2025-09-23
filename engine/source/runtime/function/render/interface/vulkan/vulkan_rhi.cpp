@@ -83,6 +83,11 @@ namespace Piccolo
 
     void VulkanRHI::initialize(RHIInitInfo init_info)
     {
+        // if (volkInitialize() != VK_SUCCESS) {
+        //     LOG_ERROR("Failed to initialize volk");
+        //     exit(-1);
+        // }
+
         m_window = init_info.window_system->getWindow();
 
         std::array<int, 2> window_size = init_info.window_system->getWindowSize();
@@ -91,8 +96,8 @@ namespace Piccolo
         m_scissor  = {{0, 0}, {(uint32_t)window_size[0], (uint32_t)window_size[1]}};
 
 #ifndef NDEBUG
-        m_enable_validation_Layers = true;
-        m_enable_debug_utils_label = true;
+        m_enable_validation_Layers = true; //true;
+        m_enable_debug_utils_label = true; //true;
 #else
         m_enable_validation_Layers  = false;
         m_enable_debug_utils_label  = false;
@@ -667,6 +672,8 @@ namespace Piccolo
         {
             LOG_ERROR("vk create instance");
         }
+
+        // volkLoadInstance(m_instance);
     }
 
     void VulkanRHI::initializeDebugMessenger()
@@ -808,6 +815,8 @@ namespace Piccolo
         {
             LOG_ERROR("vk create device");
         }
+
+        // volkLoadDevice(m_device);
 
         // initialize queues of this device
         VkQueue vk_graphics_queue;
@@ -2968,6 +2977,24 @@ namespace Piccolo
         VmaVulkanFunctions vulkanFunctions    = {};
         vulkanFunctions.vkGetInstanceProcAddr = &vkGetInstanceProcAddr;
         vulkanFunctions.vkGetDeviceProcAddr   = &vkGetDeviceProcAddr;
+
+        // vulkanFunctions.vkAllocateMemory                    = vkAllocateMemory;
+        // vulkanFunctions.vkBindBufferMemory                  = vkBindBufferMemory;
+        // vulkanFunctions.vkBindImageMemory                   = vkBindImageMemory;
+        // vulkanFunctions.vkCreateBuffer                      = vkCreateBuffer;
+        // vulkanFunctions.vkCreateImage                       = vkCreateImage;
+        // vulkanFunctions.vkDestroyBuffer                     = vkDestroyBuffer;
+        // vulkanFunctions.vkDestroyImage                      = vkDestroyImage;
+        // vulkanFunctions.vkFlushMappedMemoryRanges           = vkFlushMappedMemoryRanges;
+        // vulkanFunctions.vkFreeMemory                        = vkFreeMemory;
+        // vulkanFunctions.vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements;
+        // vulkanFunctions.vkGetImageMemoryRequirements        = vkGetImageMemoryRequirements;
+        // vulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+        // vulkanFunctions.vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties;
+        // vulkanFunctions.vkInvalidateMappedMemoryRanges      = vkInvalidateMappedMemoryRanges;
+        // vulkanFunctions.vkMapMemory                         = vkMapMemory;
+        // vulkanFunctions.vkUnmapMemory                       = vkUnmapMemory;
+        // vulkanFunctions.vkCmdCopyBuffer                     = vkCmdCopyBuffer;
 
         VmaAllocatorCreateInfo allocatorCreateInfo = {};
         allocatorCreateInfo.vulkanApiVersion       = m_vulkan_api_version;

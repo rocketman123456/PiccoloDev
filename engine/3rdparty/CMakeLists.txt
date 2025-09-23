@@ -87,3 +87,7 @@ endif()
 if(NOT TARGET lua)
     include(lua.cmake)
 endif()
+
+if(NOT TARGET volk)
+    add_subdirectory(volk)
+endif()
