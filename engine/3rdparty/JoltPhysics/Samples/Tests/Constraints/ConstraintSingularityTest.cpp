@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -11,16 +12,16 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Layers.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(ConstraintSingularityTest) 
-{ 
-	JPH_ADD_BASE_CLASS(ConstraintSingularityTest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(ConstraintSingularityTest)
+{
+	JPH_ADD_BASE_CLASS(ConstraintSingularityTest, Test)
 }
 
 void ConstraintSingularityTest::Initialize()
 {
 	// Floor
 	CreateFloor();
-		
+
 	float box_size = 4.0f;
 	RefConst<Shape> box = new BoxShape(Vec3::sReplicate(0.5f * box_size));
 
@@ -34,7 +35,7 @@ void ConstraintSingularityTest::Initialize()
 	for (int constraint_type = 0; constraint_type < num_constraint_types; ++constraint_type)
 		for (int configuration = 0; configuration < num_configurations; ++configuration)
 		{
-			Vec3 test_position(10.0f * constraint_type, 10.0f + 10.0f * configuration, 0);
+			RVec3 test_position(10.0f * constraint_type, 10.0f + 10.0f * configuration, 0);
 
 			Body &body1 = *mBodyInterface->CreateBody(BodyCreationSettings(box, test_position, Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
 			body1.SetCollisionGroup(CollisionGroup(group_filter, group_id, 0));
@@ -62,37 +63,37 @@ void ConstraintSingularityTest::Initialize()
 			default:
 				{
 					FixedConstraintSettings settings;
-					settings.SetPoint(body1, body2);
+					settings.mAutoDetectPoint = true;
 					constraint = settings.Create(body1, body2);
 					break;
 				}
 			}
-				
+
 			mPhysicsSystem->AddConstraint(constraint);
 
-			Vec3 position;
+			RVec3 position;
 			Quat orientation;
 			switch (configuration)
 			{
-			case 0: 
+			case 0:
 				position = test_position + Vec3(0, 0, box_size);
-				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(180.0f)); 
+				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(180.0f));
 				break;
 
-			case 1: 
+			case 1:
 				position = test_position + Vec3(0, 0, box_size);
-				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(-90.0f)) * Quat::sRotation(Vec3::sAxisX(), DegreesToRadians(180.0f)); 
+				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(-90.0f)) * Quat::sRotation(Vec3::sAxisX(), DegreesToRadians(180.0f));
 				break;
 
 			case 2:
 				position = test_position + Vec3(box_size, 0, 0);
-				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(90.0f)) * Quat::sRotation(Vec3::sAxisZ(), DegreesToRadians(90.0f)); 
+				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(90.0f)) * Quat::sRotation(Vec3::sAxisZ(), DegreesToRadians(90.0f));
 				break;
 
 			default:
 				JPH_ASSERT(configuration == 3);
 				position = test_position + Vec3(-box_size, 0, 0);
-				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(90.0f)) * Quat::sRotation(Vec3::sAxisZ(), DegreesToRadians(90.0f)); 
+				orientation = Quat::sRotation(Vec3::sAxisY(), DegreesToRadians(90.0f)) * Quat::sRotation(Vec3::sAxisZ(), DegreesToRadians(90.0f));
 				break;
 			}
 

@@ -1,14 +1,11 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #pragma once
 
-#include <Jolt/Core/Memory.h>
 #include <Jolt/Core/NonCopyable.h>
-
-JPH_SUPPRESS_WARNINGS_STD_BEGIN
-#include <atomic>
-JPH_SUPPRESS_WARNINGS_STD_END
+#include <Jolt/Core/Atomics.h>
 
 JPH_NAMESPACE_BEGIN
 
@@ -41,7 +38,7 @@ public:
 	inline T *				FromOffset(uint32 inOffset) const;
 
 private:
-	uint8 *					mObjectStore = nullptr;			///< This contains a contigous list of objects (possibly of varying size)
+	uint8 *					mObjectStore = nullptr;			///< This contains a contiguous list of objects (possibly of varying size)
 	uint32					mObjectStoreSizeBytes = 0;		///< The size of mObjectStore in bytes
 	atomic<uint32>			mWriteOffset { 0 };				///< Next offset to write to in mObjectStore
 };
@@ -55,10 +52,11 @@ public:
 	inline					LFHMAllocatorContext(LFHMAllocator &inAllocator, uint32 inBlockSize);
 
 	/// @brief Allocate data block
-	/// @param inSize Size of block to allocae
+	/// @param inSize Size of block to allocate.
+	/// @param inAlignment Alignment of block to allocate.
 	/// @param outWriteOffset Offset in buffer where block is located
 	/// @return True if allocation succeeded
-	inline bool				Allocate(uint32 inSize, uint32 &outWriteOffset);
+	inline bool				Allocate(uint32 inSize, uint32 inAlignment, uint32 &outWriteOffset);
 
 private:
 	LFHMAllocator &			mAllocator;
@@ -86,7 +84,7 @@ public:
 	/// Remove all elements.
 	/// Note that this cannot happen simultaneously with adding new elements.
 	void					Clear();
-	
+
 	/// Get the current amount of buckets that the map is using
 	uint32					GetNumBuckets() const			{ return mNumBuckets; }
 
@@ -116,10 +114,10 @@ public:
 	/// Insert a new element, returns null if map full.
 	/// Multiple threads can be inserting in the map at the same time.
 	template <class... Params>
-	inline KeyValue *		Create(LFHMAllocatorContext &ioContext, const Key &inKey, size_t inKeyHash, int inExtraBytes, Params &&... inConstructorParams);
-	
+	inline KeyValue *		Create(LFHMAllocatorContext &ioContext, const Key &inKey, uint64 inKeyHash, int inExtraBytes, Params &&... inConstructorParams);
+
 	/// Find an element, returns null if not found
-	inline const KeyValue *	Find(const Key &inKey, size_t inKeyHash) const;
+	inline const KeyValue *	Find(const Key &inKey, uint64 inKeyHash) const;
 
 	/// Value of an invalid handle
 	const static uint32		cInvalidHandle = uint32(-1);
@@ -137,7 +135,7 @@ public:
 #endif // JPH_ENABLE_ASSERTS
 
 	/// Get all key/value pairs
-	inline void				GetAllKeyValues(vector<const KeyValue *> &outAll) const;
+	inline void				GetAllKeyValues(Array<const KeyValue *> &outAll) const;
 
 	/// Non-const iterator
 	struct Iterator
@@ -147,22 +145,22 @@ public:
 		bool				operator != (const Iterator &inRHS) const	{ return !(*this == inRHS); }
 
 		/// Convert to key value pair
-		KeyValue & 			operator * ();
+		KeyValue &			operator * ();
 
 		/// Next item
 		Iterator &			operator ++ ();
 
-		MapType *			mMap;		
+		MapType *			mMap;
 		uint32				mBucket;
 		uint32				mOffset;
 	};
 
-	/// Iterate over the map, note that it is not safe to do this in parallel to Clear(). 
+	/// Iterate over the map, note that it is not safe to do this in parallel to Clear().
 	/// It is safe to do this while adding elements to the map, but newly added elements may or may not be returned by the iterator.
 	Iterator				begin();
 	Iterator				end();
 
-#ifdef _DEBUG
+#ifdef JPH_DEBUG
 	/// Output stats about this map to the log
 	void					TraceStats() const;
 #endif

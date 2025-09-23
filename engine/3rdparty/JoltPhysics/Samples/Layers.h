@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -9,38 +10,42 @@
 /// Layer that objects can be in, determines which other objects it can collide with
 namespace Layers
 {
-	static constexpr uint8 UNUSED1 = 0; // 4 unused values so that broadphase layers values don't match with object layer values (for testing purposes)
-	static constexpr uint8 UNUSED2 = 1;
-	static constexpr uint8 UNUSED3 = 2;
-	static constexpr uint8 UNUSED4 = 3;
-	static constexpr uint8 NON_MOVING = 4;
-	static constexpr uint8 MOVING = 5;
-	static constexpr uint8 DEBRIS = 6; // Example: Debris collides only with NON_MOVING
-	static constexpr uint8 SENSOR = 7; // Sensors only collide with MOVING objects
-	static constexpr uint8 NUM_LAYERS = 8;
+	static constexpr ObjectLayer UNUSED1 = 0; // 4 unused values so that broadphase layers values don't match with object layer values (for testing purposes)
+	static constexpr ObjectLayer UNUSED2 = 1;
+	static constexpr ObjectLayer UNUSED3 = 2;
+	static constexpr ObjectLayer UNUSED4 = 3;
+	static constexpr ObjectLayer NON_MOVING = 4;
+	static constexpr ObjectLayer MOVING = 5;
+	static constexpr ObjectLayer DEBRIS = 6; // Example: Debris collides only with NON_MOVING
+	static constexpr ObjectLayer SENSOR = 7; // Sensors only collide with MOVING objects
+	static constexpr ObjectLayer NUM_LAYERS = 8;
 };
 
-/// Function that determines if two object layers can collide
-inline bool ObjectCanCollide(ObjectLayer inObject1, ObjectLayer inObject2)
+/// Class that determines if two object layers can collide
+class ObjectLayerPairFilterImpl : public ObjectLayerPairFilter
 {
-	switch (inObject1)
+public:
+	virtual bool					ShouldCollide(ObjectLayer inObject1, ObjectLayer inObject2) const override
 	{
-	case Layers::UNUSED1:
-	case Layers::UNUSED2:
-	case Layers::UNUSED3:
-	case Layers::UNUSED4:
-		return false;
-	case Layers::NON_MOVING:
-		return inObject2 == Layers::MOVING || inObject2 == Layers::DEBRIS;
-	case Layers::MOVING:
-		return inObject2 == Layers::NON_MOVING || inObject2 == Layers::MOVING || inObject2 == Layers::SENSOR;
-	case Layers::DEBRIS:
-		return inObject2 == Layers::NON_MOVING;
-	case Layers::SENSOR:
-		return inObject2 == Layers::MOVING;
-	default:
-		JPH_ASSERT(false);
-		return false;
+		switch (inObject1)
+		{
+		case Layers::UNUSED1:
+		case Layers::UNUSED2:
+		case Layers::UNUSED3:
+		case Layers::UNUSED4:
+			return false;
+		case Layers::NON_MOVING:
+			return inObject2 == Layers::MOVING || inObject2 == Layers::DEBRIS;
+		case Layers::MOVING:
+			return inObject2 == Layers::NON_MOVING || inObject2 == Layers::MOVING || inObject2 == Layers::SENSOR;
+		case Layers::DEBRIS:
+			return inObject2 == Layers::NON_MOVING;
+		case Layers::SENSOR:
+			return inObject2 == Layers::MOVING;
+		default:
+			JPH_ASSERT(false);
+			return false;
+		}
 	}
 };
 
@@ -102,25 +107,29 @@ private:
 	BroadPhaseLayer					mObjectToBroadPhase[Layers::NUM_LAYERS];
 };
 
-/// Function that determines if two broadphase layers can collide
-inline bool BroadPhaseCanCollide(ObjectLayer inLayer1, BroadPhaseLayer inLayer2)
+/// Class that determines if an object layer can collide with a broadphase layer
+class ObjectVsBroadPhaseLayerFilterImpl : public ObjectVsBroadPhaseLayerFilter
 {
-	switch (inLayer1)
+public:
+	virtual bool					ShouldCollide(ObjectLayer inLayer1, BroadPhaseLayer inLayer2) const override
 	{
-	case Layers::NON_MOVING:
-		return inLayer2 == BroadPhaseLayers::MOVING;
-	case Layers::MOVING:
-		return inLayer2 == BroadPhaseLayers::NON_MOVING || inLayer2 == BroadPhaseLayers::MOVING || inLayer2 == BroadPhaseLayers::SENSOR;
-	case Layers::DEBRIS:
-		return inLayer2 == BroadPhaseLayers::NON_MOVING;
-	case Layers::SENSOR:
-		return inLayer2 == BroadPhaseLayers::MOVING;
-	case Layers::UNUSED1:
-	case Layers::UNUSED2:
-	case Layers::UNUSED3:
-		return false;			
-	default:
-		JPH_ASSERT(false);
-		return false;
+		switch (inLayer1)
+		{
+		case Layers::NON_MOVING:
+			return inLayer2 == BroadPhaseLayers::MOVING || inLayer2 == BroadPhaseLayers::DEBRIS;
+		case Layers::MOVING:
+			return inLayer2 == BroadPhaseLayers::NON_MOVING || inLayer2 == BroadPhaseLayers::MOVING || inLayer2 == BroadPhaseLayers::SENSOR;
+		case Layers::DEBRIS:
+			return inLayer2 == BroadPhaseLayers::NON_MOVING;
+		case Layers::SENSOR:
+			return inLayer2 == BroadPhaseLayers::MOVING;
+		case Layers::UNUSED1:
+		case Layers::UNUSED2:
+		case Layers::UNUSED3:
+			return false;
+		default:
+			JPH_ASSERT(false);
+			return false;
+		}
 	}
-}
+};

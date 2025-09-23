@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -27,7 +28,7 @@ JPH_IMPLEMENT_SERIALIZABLE_VIRTUAL(ConeConstraintSettings)
 }
 
 void ConeConstraintSettings::SaveBinaryState(StreamOut &inStream) const
-{ 
+{
 	ConstraintSettings::SaveBinaryState(inStream);
 
 	inStream.Write(mSpace);
@@ -56,11 +57,7 @@ TwoBodyConstraint *ConeConstraintSettings::Create(Body &inBody1, Body &inBody2) 
 }
 
 ConeConstraint::ConeConstraint(Body &inBody1, Body &inBody2, const ConeConstraintSettings &inSettings) :
-	TwoBodyConstraint(inBody1, inBody2, inSettings),
-	mLocalSpacePosition1(inSettings.mPoint1),
-	mLocalSpacePosition2(inSettings.mPoint2),
-	mLocalSpaceTwistAxis1(inSettings.mTwistAxis1),
-	mLocalSpaceTwistAxis2(inSettings.mTwistAxis2)
+	TwoBodyConstraint(inBody1, inBody2, inSettings)
 {
 	// Store limits
 	SetHalfConeAngle(inSettings.mHalfConeAngle);
@@ -71,22 +68,36 @@ ConeConstraint::ConeConstraint(Body &inBody1, Body &inBody2, const ConeConstrain
 	if (inSettings.mSpace == EConstraintSpace::WorldSpace)
 	{
 		// If all properties were specified in world space, take them to local space now
-		Mat44 inv_transform1 = inBody1.GetInverseCenterOfMassTransform();
-		mLocalSpacePosition1 = inv_transform1 * mLocalSpacePosition1;
-		mLocalSpaceTwistAxis1 = inv_transform1.Multiply3x3(mLocalSpaceTwistAxis1);
+		RMat44 inv_transform1 = inBody1.GetInverseCenterOfMassTransform();
+		mLocalSpacePosition1 = Vec3(inv_transform1 * inSettings.mPoint1);
+		mLocalSpaceTwistAxis1 = inv_transform1.Multiply3x3(inSettings.mTwistAxis1);
 
-		Mat44 inv_transform2 = inBody2.GetInverseCenterOfMassTransform();
-		mLocalSpacePosition2 = inv_transform2 * mLocalSpacePosition2;
-		mLocalSpaceTwistAxis2 = inv_transform2.Multiply3x3(mLocalSpaceTwistAxis2);
+		RMat44 inv_transform2 = inBody2.GetInverseCenterOfMassTransform();
+		mLocalSpacePosition2 = Vec3(inv_transform2 * inSettings.mPoint2);
+		mLocalSpaceTwistAxis2 = inv_transform2.Multiply3x3(inSettings.mTwistAxis2);
 	}
 	else
 	{
+		// Properties already in local space
+		mLocalSpacePosition1 = Vec3(inSettings.mPoint1);
+		mLocalSpacePosition2 = Vec3(inSettings.mPoint2);
+		mLocalSpaceTwistAxis1 = inSettings.mTwistAxis1;
+		mLocalSpaceTwistAxis2 = inSettings.mTwistAxis2;
+
 		// If they were in local space, we need to take the initial rotation axis to world space
 		mWorldSpaceRotationAxis = inBody1.GetRotation() * mWorldSpaceRotationAxis;
 	}
 }
 
-void ConeConstraint::CalculateRotationConstraintProperties(float inDeltaTime, Mat44Arg inRotation1, Mat44Arg inRotation2)
+void ConeConstraint::NotifyShapeChanged(const BodyID &inBodyID, Vec3Arg inDeltaCOM)
+{
+	if (mBody1->GetID() == inBodyID)
+		mLocalSpacePosition1 -= inDeltaCOM;
+	else if (mBody2->GetID() == inBodyID)
+		mLocalSpacePosition2 -= inDeltaCOM;
+}
+
+void ConeConstraint::CalculateRotationConstraintProperties(Mat44Arg inRotation1, Mat44Arg inRotation2)
 {
 	// Rotation is along the cross product of both twist axis
 	Vec3 twist1 = inRotation1.Multiply3x3(mLocalSpaceTwistAxis1);
@@ -104,7 +115,7 @@ void ConeConstraint::CalculateRotationConstraintProperties(float inDeltaTime, Ma
 		if (len > 0.0f)
 			mWorldSpaceRotationAxis = rot_axis / len;
 
-		mAngleConstraintPart.CalculateConstraintProperties(inDeltaTime, *mBody1, *mBody2, mWorldSpaceRotationAxis);		
+		mAngleConstraintPart.CalculateConstraintProperties(*mBody1, *mBody2, mWorldSpaceRotationAxis);
 	}
 	else
 		mAngleConstraintPart.Deactivate();
@@ -115,7 +126,13 @@ void ConeConstraint::SetupVelocityConstraint(float inDeltaTime)
 	Mat44 rotation1 = Mat44::sRotation(mBody1->GetRotation());
 	Mat44 rotation2 = Mat44::sRotation(mBody2->GetRotation());
 	mPointConstraintPart.CalculateConstraintProperties(*mBody1, rotation1, mLocalSpacePosition1, *mBody2, rotation2, mLocalSpacePosition2);
-	CalculateRotationConstraintProperties(inDeltaTime, rotation1, rotation2);
+	CalculateRotationConstraintProperties(rotation1, rotation2);
+}
+
+void ConeConstraint::ResetWarmStart()
+{
+	mPointConstraintPart.Deactivate();
+	mAngleConstraintPart.Deactivate();
 }
 
 void ConeConstraint::WarmStartVelocityConstraint(float inWarmStartImpulseRatio)
@@ -142,7 +159,7 @@ bool ConeConstraint::SolvePositionConstraint(float inDeltaTime, float inBaumgart
 	bool pos = mPointConstraintPart.SolvePositionConstraint(*mBody1, *mBody2, inBaumgarte);
 
 	bool rot = false;
-	CalculateRotationConstraintProperties(inDeltaTime, Mat44::sRotation(mBody1->GetRotation()), Mat44::sRotation(mBody2->GetRotation()));
+	CalculateRotationConstraintProperties(Mat44::sRotation(mBody1->GetRotation()), Mat44::sRotation(mBody2->GetRotation()));
 	if (mAngleConstraintPart.IsActive())
 		rot = mAngleConstraintPart.SolvePositionConstraint(*mBody1, *mBody2, mCosTheta - mCosHalfConeAngle, inBaumgarte);
 
@@ -152,11 +169,11 @@ bool ConeConstraint::SolvePositionConstraint(float inDeltaTime, float inBaumgart
 #ifdef JPH_DEBUG_RENDERER
 void ConeConstraint::DrawConstraint(DebugRenderer *inRenderer) const
 {
-	Mat44 transform1 = mBody1->GetCenterOfMassTransform();
-	Mat44 transform2 = mBody2->GetCenterOfMassTransform();
+	RMat44 transform1 = mBody1->GetCenterOfMassTransform();
+	RMat44 transform2 = mBody2->GetCenterOfMassTransform();
 
-	Vec3 p1 = transform1 * mLocalSpacePosition1;
-	Vec3 p2 = transform2 * mLocalSpacePosition2;
+	RVec3 p1 = transform1 * mLocalSpacePosition1;
+	RVec3 p2 = transform2 * mLocalSpacePosition2;
 
 	// Draw constraint
 	inRenderer->DrawMarker(p1, Color::sRed, 0.1f);
@@ -170,12 +187,12 @@ void ConeConstraint::DrawConstraint(DebugRenderer *inRenderer) const
 void ConeConstraint::DrawConstraintLimits(DebugRenderer *inRenderer) const
 {
 	// Get constraint properties in world space
-	Mat44 transform1 = mBody1->GetCenterOfMassTransform();
-	Vec3 position1 = transform1 * mLocalSpacePosition1;
+	RMat44 transform1 = mBody1->GetCenterOfMassTransform();
+	RVec3 position1 = transform1 * mLocalSpacePosition1;
 	Vec3 twist_axis1 = transform1.Multiply3x3(mLocalSpaceTwistAxis1);
 	Vec3 normal_axis1 = transform1.Multiply3x3(mLocalSpaceTwistAxis1.GetNormalizedPerpendicular());
 
-	inRenderer->DrawOpenCone(position1, twist_axis1, normal_axis1, acos(mCosHalfConeAngle), mDrawConstraintSize * mCosHalfConeAngle, Color::sPurple, DebugRenderer::ECastShadow::Off);
+	inRenderer->DrawOpenCone(position1, twist_axis1, normal_axis1, ACos(mCosHalfConeAngle), mDrawConstraintSize * mCosHalfConeAngle, Color::sPurple, DebugRenderer::ECastShadow::Off);
 }
 #endif // JPH_DEBUG_RENDERER
 
@@ -202,28 +219,28 @@ Ref<ConstraintSettings> ConeConstraint::GetConstraintSettings() const
 	ConeConstraintSettings *settings = new ConeConstraintSettings;
 	ToConstraintSettings(*settings);
 	settings->mSpace = EConstraintSpace::LocalToBodyCOM;
-	settings->mPoint1 = mLocalSpacePosition1;
+	settings->mPoint1 = RVec3(mLocalSpacePosition1);
 	settings->mTwistAxis1 = mLocalSpaceTwistAxis1;
-	settings->mPoint2 = mLocalSpacePosition2;
+	settings->mPoint2 = RVec3(mLocalSpacePosition2);
 	settings->mTwistAxis2 = mLocalSpaceTwistAxis2;
-	settings->mHalfConeAngle = acos(mCosHalfConeAngle);
+	settings->mHalfConeAngle = ACos(mCosHalfConeAngle);
 	return settings;
 }
 
-Mat44 ConeConstraint::GetConstraintToBody1Matrix() const 
-{ 
-	Vec3 perp = mLocalSpaceTwistAxis1.GetNormalizedPerpendicular(); 
-	Vec3 perp2 = mLocalSpaceTwistAxis1.Cross(perp); 
-	return Mat44(Vec4(mLocalSpaceTwistAxis1, 0), Vec4(perp, 0), Vec4(perp2, 0), Vec4(mLocalSpacePosition1, 1)); 
+Mat44 ConeConstraint::GetConstraintToBody1Matrix() const
+{
+	Vec3 perp = mLocalSpaceTwistAxis1.GetNormalizedPerpendicular();
+	Vec3 perp2 = mLocalSpaceTwistAxis1.Cross(perp);
+	return Mat44(Vec4(mLocalSpaceTwistAxis1, 0), Vec4(perp, 0), Vec4(perp2, 0), Vec4(mLocalSpacePosition1, 1));
 }
 
-Mat44 ConeConstraint::GetConstraintToBody2Matrix() const 
-{ 
+Mat44 ConeConstraint::GetConstraintToBody2Matrix() const
+{
 	// Note: Incorrect in rotation around the twist axis (the perpendicular does not match that of body 1),
 	// this should not matter as we're not limiting rotation around the twist axis.
-	Vec3 perp = mLocalSpaceTwistAxis2.GetNormalizedPerpendicular(); 
-	Vec3 perp2 = mLocalSpaceTwistAxis2.Cross(perp); 
-	return Mat44(Vec4(mLocalSpaceTwistAxis2, 0), Vec4(perp, 0), Vec4(perp2, 0), Vec4(mLocalSpacePosition2, 1)); 
+	Vec3 perp = mLocalSpaceTwistAxis2.GetNormalizedPerpendicular();
+	Vec3 perp2 = mLocalSpaceTwistAxis2.Cross(perp);
+	return Mat44(Vec4(mLocalSpaceTwistAxis2, 0), Vec4(perp, 0), Vec4(perp2, 0), Vec4(mLocalSpacePosition2, 1));
 }
 
 JPH_NAMESPACE_END

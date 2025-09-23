@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -12,8 +13,8 @@ JPH_IMPLEMENT_RTTI_VIRTUAL(UIHorizontalStack)
 
 void UIHorizontalStack::sUniformChildWidth(UIElement *inParent)
 {
-	vector<int> sizes;
-	sizes.resize(1);
+	Array<int> sizes;
+	sizes.resize(1, 0);
 	for (UIElement *e : inParent->GetChildren())
 	{
 		e->AutoLayout();
@@ -22,7 +23,7 @@ void UIHorizontalStack::sUniformChildWidth(UIElement *inParent)
 		if (horiz != nullptr)
 		{
 			if (horiz->GetNumChildren() > (int)sizes.size())
-				sizes.resize(horiz->GetNumChildren());
+				sizes.resize(horiz->GetNumChildren(), 0);
 			for (int i = 0; i < horiz->GetNumChildren(); ++i)
 				sizes[i] = max(sizes[i], horiz->GetChild(i)->GetWidth());
 		}

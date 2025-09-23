@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -9,9 +10,9 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Layers.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(ScaledConvexHullShapeTest) 
-{ 
-	JPH_ADD_BASE_CLASS(ScaledConvexHullShapeTest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(ScaledConvexHullShapeTest)
+{
+	JPH_ADD_BASE_CLASS(ScaledConvexHullShapeTest, Test)
 }
 
 void ScaledConvexHullShapeTest::Initialize()
@@ -20,14 +21,14 @@ void ScaledConvexHullShapeTest::Initialize()
 	CreateFloor();
 
 	// Create tetrahedron
-	vector<Vec3> tetrahedron;
+	Array<Vec3> tetrahedron;
 	tetrahedron.push_back(Vec3::sZero());
 	tetrahedron.push_back(Vec3(10, 0, 12.5f));
 	tetrahedron.push_back(Vec3(15, 0, 2.5f));
 	tetrahedron.push_back(Vec3(10, -5, 5));
 
 	// Create vertices for box
-	vector<Vec3> box;
+	Array<Vec3> box;
 	box.push_back(Vec3(1, 2, 3));
 	box.push_back(Vec3(-1, 2, 3));
 	box.push_back(Vec3(1, -2, 3));
@@ -48,23 +49,18 @@ void ScaledConvexHullShapeTest::Initialize()
 	for (int i = 0; i < 2; ++i)
 	{
 		// Original shape
-		Body &body1 = *mBodyInterface->CreateBody(BodyCreationSettings(hull_shape[i], Vec3(-40, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-		mBodyInterface->AddBody(body1.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(BodyCreationSettings(hull_shape[i], RVec3(-40, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 		// Uniformly scaled shape
-		Body &body2 = *mBodyInterface->CreateBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3::sReplicate(0.25f)), Vec3(-20, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-		mBodyInterface->AddBody(body2.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3::sReplicate(0.25f)), RVec3(-20, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 		// Non-uniform scaled shape
-		Body &body3 = *mBodyInterface->CreateBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3(0.25f, 0.5f, 1.5f)), Vec3(0, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-		mBodyInterface->AddBody(body3.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3(0.25f, 0.5f, 1.5f)), RVec3(0, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 		// Flipped in 2 axis
-		Body &body4 = *mBodyInterface->CreateBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3(-0.25f, 0.5f, -1.5f)), Vec3(20, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-		mBodyInterface->AddBody(body4.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3(-0.25f, 0.5f, -1.5f)), RVec3(20, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 		// Inside out
-		Body &body5 = *mBodyInterface->CreateBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3(-0.25f, 0.5f, 1.5f)), Vec3(40, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-		mBodyInterface->AddBody(body5.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ScaledShapeSettings(hull_shape[i], Vec3(-0.25f, 0.5f, 1.5f)), RVec3(40, 10, i * 20.0f), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 	}
 }

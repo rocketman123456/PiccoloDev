@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -7,12 +8,12 @@
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
-#include <Renderer/DebugRendererImp.h>
+#include <Utils/DebugRendererSP.h>
 #include <random>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(BroadPhaseCastRayTest) 
-{ 
-	JPH_ADD_BASE_CLASS(BroadPhaseCastRayTest, BroadPhaseTest) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(BroadPhaseCastRayTest)
+{
+	JPH_ADD_BASE_CLASS(BroadPhaseCastRayTest, BroadPhaseTest)
 }
 
 void BroadPhaseCastRayTest::Initialize()
@@ -52,6 +53,6 @@ void BroadPhaseCastRayTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 
 	// Draw results
 	for (int i = 0; i < num_hits; ++i)
-		mDebugRenderer->DrawMarker(ray.mOrigin + results[i].mFraction * ray.mDirection, Color::sGreen, 10.0f);
-	mDebugRenderer->DrawLine(ray.mOrigin, ray.mOrigin + ray.mDirection, Color::sRed);
+		DrawMarkerSP(mDebugRenderer, ray.GetPointOnRay(results[i].mFraction), Color::sGreen, 10.0f);
+	DrawLineSP(mDebugRenderer, ray.mOrigin, ray.mOrigin + ray.mDirection, Color::sRed);
 }

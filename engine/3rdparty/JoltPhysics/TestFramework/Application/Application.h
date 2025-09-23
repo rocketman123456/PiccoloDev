@@ -1,4 +1,5 @@
-﻿// SPDX-FileCopyrightText: 2021 Jorrit Rouwe
+﻿// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
+// SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <Renderer/Renderer.h>
@@ -6,6 +7,11 @@
 #include <Input/Keyboard.h>
 #include <Input/Mouse.h>
 #include <Jolt/Core/Reference.h>
+
+// STL includes
+JPH_SUPPRESS_WARNINGS_STD_BEGIN
+#include <chrono>
+JPH_SUPPRESS_WARNINGS_STD_END
 
 class UIManager;
 class DebugUI;
@@ -24,6 +30,9 @@ protected:
 	/// Debug renderer module
 	DebugRenderer *				mDebugRenderer;
 
+	/// Main window
+	ApplicationWindow *			mWindow;
+
 	/// Render module
 	Renderer *					mRenderer;
 
@@ -39,25 +48,31 @@ protected:
 	DebugUI *					mDebugUI;
 
 	/// A string that is shown on screen to indicate the status of the application
-	string						mStatusString;
+	String						mStatusString;
 
 public:
 	/// Constructor
-								Application();
+								Application(const char *inApplicationName, const String &inCommandLine);
 	virtual						~Application();
+
+	/// Create a single string command line
+	static String				sCreateCommandLine(int inArgC, char **inArgV);
 
 	/// Enter the main loop
 	void						Run();
 
 protected:
-	/// Callback to render a frame
-	virtual bool				RenderFrame(float inDeltaTime)					{ return false; }
+	/// Update the application
+	virtual bool				UpdateFrame(float inDeltaTime)					{ return false; }
 
 	/// Pause / unpause the simulation
 	void						Pause(bool inPaused)							{ mIsPaused = inPaused; }
 
 	/// Programmatically single step the simulation
 	void						SingleStep()									{ mIsPaused = true; mSingleStep = true; }
+
+	/// Set the frequency at which we want to render frames
+	void						SetRenderFrequency(float inFrequency)			{ mRequestedDeltaTime = 1.0f / inFrequency; }
 
 	/// Will restore camera position to that returned by GetInitialCamera
 	void						ResetCamera();
@@ -66,7 +81,7 @@ protected:
 	virtual void				GetInitialCamera(CameraState &ioState) const	{ }
 
 	/// Override to specify a camera pivot point and orientation (world space)
-	virtual Mat44				GetCameraPivot(float inCameraHeading, float inCameraPitch) const { return Mat44::sIdentity(); }
+	virtual RMat44				GetCameraPivot(float inCameraHeading, float inCameraPitch) const { return RMat44::sIdentity(); }
 
 	/// Get scale factor for this world, used to boost camera speed and to scale detail of the shadows
 	virtual float				GetWorldScale() const							{ return 1.0f; }
@@ -78,6 +93,9 @@ protected:
 	void						ClearDebugRenderer();
 
 private:
+	/// Render a frame
+	bool						RenderFrame();
+
 	/// Extract heading and pitch from the local space (relative to the camera pivot) camera forward
 	void						GetCameraLocalHeadingAndPitch(float &outHeading, float &outPitch);
 
@@ -90,12 +108,14 @@ private:
 	/// Draw the frame rate counter
 	void						DrawFPS(float inDeltaTime);
 
-	uint64						mLastUpdateTicks;
+	chrono::high_resolution_clock::time_point mLastUpdateTime;
 	bool						mIsPaused = false;
 	bool						mSingleStep = false;
 	bool						mDebugRendererCleared = true;
 	bool						mLeftMousePressed = false;
 	float						mFPS = 0.0f;
+	float						mRequestedDeltaTime = 0.0f;
+	float						mResidualDeltaTime = 0.0f;
 	float						mTotalDeltaTime = 0.0f;
 	int							mNumFrames = 0;
 };

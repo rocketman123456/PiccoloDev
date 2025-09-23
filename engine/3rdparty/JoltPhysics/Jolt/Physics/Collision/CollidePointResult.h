@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -12,6 +13,8 @@ JPH_NAMESPACE_BEGIN
 class CollidePointResult
 {
 public:
+	JPH_OVERRIDE_NEW_DELETE
+
 	/// Function required by the CollisionCollector. A smaller fraction is considered to be a 'better hit'. For point queries there is no sensible return value.
 	inline float	GetEarlyOutFraction() const			{ return 0.0f; }
 

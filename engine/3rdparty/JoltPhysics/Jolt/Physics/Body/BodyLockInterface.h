@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -44,7 +45,7 @@ public:
 	virtual void				LockWrite(MutexMask inMutexMask) const = 0;
 	virtual void				UnlockWrite(MutexMask inMutexMask) const = 0;
 	///@}
-		
+
 	/// Convert body ID to body
 	inline Body *				TryGetBody(const BodyID &inBodyID) const			{ return mBodyManager.TryGetBody(inBodyID); }
 
@@ -59,17 +60,17 @@ public:
 	using BodyLockInterface::BodyLockInterface;
 
 	///@name Locking functions
-	virtual SharedMutex *		LockRead(const BodyID &inBodyID) const override		{ return nullptr; }
-	virtual void				UnlockRead(SharedMutex *inMutex) const override		{ /* Nothing to do */ }
-	virtual SharedMutex *		LockWrite(const BodyID &inBodyID) const override	{ return nullptr; }
-	virtual void				UnlockWrite(SharedMutex *inMutex) const override	{ /* Nothing to do */ }
+	virtual SharedMutex *		LockRead([[maybe_unused]] const BodyID &inBodyID) const override	{ return nullptr; }
+	virtual void				UnlockRead([[maybe_unused]] SharedMutex *inMutex) const override	{ /* Nothing to do */ }
+	virtual SharedMutex *		LockWrite([[maybe_unused]] const BodyID &inBodyID) const override	{ return nullptr; }
+	virtual void				UnlockWrite([[maybe_unused]] SharedMutex *inMutex) const override	{ /* Nothing to do */ }
 
 	///@name Batch locking functions
-	virtual MutexMask			GetMutexMask(const BodyID *inBodies, int inNumber) const override { return 0; }
-	virtual void				LockRead(MutexMask inMutexMask) const override		{ /* Nothing to do */ }
-	virtual void				UnlockRead(MutexMask inMutexMask) const override	{ /* Nothing to do */ }
-	virtual void				LockWrite(MutexMask inMutexMask) const override		{ /* Nothing to do */ }
-	virtual void				UnlockWrite(MutexMask inMutexMask) const override	{ /* Nothing to do */ }
+	virtual MutexMask			GetMutexMask([[maybe_unused]] const BodyID *inBodies, [[maybe_unused]] int inNumber) const override { return 0; }
+	virtual void				LockRead([[maybe_unused]] MutexMask inMutexMask) const override		{ /* Nothing to do */ }
+	virtual void				UnlockRead([[maybe_unused]] MutexMask inMutexMask) const override	{ /* Nothing to do */ }
+	virtual void				LockWrite([[maybe_unused]] MutexMask inMutexMask) const override	{ /* Nothing to do */ }
+	virtual void				UnlockWrite([[maybe_unused]] MutexMask inMutexMask) const override	{ /* Nothing to do */ }
 };
 
 /// Implementation that uses the body manager to lock the correct mutex for a body
@@ -82,30 +83,30 @@ public:
 	virtual SharedMutex *		LockRead(const BodyID &inBodyID) const override
 	{
 		SharedMutex &mutex = mBodyManager.GetMutexForBody(inBodyID);
-		PhysicsLock::sLockShared(mutex, EPhysicsLockTypes::PerBody);
+		PhysicsLock::sLockShared(mutex JPH_IF_ENABLE_ASSERTS(, &mBodyManager, EPhysicsLockTypes::PerBody));
 		return &mutex;
 	}
 
 	virtual void				UnlockRead(SharedMutex *inMutex) const override
 	{
-		PhysicsLock::sUnlockShared(*inMutex, EPhysicsLockTypes::PerBody);
+		PhysicsLock::sUnlockShared(*inMutex JPH_IF_ENABLE_ASSERTS(, &mBodyManager, EPhysicsLockTypes::PerBody));
 	}
-	
+
 	virtual SharedMutex *		LockWrite(const BodyID &inBodyID) const override
 	{
 		SharedMutex &mutex = mBodyManager.GetMutexForBody(inBodyID);
-		PhysicsLock::sLock(mutex, EPhysicsLockTypes::PerBody);
+		PhysicsLock::sLock(mutex JPH_IF_ENABLE_ASSERTS(, &mBodyManager, EPhysicsLockTypes::PerBody));
 		return &mutex;
 	}
 
 	virtual void				UnlockWrite(SharedMutex *inMutex) const override
 	{
-		PhysicsLock::sUnlock(*inMutex, EPhysicsLockTypes::PerBody);
+		PhysicsLock::sUnlock(*inMutex JPH_IF_ENABLE_ASSERTS(, &mBodyManager, EPhysicsLockTypes::PerBody));
 	}
 
 	///@name Batch locking functions
-	virtual MutexMask			GetMutexMask(const BodyID *inBodies, int inNumber) const override	
-	{ 
+	virtual MutexMask			GetMutexMask(const BodyID *inBodies, int inNumber) const override
+	{
 		return mBodyManager.GetMutexMask(inBodies, inNumber);
 	}
 

@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -11,30 +12,36 @@ JPH_NAMESPACE_BEGIN
 
 class IslandBuilder;
 class BodyManager;
+class StateRecorderFilter;
 #ifdef JPH_DEBUG_RENDERER
 class DebugRenderer;
 #endif // JPH_DEBUG_RENDERER
 
 /// A list of constraints
-using Constraints = vector<Ref<Constraint>>;
+using Constraints = Array<Ref<Constraint>>;
 
 /// A constraint manager manages all constraints of the same type
-class ConstraintManager : public NonCopyable
+class JPH_EXPORT ConstraintManager : public NonCopyable
 {
 public:
+	JPH_OVERRIDE_NEW_DELETE
+
+#ifdef JPH_ENABLE_ASSERTS
+	/// Constructor
+							ConstraintManager(PhysicsLockContext inContext) : mLockContext(inContext) { }
+#endif // JPH_ENABLE_ASSERTS
+
 	/// Add a new constraint. This is thread safe.
-	/// Note that the inConstraints array is allowed to have nullptrs, these will be ignored.
 	void					Add(Constraint **inConstraints, int inNumber);
 
 	/// Remove a constraint. This is thread safe.
-	/// Note that the inConstraints array is allowed to have nullptrs, these will be ignored.
 	void					Remove(Constraint **inConstraint, int inNumber);
 
 	/// Get a list of all constraints
 	Constraints				GetConstraints() const;
 
 	/// Get total number of constraints
-	inline uint32			GetNumConstraints() const					{ return (uint32)mConstraints.size(); }
+	inline uint32			GetNumConstraints() const					{ return uint32(mConstraints.size()); }
 
 	/// Determine the active constraints of a subset of the constraints
 	void					GetActiveConstraints(uint32 inStartConstraintIdx, uint32 inEndConstraintIdx, Constraint **outActiveConstraints, uint32 &outNumActiveConstraints) const;
@@ -48,11 +55,9 @@ public:
 	/// Prior to solving the velocity constraints, you must call SetupVelocityConstraints once to precalculate values that are independent of velocity
 	static void				sSetupVelocityConstraints(Constraint **inActiveConstraints, uint32 inNumActiveConstraints, float inDeltaTime);
 
-	/// Same as above, but applies to a limited amount of constraints only
-	static void				sSetupVelocityConstraints(Constraint **inActiveConstraints, const uint32 *inConstraintIdxBegin, const uint32 *inConstraintIdxEnd, float inDeltaTime);
-
 	/// Apply last frame's impulses, must be called prior to SolveVelocityConstraints
-	static void				sWarmStartVelocityConstraints(Constraint **inActiveConstraints, const uint32 *inConstraintIdxBegin, const uint32 *inConstraintIdxEnd, float inWarmStartImpulseRatio);
+	template <class ConstraintCallback>
+	static void				sWarmStartVelocityConstraints(Constraint **inActiveConstraints, const uint32 *inConstraintIdxBegin, const uint32 *inConstraintIdxEnd, float inWarmStartImpulseRatio, ConstraintCallback &ioCallback);
 
 	/// This function is called multiple times to iteratively come to a solution that meets all velocity constraints
 	static bool				sSolveVelocityConstraints(Constraint **inActiveConstraints, const uint32 *inConstraintIdxBegin, const uint32 *inConstraintIdxEnd, float inDeltaTime);
@@ -72,16 +77,19 @@ public:
 #endif // JPH_DEBUG_RENDERER
 
 	/// Save state of constraints
-	void					SaveState(StateRecorder &inStream) const;
+	void					SaveState(StateRecorder &inStream, const StateRecorderFilter *inFilter) const;
 
 	/// Restore the state of constraints. Returns false if failed.
 	bool					RestoreState(StateRecorder &inStream);
 
 	/// Lock all constraints. This should only be done during PhysicsSystem::Update().
-	void					LockAllConstraints()						{ PhysicsLock::sLock(mConstraintsMutex, EPhysicsLockTypes::ConstraintsList); }
-	void					UnlockAllConstraints()						{ PhysicsLock::sUnlock(mConstraintsMutex, EPhysicsLockTypes::ConstraintsList); }
+	void					LockAllConstraints()						{ PhysicsLock::sLock(mConstraintsMutex JPH_IF_ENABLE_ASSERTS(, mLockContext, EPhysicsLockTypes::ConstraintsList)); }
+	void					UnlockAllConstraints()						{ PhysicsLock::sUnlock(mConstraintsMutex JPH_IF_ENABLE_ASSERTS(, mLockContext, EPhysicsLockTypes::ConstraintsList)); }
 
 private:
+#ifdef JPH_ENABLE_ASSERTS
+	PhysicsLockContext		mLockContext;
+#endif // JPH_ENABLE_ASSERTS
 	Constraints				mConstraints;
 	mutable Mutex			mConstraintsMutex;
 };

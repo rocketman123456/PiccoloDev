@@ -1,50 +1,85 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <Jolt/Jolt.h>
-
-#include <Jolt/Core/Memory.h>
 
 JPH_SUPPRESS_WARNINGS_STD_BEGIN
 #include <cstdlib>
 JPH_SUPPRESS_WARNINGS_STD_END
 #include <stdlib.h>
 
-#if defined(__APPLE__)
-#include <AvailabilityMacros.h>
-#endif
-
 JPH_NAMESPACE_BEGIN
 
-void *AlignedAlloc(size_t inSize, size_t inAlignment)
-{
-#if defined(JPH_PLATFORM_WINDOWS)
-	// Microsoft doesn't implement C++17 std::aligned_alloc
-	return _aligned_malloc(inSize, inAlignment);
-#elif defined(JPH_PLATFORM_ANDROID)
-	return memalign(inAlignment, AlignUp(inSize, inAlignment));
-#elif defined(__APPLE__) && (defined(MAC_OS_X_VERSION_10_16)) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_16
-    // For C++14, usr/include/malloc/_malloc.h declares aligned_alloc()) only
-    // with the MacOSX11.0 SDK in Xcode 12 (which is what adds
-    // MAC_OS_X_VERSION_10_16), even though the function is marked
-    // availabe for 10.15. That's why the preprocessor checks for 10.16 but
-    // the __builtin_available checks for 10.15.
-    // People who use C++17 could call aligned_alloc with the 10.15 SDK already.
-    return aligned_alloc(inAlignment, AlignUp(inSize, inAlignment));
+#ifdef JPH_DISABLE_CUSTOM_ALLOCATOR
+	#define JPH_ALLOC_FN(x)	x
+	#define JPH_ALLOC_SCOPE
 #else
-	return std::aligned_alloc(inAlignment, AlignUp(inSize, inAlignment));
+	#define JPH_ALLOC_FN(x)	x##Impl
+	#define JPH_ALLOC_SCOPE static
+#endif
+
+JPH_ALLOC_SCOPE void *JPH_ALLOC_FN(Allocate)(size_t inSize)
+{
+	JPH_ASSERT(inSize > 0);
+	return malloc(inSize);
+}
+
+JPH_ALLOC_SCOPE void *JPH_ALLOC_FN(Reallocate)(void *inBlock, [[maybe_unused]] size_t inOldSize, size_t inNewSize)
+{
+	JPH_ASSERT(inNewSize > 0);
+	return realloc(inBlock, inNewSize);
+}
+
+JPH_ALLOC_SCOPE void JPH_ALLOC_FN(Free)(void *inBlock)
+{
+	free(inBlock);
+}
+
+JPH_ALLOC_SCOPE void *JPH_ALLOC_FN(AlignedAllocate)(size_t inSize, size_t inAlignment)
+{
+	JPH_ASSERT(inSize > 0 && inAlignment > 0);
+
+#if defined(JPH_PLATFORM_WINDOWS)
+	// Microsoft doesn't implement posix_memalign
+	return _aligned_malloc(inSize, inAlignment);
+#else
+	void *block = nullptr;
+	JPH_SUPPRESS_WARNING_PUSH
+	JPH_GCC_SUPPRESS_WARNING("-Wunused-result")
+	JPH_CLANG_SUPPRESS_WARNING("-Wunused-result")
+	posix_memalign(&block, inAlignment, inSize);
+	JPH_SUPPRESS_WARNING_POP
+	return block;
 #endif
 }
 
-void AlignedFree(void *inBlock)
+JPH_ALLOC_SCOPE void JPH_ALLOC_FN(AlignedFree)(void *inBlock)
 {
 #if defined(JPH_PLATFORM_WINDOWS)
 	_aligned_free(inBlock);
-#elif defined(JPH_PLATFORM_ANDROID)
-	free(inBlock);
 #else
-	std::free(inBlock);
+	free(inBlock);
 #endif
 }
+
+#ifndef JPH_DISABLE_CUSTOM_ALLOCATOR
+
+AllocateFunction Allocate = nullptr;
+ReallocateFunction Reallocate = nullptr;
+FreeFunction Free = nullptr;
+AlignedAllocateFunction AlignedAllocate = nullptr;
+AlignedFreeFunction AlignedFree = nullptr;
+
+void RegisterDefaultAllocator()
+{
+	Allocate = AllocateImpl;
+	Reallocate = ReallocateImpl;
+	Free = FreeImpl;
+	AlignedAllocate = AlignedAllocateImpl;
+	AlignedFree = AlignedFreeImpl;
+}
+
+#endif // JPH_DISABLE_CUSTOM_ALLOCATOR
 
 JPH_NAMESPACE_END

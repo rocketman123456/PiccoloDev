@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -6,11 +7,16 @@
 #include <Tests/ConvexCollision/ConvexHullTest.h>
 #include <Jolt/Geometry/ConvexHullBuilder.h>
 #include <Utils/Log.h>
-#include <Renderer/DebugRendererImp.h>
+#include <Utils/AssetStream.h>
+#include <Utils/DebugRendererSP.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(ConvexHullTest) 
-{ 
-	JPH_ADD_BASE_CLASS(ConvexHullTest, Test) 
+JPH_SUPPRESS_WARNINGS_STD_BEGIN
+#include <fstream>
+JPH_SUPPRESS_WARNINGS_STD_END
+
+JPH_IMPLEMENT_RTTI_VIRTUAL(ConvexHullTest)
+{
+	JPH_ADD_BASE_CLASS(ConvexHullTest, Test)
 }
 
 void ConvexHullTest::Initialize()
@@ -164,33 +170,33 @@ void ConvexHullTest::Initialize()
 			Vec3(-0.0946691483f, 1.07357991f, -0.0185115524f)
 		},
 		{
-			Vec3(0.0283679180f, 0.0443800166f, -0.00569444988f), 
-			Vec3(0.0327114500f, -0.0221119970f, 0.0232404359f), 
-			Vec3(0.0374971032f, 0.0148781445f, -0.0245264377f), 
-			Vec3(0.0439460576f, 0.0126368264f, 0.0197663195f), 
-			Vec3(-0.0327170566f, 0.0423904508f, 0.0181609988f), 
-			Vec3(-0.0306955911f, 0.0311534479f, -0.0281516202f), 
-			Vec3(-0.0262422040f, 0.0248970203f, 0.0450032614f), 
-			Vec3(-0.0262093470f, 0.00906597450f, 0.0481815264f), 
-			Vec3(-0.0256845430f, -0.00607067533f, -0.0401362479f), 
-			Vec3(-0.0179684199f, 0.0266145933f, -0.0394567028f), 
-			Vec3(-0.00567848794f, -0.0313231349f, -0.0263656937f), 
-			Vec3(-0.00444967486f, -0.0383231938f, 0.0206601117f), 
-			Vec3(-0.00329093798f, 0.0464436933f, 0.0343827978f), 
-			Vec3(-0.00225042878f, 0.0550651476f, -0.00304153794f), 
-			Vec3(0.00310287252f, 0.00219658483f, 0.0542362332f), 
-			Vec3(0.00435558241f, 0.00644031307f, -0.0455060303f), 
-			Vec3(0.00495047215f, -0.0144955292f, 0.0482611060f), 
-			Vec3(0.00510909408f, 0.0300753452f, -0.0415933356f), 
-			Vec3(0.00619197031f, 0.0269140154f, 0.0500008501f), 
-			Vec3(0.0190936550f, -0.0106478147f, 0.0453430638f), 
-			Vec3(0.0202461667f, 0.00821140409f, 0.0500608832f), 
-			Vec3(0.0199985132f, 0.0353404805f, 0.0413853638f), 
-			Vec3(0.0267947838f, -0.0155944452f, -0.0300960485f), 
-			Vec3(0.0274163429f, 0.0318853259f, -0.0288569275f), 
-			Vec3(-0.0404368788f, -0.0213200711f, -0.00530833099f), 
-			Vec3(-0.0383560173f, -0.0111571737f, 0.0346816145f), 
-			Vec3(-0.0453024730f, 0.00178011740f, -0.0218658112f), 
+			Vec3(0.0283679180f, 0.0443800166f, -0.00569444988f),
+			Vec3(0.0327114500f, -0.0221119970f, 0.0232404359f),
+			Vec3(0.0374971032f, 0.0148781445f, -0.0245264377f),
+			Vec3(0.0439460576f, 0.0126368264f, 0.0197663195f),
+			Vec3(-0.0327170566f, 0.0423904508f, 0.0181609988f),
+			Vec3(-0.0306955911f, 0.0311534479f, -0.0281516202f),
+			Vec3(-0.0262422040f, 0.0248970203f, 0.0450032614f),
+			Vec3(-0.0262093470f, 0.00906597450f, 0.0481815264f),
+			Vec3(-0.0256845430f, -0.00607067533f, -0.0401362479f),
+			Vec3(-0.0179684199f, 0.0266145933f, -0.0394567028f),
+			Vec3(-0.00567848794f, -0.0313231349f, -0.0263656937f),
+			Vec3(-0.00444967486f, -0.0383231938f, 0.0206601117f),
+			Vec3(-0.00329093798f, 0.0464436933f, 0.0343827978f),
+			Vec3(-0.00225042878f, 0.0550651476f, -0.00304153794f),
+			Vec3(0.00310287252f, 0.00219658483f, 0.0542362332f),
+			Vec3(0.00435558241f, 0.00644031307f, -0.0455060303f),
+			Vec3(0.00495047215f, -0.0144955292f, 0.0482611060f),
+			Vec3(0.00510909408f, 0.0300753452f, -0.0415933356f),
+			Vec3(0.00619197031f, 0.0269140154f, 0.0500008501f),
+			Vec3(0.0190936550f, -0.0106478147f, 0.0453430638f),
+			Vec3(0.0202461667f, 0.00821140409f, 0.0500608832f),
+			Vec3(0.0199985132f, 0.0353404805f, 0.0413853638f),
+			Vec3(0.0267947838f, -0.0155944452f, -0.0300960485f),
+			Vec3(0.0274163429f, 0.0318853259f, -0.0288569275f),
+			Vec3(-0.0404368788f, -0.0213200711f, -0.00530833099f),
+			Vec3(-0.0383560173f, -0.0111571737f, 0.0346816145f),
+			Vec3(-0.0453024730f, 0.00178011740f, -0.0218658112f),
 			Vec3(-0.0482929349f, 0.0101582557f, 0.0191618335f)
 		},
 		{
@@ -356,6 +362,55 @@ void ConvexHullTest::Initialize()
 			Vec3(-0.30392047f, -0.17969127f, 0.22713920f),
 			Vec3(-0.30392047f, -0.17969127f, 0.22713920f),
 			Vec3(-0.30392047f, -0.17969127f, 0.22713920f)
+		},
+		{
+			// A really small hull
+			Vec3(-0.00707678869f, 0.00559568405f, -0.0239779726f),
+			Vec3(0.0136205591f, 0.00541752577f, -0.0225500446f),
+			Vec3(0.0135576781f, 0.00559568405f, -0.0224227905f),
+			Vec3(-0.0108219199f, 0.00559568405f, -0.0223935191f),
+			Vec3(0.0137226451f, 0.00559568405f, -0.0220940933f),
+			Vec3(0.00301175844f, -0.0232942104f, -0.0214947499f),
+			Vec3(0.017349612f, 0.00559568405f, 0.0241708681f),
+			Vec3(0.00390899926f, -0.0368074179f, 0.0541367307f),
+			Vec3(-0.0164459459f, 0.00559568405f, 0.0607497096f),
+			Vec3(-0.0169881769f, 0.00559568405f, 0.0608173609f),
+			Vec3(-0.0168782212f, 0.0052883029f, 0.0613293499f),
+			Vec3(-0.00663783913f, 0.00559568405f, -0.024154868f),
+			Vec3(-0.00507298298f, 0.00559568405f, -0.0242112875f),
+			Vec3(-0.00565947127f, 0.00477081537f, -0.0243848339f),
+			Vec3(0.0118075963f, 0.00124305487f, -0.0258472487f),
+			Vec3(0.00860248506f, -0.00697988272f, -0.0276725553f),
+		},
+		{
+			// Nearly co-planar hull (but not enough to go through the 2d hull builder)
+			Vec3(0.129325435f, -0.213319957f, 0.00901593268f),
+			Vec3(0.129251331f, -0.213436425f, 0.00932094082f),
+			Vec3(0.160741553f, -0.171540618f, 0.0494558439f),
+			Vec3(0.160671368f, -0.17165187f, 0.049765937f),
+			Vec3(0.14228563f, 0.432965666f, 0.282429159f),
+			Vec3(0.142746598f, 0.433226734f, 0.283286631f),
+			Vec3(0.296031296f, 0.226935148f, 0.312804461f),
+			Vec3(0.296214104f, 0.227568939f, 0.313606918f),
+			Vec3(-0.00354258716f, -0.180767179f, -0.0762089267f),
+			Vec3(-0.00372517109f, -0.1805875f, -0.0766792595f),
+			Vec3(-0.0157070309f, -0.176182508f, -0.0833940506f),
+			Vec3(-0.0161666721f, -0.175898403f, -0.0840280354f),
+			Vec3(-0.342764735f, 0.0259497911f, -0.244388372f),
+			Vec3(-0.342298329f, 0.0256615728f, -0.24456653f),
+			Vec3(-0.366584063f, 0.0554589033f, -0.250078142f),
+			Vec3(-0.366478682f, 0.0556178838f, -0.250342518f),
+		},
+		{
+			// A hull with a very acute angle that won't properly build when using distance to plane only
+			Vec3(-0.0451235026f, -0.103826642f, -0.0346511155f),
+			Vec3(-0.0194563419f, -0.123563275f, -0.032212317f),
+			Vec3(0.0323024541f, -0.0468643308f, -0.0307639092f),
+			Vec3(0.0412166864f, -0.0884782523f, -0.0288816988f),
+			Vec3(-0.0564572513f, 0.0207469314f, 0.0169318169f),
+			Vec3(0.00537410378f, 0.105688639f, 0.0355164111f),
+			Vec3(0.0209896415f, 0.117749952f, 0.0365252197f),
+			Vec3(0.0211542398f, 0.118546993f, 0.0375355929f),
 		}
 	};
 
@@ -367,7 +422,7 @@ void ConvexHullTest::Initialize()
 			for (int y = 0; y < 10; ++y)
 				for (int z = 0; z < 10; ++z)
 					p.push_back(Vec3::sReplicate(-0.5f) * 0.1f * Vec3(float(x), float(y), float(z)));
-		mPoints.push_back(move(p));
+		mPoints.push_back(std::move(p));
 	}
 
 	// Add disc of many points
@@ -376,8 +431,20 @@ void ConvexHullTest::Initialize()
 		Mat44 rot = Mat44::sRotationZ(0.25f * JPH_PI);
 		for (float r = 0.0f; r < 2.0f; r += 0.1f)
 			for (float phi = 0.0f; phi <= 2.0f * JPH_PI; phi += 2.0f * JPH_PI / 20.0f)
-				p.push_back(rot * Vec3(r * cos(phi), r * sin(phi), 0));
-		mPoints.push_back(move(p));
+				p.push_back(rot * Vec3(r * Cos(phi), r * Sin(phi), 0));
+		mPoints.push_back(std::move(p));
+	}
+
+	// Add wedge shaped disc that is just above the hull tolerance on its widest side and zero on the other side
+	{
+		Points p;
+		for (float phi = 0.0f; phi <= 2.0f * JPH_PI; phi += 2.0f * JPH_PI / 40.0f)
+		{
+			Vec3 pos(2.0f * Cos(phi), 0, 2.0f * Sin(phi));
+			p.push_back(pos);
+			p.push_back(pos + Vec3(0, 2.0e-3f * (2.0f + pos.GetX()) / 4.0f, 0));
+		}
+		mPoints.push_back(std::move(p));
 	}
 
 	// Add a sphere of many points
@@ -386,34 +453,32 @@ void ConvexHullTest::Initialize()
 		for (float theta = 0.0f; theta <= JPH_PI; theta += JPH_PI / 20.0f)
 			for (float phi = 0.0f; phi <= 2.0f * JPH_PI; phi += 2.0f * JPH_PI / 20.0f)
 				p.push_back(Vec3::sUnitSpherical(theta, phi));
-		mPoints.push_back(move(p));
+		mPoints.push_back(std::move(p));
 	}
 
 	// Open the external file with hulls
 	// A stream containing predefined convex hulls
-	ifstream points_stream("Assets/convex_hulls.bin", std::ios::binary);
-	if (points_stream.is_open())
+	AssetStream points_asset_stream("convex_hulls.bin", std::ios::in | std::ios::binary);
+	std::istream &points_stream = points_asset_stream.Get();
+	for (;;)
 	{
-		for (;;)
-		{
-			// Read the length of the next point cloud
-			uint32 len = 0;
-			points_stream.read((char *)&len, sizeof(len));
-			if (points_stream.eof())
-				break;
+		// Read the length of the next point cloud
+		uint32 len = 0;
+		points_stream.read((char *)&len, sizeof(len));
+		if (points_stream.eof())
+			break;
 
-			// Read the points
-			if (len > 0)
+		// Read the points
+		if (len > 0)
+		{
+			Points p;
+			for (uint32 i = 0; i < len; ++i)
 			{
-				Points p;
-				for (uint32 i = 0; i < len; ++i)
-				{
-					Float3 v;
-					points_stream.read((char *)&v, sizeof(v));
-					p.push_back(Vec3(v));
-				}
-				mPoints.push_back(move(p));
+				Float3 v;
+				points_stream.read((char *)&v, sizeof(v));
+				p.push_back(Vec3(v));
 			}
+			mPoints.push_back(std::move(p));
 		}
 	}
 }
@@ -497,27 +562,27 @@ void ConvexHullTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 	if (max_error > 4.0f * max(tolerance, coplanar_distance))
 	{
 		Trace("Iteration %d: max_error=%g", mIteration - 1, (double)max_error);
-		
+
 		// Draw point that had the max error
 		Vec3 point = display_scale * (points[max_error_point] - com);
-		mDebugRenderer->DrawMarker(point, Color::sRed, 1.0f);
-		mDebugRenderer->DrawText3D(point, StringFormat("%d: %g", max_error_point, (double)max_error), Color::sRed);
+		DrawMarkerSP(mDebugRenderer, point, Color::sRed, 1.0f);
+		DrawText3DSP(mDebugRenderer, point, StringFormat("%d: %g", max_error_point, (double)max_error), Color::sRed);
 
 		// Length of normal (2x area) for max error face
 		Vec3 centroid = display_scale * (max_error_face->mCentroid - com);
 		Vec3 centroid_plus_normal = centroid + max_error_face->mNormal.Normalized();
-		mDebugRenderer->DrawArrow(centroid, centroid_plus_normal, Color::sGreen, 0.1f);
-		mDebugRenderer->DrawText3D(centroid_plus_normal, ConvertToString(max_error_face->mNormal.Length()), Color::sGreen);
+		DrawArrowSP(mDebugRenderer, centroid, centroid_plus_normal, Color::sGreen, 0.1f);
+		DrawText3DSP(mDebugRenderer, centroid_plus_normal, ConvertToString(max_error_face->mNormal.Length()), Color::sGreen);
 
 		// Draw face that had the max error
 		const Edge *e = max_error_face->mFirstEdge;
 		Vec3 prev = display_scale * (points[e->mStartIdx] - com);
 		do
-		{ 
+		{
 			const Edge *next = e->mNextEdge;
 			Vec3 cur = display_scale * (points[next->mStartIdx] - com);
-			mDebugRenderer->DrawArrow(prev, cur, Color::sYellow, 0.01f);			
-			mDebugRenderer->DrawText3D(prev, ConvertToString(e->mStartIdx), Color::sYellow);
+			DrawArrowSP(mDebugRenderer, prev, cur, Color::sYellow, 0.01f);
+			DrawText3DSP(mDebugRenderer, prev, ConvertToString(e->mStartIdx), Color::sYellow);
 			e = next;
 			prev = cur;
 		} while (e != max_error_face->mFirstEdge);
@@ -527,7 +592,7 @@ void ConvexHullTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 
 	// Draw input points around center of mass
 	for (Vec3 v : points)
-		mDebugRenderer->DrawMarker(display_scale * (v - com), Color::sWhite, 0.01f);
+		DrawMarkerSP(mDebugRenderer, display_scale * (v - com), Color::sWhite, 0.01f);
 
 	// Draw the hull around center of mass
 	int color_idx = 0;
@@ -544,7 +609,7 @@ void ConvexHullTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 		Vec3 p2 = display_scale * (points[e->mStartIdx] - com);
 
 		// First line
-		mDebugRenderer->DrawLine(p1, p2, Color::sGrey);
+		DrawLineSP(mDebugRenderer, p1, p2, Color::sGrey);
 
 		do
 		{
@@ -552,9 +617,9 @@ void ConvexHullTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 			e = e->mNextEdge;
 			Vec3 p3 = display_scale * (points[e->mStartIdx] - com);
 
-			mDebugRenderer->DrawTriangle(p1, p2, p3, color);
+			DrawTriangleSP(mDebugRenderer, p1, p2, p3, color);
 
-			mDebugRenderer->DrawLine(p2, p3, Color::sGrey);
+			DrawLineSP(mDebugRenderer, p2, p3, Color::sGrey);
 
 			p2 = p3;
 		}

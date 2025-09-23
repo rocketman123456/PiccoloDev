@@ -1,9 +1,8 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #pragma once
-
-#include <Jolt/Core/Memory.h>
 
 JPH_NAMESPACE_BEGIN
 
@@ -26,6 +25,12 @@ public:
 	using size_type = size_t;
 	using difference_type = ptrdiff_t;
 
+	/// The allocator is stateless
+	using is_always_equal = std::true_type;
+
+	/// Allocator supports moving
+	using propagate_on_container_move_assignment = std::true_type;
+
 	/// Constructor
 	inline					STLAlignedAllocator() = default;
 
@@ -36,7 +41,7 @@ public:
 	/// Allocate memory
 	inline pointer			allocate(size_type inN)
 	{
-		return (pointer)AlignedAlloc(inN * sizeof(value_type), N);
+		return (pointer)AlignedAllocate(inN * sizeof(value_type), N);
 	}
 
 	/// Free memory

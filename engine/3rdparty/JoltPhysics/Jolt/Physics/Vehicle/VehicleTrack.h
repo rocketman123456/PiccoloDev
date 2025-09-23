@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -20,11 +21,11 @@ enum class ETrackSide : uint
 };
 
 /// Generic properties for tank tracks
-class VehicleTrackSettings
+class JPH_EXPORT VehicleTrackSettings
 {
-public:
-	JPH_DECLARE_SERIALIZABLE_NON_VIRTUAL(VehicleTrackSettings)
+	JPH_DECLARE_SERIALIZABLE_NON_VIRTUAL(JPH_EXPORT, VehicleTrackSettings)
 
+public:
 	/// Saves the contents in binary form to inStream.
 	void					SaveBinaryState(StreamOut &inStream) const;
 
@@ -32,7 +33,7 @@ public:
 	void					RestoreBinaryState(StreamIn &inStream);
 
 	uint					mDrivenWheel;								///< Which wheel on the track is connected to the engine
-	vector<uint>			mWheels;									///< Indices of wheels that are inside this track, should include the driven wheel too
+	Array<uint>				mWheels;									///< Indices of wheels that are inside this track, should include the driven wheel too
 	float					mInertia = 10.0f;							///< Moment of inertia (kg m^2) of the track and its wheels as seen on the driven wheel
 	float					mAngularDamping = 0.5f;						///< Damping factor of track and its wheels: dw/dt = -c * w as seen on the driven wheel
 	float					mMaxBrakeTorque = 15000.0f;					///< How much torque (Nm) the brakes can apply on the driven wheel
@@ -40,7 +41,7 @@ public:
 };
 
 /// Runtime data for tank tracks
-class VehicleTrack : public VehicleTrackSettings
+class JPH_EXPORT VehicleTrack : public VehicleTrackSettings
 {
 public:
 	/// Saving state for replay

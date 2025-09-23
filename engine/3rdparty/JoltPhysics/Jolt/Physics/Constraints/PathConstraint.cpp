@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -29,7 +30,7 @@ JPH_IMPLEMENT_SERIALIZABLE_VIRTUAL(PathConstraintSettings)
 }
 
 void PathConstraintSettings::SaveBinaryState(StreamOut &inStream) const
-{ 
+{
 	ConstraintSettings::SaveBinaryState(inStream);
 
 	mPath->SaveBinaryState(inStream);
@@ -73,6 +74,14 @@ PathConstraint::PathConstraint(Body &inBody1, Body &inBody2, const PathConstrain
 	SetPath(inSettings.mPath, inSettings.mPathFraction);
 }
 
+void PathConstraint::NotifyShapeChanged(const BodyID &inBodyID, Vec3Arg inDeltaCOM)
+{
+	if (mBody1->GetID() == inBodyID)
+		mPathToBody1.SetTranslation(mPathToBody1.GetTranslation() - inDeltaCOM);
+	else if (mBody2->GetID() == inBodyID)
+		mPathToBody2.SetTranslation(mPathToBody2.GetTranslation() - inDeltaCOM);
+}
+
 void PathConstraint::SetPath(const PathConstraintPath *inPath, float inPathFraction)
 {
 	mPath = inPath;
@@ -86,9 +95,8 @@ void PathConstraint::SetPath(const PathConstraintPath *inPath, float inPathFract
 
 		// Construct the matrix that takes us from the closest point on the path to body 2 center of mass space
 		Mat44 closest_point_to_path(Vec4(path_tangent, 0), Vec4(path_binormal, 0), Vec4(path_normal, 0), Vec4(path_point, 1));
-		Mat44 inv_transform2 = mBody2->GetInverseCenterOfMassTransform();
-		Mat44 path_to_world = mBody1->GetCenterOfMassTransform() * mPathToBody1;
-		mPathToBody2 = inv_transform2 * path_to_world * closest_point_to_path;
+		Mat44 cp_to_body1 = mPathToBody1 * closest_point_to_path;
+		mPathToBody2 = (mBody2->GetInverseCenterOfMassTransform() * mBody1->GetCenterOfMassTransform()).ToMat44() * cp_to_body1;
 
 		// Calculate initial orientation
 		if (mRotationConstraintType == EPathRotationConstraintType::FullyConstrained)
@@ -99,31 +107,31 @@ void PathConstraint::SetPath(const PathConstraintPath *inPath, float inPathFract
 void PathConstraint::CalculateConstraintProperties(float inDeltaTime)
 {
 	// Get transforms of body 1 and 2
-	Mat44 transform1 = mBody1->GetCenterOfMassTransform();
-	Mat44 transform2 = mBody2->GetCenterOfMassTransform();
+	RMat44 transform1 = mBody1->GetCenterOfMassTransform();
+	RMat44 transform2 = mBody2->GetCenterOfMassTransform();
 
 	// Get the transform of the path transform as seen from body 1 in world space
-	Mat44 path_to_world_1 = transform1 * mPathToBody1;
+	RMat44 path_to_world_1 = transform1 * mPathToBody1;
 
 	// Get the transform of from the point on path that body 2 is attached to in world space
-	Mat44 path_to_world_2 = transform2 * mPathToBody2;
+	RMat44 path_to_world_2 = transform2 * mPathToBody2;
 
 	// Calculate new closest point on path
-	Vec3 position2 = path_to_world_2.GetTranslation();
-	Vec3 position2_local_to_path = path_to_world_1.InversedRotationTranslation() * position2;
-	mPathFraction = mPath->GetClosestPoint(position2_local_to_path);
+	RVec3 position2 = path_to_world_2.GetTranslation();
+	Vec3 position2_local_to_path = Vec3(path_to_world_1.InversedRotationTranslation() * position2);
+	mPathFraction = mPath->GetClosestPoint(position2_local_to_path, mPathFraction);
 
 	// Get the point on the path for this fraction
 	Vec3 path_point, path_tangent, path_normal, path_binormal;
 	mPath->GetPointOnPath(mPathFraction, path_point, path_tangent, path_normal, path_binormal);
 
 	// Calculate R1 and R2
-	path_point = path_to_world_1 * path_point;
-	mR1 = path_point - mBody1->GetCenterOfMassPosition();
-	mR2 = position2 - mBody2->GetCenterOfMassPosition();
-	
+	RVec3 path_point_ws = path_to_world_1 * path_point;
+	mR1 = Vec3(path_point_ws - mBody1->GetCenterOfMassPosition());
+	mR2 = Vec3(position2 - mBody2->GetCenterOfMassPosition());
+
 	// Calculate U = X2 + R2 - X1 - R1
-	mU = position2 - path_point;
+	mU = Vec3(position2 - path_point_ws);
 
 	// Calculate world space normals
 	mPathNormal = path_to_world_1.Multiply3x3(path_normal);
@@ -137,7 +145,7 @@ void PathConstraint::CalculateConstraintProperties(float inDeltaTime)
 
 	// Check if closest point is on the boundary of the path and if so apply limit
 	if (!mPath->IsLooping() && (mPathFraction <= 0.0f || mPathFraction >= mPath->GetPathMaxFraction()))
-		mPositionLimitsConstraintPart.CalculateConstraintProperties(inDeltaTime, *mBody1, mR1 + mU, *mBody2, mR2, mPathTangent);
+		mPositionLimitsConstraintPart.CalculateConstraintProperties(*mBody1, mR1 + mU, *mBody2, mR2, mPathTangent);
 	else
 		mPositionLimitsConstraintPart.Deactivate();
 
@@ -160,7 +168,7 @@ void PathConstraint::CalculateConstraintProperties(float inDeltaTime)
 		mHingeConstraintPart.CalculateConstraintProperties(*mBody1, transform1.GetRotation(), mPathBinormal, *mBody2, transform2.GetRotation(), path_to_world_2.GetAxisY());
 		break;
 
-	case EPathRotationConstraintType::ConstaintToPath:
+	case EPathRotationConstraintType::ConstrainToPath:
 		// We need to calculate the inverse of the rotation from body 1 to body 2 for the current path position (see: RotationEulerConstraintPart::sGetInvInitialOrientation)
 		// RotationBody2 = RotationBody1 * InitialOrientation <=> InitialOrientation^-1 = RotationBody2^-1 * RotationBody1
 		// We can express RotationBody2 in terms of RotationBody1: RotationBody2 = RotationBody1 * PathToBody1 * RotationClosestPointOnPath * PathToBody2^-1
@@ -178,16 +186,17 @@ void PathConstraint::CalculateConstraintProperties(float inDeltaTime)
 	{
 	case EMotorState::Off:
 		if (mMaxFrictionForce > 0.0f)
-			mPositionMotorConstraintPart.CalculateConstraintProperties(inDeltaTime, *mBody1, mR1 + mU, *mBody2, mR2, mPathTangent);
+			mPositionMotorConstraintPart.CalculateConstraintProperties(*mBody1, mR1 + mU, *mBody2, mR2, mPathTangent);
 		else
 			mPositionMotorConstraintPart.Deactivate();
 		break;
 
 	case EMotorState::Velocity:
-		mPositionMotorConstraintPart.CalculateConstraintProperties(inDeltaTime, *mBody1, mR1 + mU, *mBody2, mR2, mPathTangent, -mTargetVelocity);
+		mPositionMotorConstraintPart.CalculateConstraintProperties(*mBody1, mR1 + mU, *mBody2, mR2, mPathTangent, -mTargetVelocity);
 		break;
 
 	case EMotorState::Position:
+		if (mPositionMotorSettings.mSpringSettings.HasStiffness())
 		{
 			// Calculate constraint value to drive to
 			float c;
@@ -203,15 +212,26 @@ void PathConstraint::CalculateConstraintProperties(float inDeltaTime)
 			}
 			else
 				c = mPathFraction - mTargetPathFraction;
-			mPositionMotorConstraintPart.CalculateConstraintProperties(inDeltaTime, *mBody1, mR1 + mU, *mBody2, mR2, mPathTangent, 0.0f, c, mPositionMotorSettings.mFrequency, mPositionMotorSettings.mDamping);
-			break;
+			mPositionMotorConstraintPart.CalculateConstraintPropertiesWithSettings(inDeltaTime, *mBody1, mR1 + mU, *mBody2, mR2, mPathTangent, 0.0f, c, mPositionMotorSettings.mSpringSettings);
 		}
-	}	
+		else
+			mPositionMotorConstraintPart.Deactivate();
+		break;
+	}
 }
 
 void PathConstraint::SetupVelocityConstraint(float inDeltaTime)
 {
 	CalculateConstraintProperties(inDeltaTime);
+}
+
+void PathConstraint::ResetWarmStart()
+{
+	mPositionMotorConstraintPart.Deactivate();
+	mPositionConstraintPart.Deactivate();
+	mPositionLimitsConstraintPart.Deactivate();
+	mHingeConstraintPart.Deactivate();
+	mRotationConstraintPart.Deactivate();
 }
 
 void PathConstraint::WarmStartVelocityConstraint(float inWarmStartImpulseRatio)
@@ -233,7 +253,7 @@ void PathConstraint::WarmStartVelocityConstraint(float inWarmStartImpulseRatio)
 		mHingeConstraintPart.WarmStart(*mBody1, *mBody2, inWarmStartImpulseRatio);
 		break;
 
-	case EPathRotationConstraintType::ConstaintToPath:
+	case EPathRotationConstraintType::ConstrainToPath:
 	case EPathRotationConstraintType::FullyConstrained:
 		mRotationConstraintPart.WarmStart(*mBody1, *mBody2, inWarmStartImpulseRatio);
 		break;
@@ -253,7 +273,7 @@ bool PathConstraint::SolveVelocityConstraint(float inDeltaTime)
 				float max_lambda = mMaxFrictionForce * inDeltaTime;
 				motor = mPositionMotorConstraintPart.SolveVelocityConstraint(*mBody1, *mBody2, mPathTangent, -max_lambda, max_lambda);
 				break;
-			}	
+			}
 
 		case EMotorState::Velocity:
 		case EMotorState::Position:
@@ -295,7 +315,7 @@ bool PathConstraint::SolveVelocityConstraint(float inDeltaTime)
 		rot = mHingeConstraintPart.SolveVelocityConstraint(*mBody1, *mBody2);
 		break;
 
-	case EPathRotationConstraintType::ConstaintToPath:
+	case EPathRotationConstraintType::ConstrainToPath:
 	case EPathRotationConstraintType::FullyConstrained:
 		rot = mRotationConstraintPart.SolveVelocityConstraint(*mBody1, *mBody2);
 		break;
@@ -339,7 +359,7 @@ bool PathConstraint::SolvePositionConstraint(float inDeltaTime, float inBaumgart
 		rot = mHingeConstraintPart.SolvePositionConstraint(*mBody1, *mBody2, inBaumgarte);
 		break;
 
-	case EPathRotationConstraintType::ConstaintToPath:
+	case EPathRotationConstraintType::ConstrainToPath:
 	case EPathRotationConstraintType::FullyConstrained:
 		rot = mRotationConstraintPart.SolvePositionConstraint(*mBody1, *mBody2, mInvInitialOrientation, inBaumgarte);
 		break;
@@ -351,41 +371,44 @@ bool PathConstraint::SolvePositionConstraint(float inDeltaTime, float inBaumgart
 #ifdef JPH_DEBUG_RENDERER
 void PathConstraint::DrawConstraint(DebugRenderer *inRenderer) const
 {
-	// Draw the path in world space
-	Mat44 path_to_world = mBody1->GetCenterOfMassTransform() * mPathToBody1;
-	mPath->DrawPath(inRenderer, path_to_world);
-
-	// Draw anchor point of both bodies in world space
-	Vec3 x1 = mBody1->GetCenterOfMassPosition() + mR1;
-	Vec3 x2 = mBody2->GetCenterOfMassPosition() + mR2;
-	inRenderer->DrawMarker(x1, Color::sYellow, 0.1f);
-	inRenderer->DrawMarker(x2, Color::sYellow, 0.1f);
-	inRenderer->DrawArrow(x1, x1 + mPathTangent, Color::sBlue, 0.1f);
-	inRenderer->DrawArrow(x1, x1 + mPathNormal, Color::sRed, 0.1f);
-	inRenderer->DrawArrow(x1, x1 + mPathBinormal, Color::sGreen, 0.1f);
-	inRenderer->DrawText3D(x1, StringFormat("%.1f", (double)mPathFraction));
-
-	// Draw motor
-	switch (mPositionMotorState)
+	if (mPath != nullptr)
 	{
-	case EMotorState::Position:
+		// Draw the path in world space
+		RMat44 path_to_world = mBody1->GetCenterOfMassTransform() * mPathToBody1;
+		mPath->DrawPath(inRenderer, path_to_world);
+
+		// Draw anchor point of both bodies in world space
+		RVec3 x1 = mBody1->GetCenterOfMassPosition() + mR1;
+		RVec3 x2 = mBody2->GetCenterOfMassPosition() + mR2;
+		inRenderer->DrawMarker(x1, Color::sYellow, 0.1f);
+		inRenderer->DrawMarker(x2, Color::sYellow, 0.1f);
+		inRenderer->DrawArrow(x1, x1 + mPathTangent, Color::sBlue, 0.1f);
+		inRenderer->DrawArrow(x1, x1 + mPathNormal, Color::sRed, 0.1f);
+		inRenderer->DrawArrow(x1, x1 + mPathBinormal, Color::sGreen, 0.1f);
+		inRenderer->DrawText3D(x1, StringFormat("%.1f", (double)mPathFraction));
+
+		// Draw motor
+		switch (mPositionMotorState)
 		{
-			// Draw target marker
-			Vec3 position, tangent, normal, binormal;
-			mPath->GetPointOnPath(mTargetPathFraction, position, tangent, normal, binormal);			
-			inRenderer->DrawMarker(path_to_world * position, Color::sYellow, 1.0f);
+		case EMotorState::Position:
+			{
+				// Draw target marker
+				Vec3 position, tangent, normal, binormal;
+				mPath->GetPointOnPath(mTargetPathFraction, position, tangent, normal, binormal);
+				inRenderer->DrawMarker(path_to_world * position, Color::sYellow, 1.0f);
+				break;
+			}
+
+		case EMotorState::Velocity:
+			{
+				RVec3 position = mBody2->GetCenterOfMassPosition() + mR2;
+				inRenderer->DrawArrow(position, position + mPathTangent * mTargetVelocity, Color::sRed, 0.1f);
+				break;
+			}
+
+		case EMotorState::Off:
 			break;
 		}
-
-	case EMotorState::Velocity:
-		{
-			Vec3 position = mBody2->GetCenterOfMassPosition() + mR2;
-			inRenderer->DrawArrow(position, position + mPathTangent * mTargetVelocity, Color::sRed, 0.1f);
-			break;
-		}
-
-	case EMotorState::Off:
-		break;
 	}
 }
 #endif // JPH_DEBUG_RENDERER

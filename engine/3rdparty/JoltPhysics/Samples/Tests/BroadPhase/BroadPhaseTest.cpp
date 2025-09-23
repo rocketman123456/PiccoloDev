@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -10,9 +11,9 @@
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h>
 #include <random>
 
-JPH_IMPLEMENT_RTTI_ABSTRACT(BroadPhaseTest) 
-{ 
-	JPH_ADD_BASE_CLASS(BroadPhaseTest, Test) 
+JPH_IMPLEMENT_RTTI_ABSTRACT(BroadPhaseTest)
+{
+	JPH_ADD_BASE_CLASS(BroadPhaseTest, Test)
 }
 
 #define NUM_BODIES		10000
@@ -42,10 +43,11 @@ void BroadPhaseTest::CreateBalancedDistribution(BodyManager *inBodyManager, int 
 
 		BodyCreationSettings s;
 		s.SetShape(new BoxShape(box.GetExtent(), 0.0f));
-		s.mPosition = box.GetCenter();
+		s.mPosition = RVec3(box.GetCenter());
 		s.mRotation = Quat::sIdentity();
 		s.mObjectLayer = (random() % 10) == 0? Layers::MOVING : Layers::NON_MOVING;
-		inBodyManager->CreateBody(s);
+		Body *body = inBodyManager->AllocateBody(s);
+		inBodyManager->AddBody(body);
 	}
 }
 
@@ -54,8 +56,8 @@ void BroadPhaseTest::Initialize()
 	// Create body manager
 	mBodyManager = new BodyManager();
 	mBodyManager->Init(NUM_BODIES, 0, mBroadPhaseLayerInterface);
-		
-	// Crate broadphase
+
+	// Create broadphase
 	mBroadPhase = new BROAD_PHASE;
 	mBroadPhase->Init(mBodyManager, mBroadPhaseLayerInterface);
 }

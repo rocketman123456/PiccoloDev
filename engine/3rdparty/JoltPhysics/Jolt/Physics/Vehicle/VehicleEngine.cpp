@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -43,32 +44,34 @@ void VehicleEngineSettings::RestoreBinaryState(StreamIn &inStream)
 	mNormalizedTorque.RestoreBinaryState(inStream);
 }
 
-void VehicleEngine::UpdateRPM(float inDeltaTime, float inAcceleration)
+void VehicleEngine::ApplyTorque(float inTorque, float inDeltaTime)
+{
+	// Accelerate engine using torque
+	mCurrentRPM += cAngularVelocityToRPM * inTorque * inDeltaTime / mInertia;
+	ClampRPM();
+}
+
+void VehicleEngine::ApplyDamping(float inDeltaTime)
 {
 	// Angular damping: dw/dt = -c * w
 	// Solution: w(t) = w(0) * e^(-c * t) or w2 = w1 * e^(-c * dt)
 	// Taylor expansion of e^(-c * dt) = 1 - c * dt + ...
 	// Since dt is usually in the order of 1/60 and c is a low number too this approximation is good enough
 	mCurrentRPM *= max(0.0f, 1.0f - mAngularDamping * inDeltaTime);
-
-	// Accelerate engine using torque
-	mCurrentRPM += cAngularVelocityToRPM * GetTorque(inAcceleration) * inDeltaTime / mInertia;
-
-	// Clamp RPM
-	mCurrentRPM = Clamp(mCurrentRPM, mMinRPM, mMaxRPM);
+	ClampRPM();
 }
 
 #ifdef JPH_DEBUG_RENDERER
 
-void VehicleEngine::DrawRPM(DebugRenderer *inRenderer, Vec3Arg inPosition, Vec3Arg inForward, Vec3Arg inUp, float inSize, float inShiftDownRPM, float inShiftUpRPM) const
+void VehicleEngine::DrawRPM(DebugRenderer *inRenderer, RVec3Arg inPosition, Vec3Arg inForward, Vec3Arg inUp, float inSize, float inShiftDownRPM, float inShiftUpRPM) const
 {
-	// Function that converts RPM to an angle in radians
-	auto rpm_to_angle = [this](float inRPM) { return (-0.75f + 1.5f * (inRPM - mMinRPM) / (mMaxRPM - mMinRPM)) * JPH_PI; };
-
 	// Function to draw part of a pie
-	auto draw_pie = [rpm_to_angle, inRenderer, inSize, inPosition, inForward, inUp](float inMinRPM, float inMaxRPM, Color inColor) { 
-		inRenderer->DrawPie(inPosition, inSize, inForward, inUp, rpm_to_angle(inMinRPM), rpm_to_angle(inMaxRPM), inColor, DebugRenderer::ECastShadow::Off);
+	auto draw_pie = [this, inRenderer, inSize, inPosition, inForward, inUp](float inMinRPM, float inMaxRPM, Color inColor) {
+		inRenderer->DrawPie(inPosition, inSize, inForward, inUp, ConvertRPMToAngle(inMinRPM), ConvertRPMToAngle(inMaxRPM), inColor, DebugRenderer::ECastShadow::Off);
 	};
+
+	// Draw segment under min RPM
+	draw_pie(0, mMinRPM, Color::sGrey);
 
 	// Draw segment until inShiftDownRPM
 	if (mCurrentRPM < inShiftDownRPM)

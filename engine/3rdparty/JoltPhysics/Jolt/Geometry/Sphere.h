@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -10,6 +11,8 @@ JPH_NAMESPACE_BEGIN
 class [[nodiscard]] Sphere
 {
 public:
+	JPH_OVERRIDE_NEW_DELETE
+
 	/// Constructor
 	inline				Sphere() = default;
 	inline				Sphere(const Float3 &inCenter, float inRadius)			: mCenter(inCenter), mRadius(inRadius) { }
@@ -23,13 +26,13 @@ public:
 	}
 
 	// Properties
-	inline Vec3 		GetCenter() const										{ return Vec3::sLoadFloat3Unsafe(mCenter); }
+	inline Vec3			GetCenter() const										{ return Vec3::sLoadFloat3Unsafe(mCenter); }
 	inline float		GetRadius() const										{ return mRadius; }
 
 	/// Test if two spheres overlap
-	inline bool			Overlaps(const Sphere &inB) const						
-	{ 
-		return (Vec3::sLoadFloat3Unsafe(mCenter) - Vec3::sLoadFloat3Unsafe(inB.mCenter)).LengthSq() <= Square(mRadius + inB.mRadius); 
+	inline bool			Overlaps(const Sphere &inB) const
+	{
+		return (Vec3::sLoadFloat3Unsafe(mCenter) - Vec3::sLoadFloat3Unsafe(inB.mCenter)).LengthSq() <= Square(mRadius + inB.mRadius);
 	}
 
 	/// Check if this sphere overlaps with a box

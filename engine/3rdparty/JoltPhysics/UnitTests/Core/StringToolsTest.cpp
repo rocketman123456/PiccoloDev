@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -18,14 +19,9 @@ TEST_SUITE("StringToolsTest")
 		CHECK(ConvertToString(0x7fffffffffffffffUL) == "9223372036854775807");
 	}
 
-	TEST_CASE("TestStringHash")
-	{
-		CHECK(HashString("This is a test") == 2733878766136413408UL);
-	}
-
 	TEST_CASE("StringReplace")
 	{
-		string value = "Hello this si si a test";
+		JPH::String value = "Hello this si si a test";
 		StringReplace(value, "si", "is");
 		CHECK(value == "Hello this is is a test");
 		StringReplace(value, "is is", "is");
@@ -38,7 +34,7 @@ TEST_SUITE("StringToolsTest")
 
 	TEST_CASE("StringToVector")
 	{
-		vector<string> value;
+		Array<JPH::String> value;
 		StringToVector("", value);
 		CHECK(value.empty());
 
@@ -55,8 +51,8 @@ TEST_SUITE("StringToolsTest")
 
 	TEST_CASE("VectorToString")
 	{
-		vector<string> input;
-		string value;
+		Array<JPH::String> input;
+		JPH::String value;
 		VectorToString(input, value);
 		CHECK(value.empty());
 

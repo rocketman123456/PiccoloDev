@@ -1,18 +1,22 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <TestFramework.h>
-#include <fstream>
 #include <Utils/ReadData.h>
 #include <Utils/Log.h>
+#include <Utils/AssetStream.h>
+
+JPH_SUPPRESS_WARNINGS_STD_BEGIN
+#include <fstream>
+JPH_SUPPRESS_WARNINGS_STD_END
 
 // Read file contents
-vector<uint8> ReadData(const char *inFileName)
+Array<uint8> ReadData(const char *inFileName)
 {
-	vector<uint8> data;
-	ifstream input(inFileName, std::ios::binary);
-	if (!input)
-		FatalError("Unable to open file: %s", inFileName);
+	Array<uint8> data;
+	AssetStream asset_stream(inFileName, std::ios::in | std::ios::binary);
+	std::istream &input = asset_stream.Get();
 	input.seekg(0, ios_base::end);
 	ifstream::pos_type length = input.tellg();
 	input.seekg(0, ios_base::beg);

@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -12,13 +13,13 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	static const float cBoxExtent = 0.5f;
 	static const float cFrequency = 60.0f;
 	static const Vec3 cVelocity(2.0f * cFrequency, 0, 0); // High enough velocity to step 2 meters in a single simulation step
-	static const Vec3 cPos1(-1, 0, 0);
-	static const Vec3 cPos2(1, 0, 0);
+	static const RVec3 cPos1(-1, 0, 0);
+	static const RVec3 cPos2(1, 0, 0);
 
 	// Two boxes colliding in the center, each has enough velocity to tunnel though in 1 step
 	TEST_CASE("TestDiscreteBoxVsDiscreteBox")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		// Register listener
@@ -36,7 +37,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 
 		c.SimulateSingleStep();
 
-		// No collisions should be reported and the bodies should have moved according to their velocity (tunneling through eachother)
+		// No collisions should be reported and the bodies should have moved according to their velocity (tunneling through each other)
 		CHECK(listener.GetEntryCount() == 0);
 		CHECK_APPROX_EQUAL(box1.GetPosition(), cPos1 + cVelocity / cFrequency);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), cVelocity);
@@ -49,7 +50,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	// Two boxes colliding in the center, each has enough velocity to step over the other in 1 step, restitution = 1
 	TEST_CASE("TestLinearCastBoxVsLinearCastBoxElastic")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		const float cPenetrationSlop = c.GetSystem()->GetPhysicsSettings().mPenetrationSlop;
@@ -72,10 +73,10 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		CHECK(listener.GetEntryCount() == 2);
 		CHECK(listener.Contains(LoggingContactListener::EType::Validate, box1.GetID(), box2.GetID()));
 		CHECK(listener.Contains(LoggingContactListener::EType::Add, box1.GetID(), box2.GetID()));
-		CHECK_APPROX_EQUAL(box1.GetPosition(), Vec3(-cBoxExtent, 0, 0), cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box1.GetPosition(), RVec3(-cBoxExtent, 0, 0), cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), -cVelocity);
 		CHECK_APPROX_EQUAL(box1.GetAngularVelocity(), Vec3::sZero());
-		CHECK_APPROX_EQUAL(box2.GetPosition(), Vec3(cBoxExtent, 0, 0), cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box2.GetPosition(), RVec3(cBoxExtent, 0, 0), cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box2.GetLinearVelocity(), cVelocity);
 		CHECK_APPROX_EQUAL(box2.GetAngularVelocity(), Vec3::sZero());
 
@@ -86,10 +87,10 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		CHECK(listener.GetEntryCount() == 2);
 		CHECK(listener.Contains(LoggingContactListener::EType::Validate, box1.GetID(), box2.GetID()));
 		CHECK(listener.Contains(LoggingContactListener::EType::Persist, box1.GetID(), box2.GetID()));
-		CHECK_APPROX_EQUAL(box1.GetPosition(), Vec3(-cBoxExtent, 0, 0) - cVelocity / cFrequency, cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box1.GetPosition(), RVec3(-cBoxExtent, 0, 0) - cVelocity / cFrequency, cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), -cVelocity);
 		CHECK_APPROX_EQUAL(box1.GetAngularVelocity(), Vec3::sZero());
-		CHECK_APPROX_EQUAL(box2.GetPosition(), Vec3(cBoxExtent, 0, 0) + cVelocity / cFrequency, cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box2.GetPosition(), RVec3(cBoxExtent, 0, 0) + cVelocity / cFrequency, cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box2.GetLinearVelocity(), cVelocity);
 		CHECK_APPROX_EQUAL(box2.GetAngularVelocity(), Vec3::sZero());
 
@@ -99,10 +100,10 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		// In the third step the bodies have separated and a contact remove callback should have been received
 		CHECK(listener.GetEntryCount() == 1);
 		CHECK(listener.Contains(LoggingContactListener::EType::Remove, box1.GetID(), box2.GetID()));
-		CHECK_APPROX_EQUAL(box1.GetPosition(), Vec3(-cBoxExtent, 0, 0) - 2.0f * cVelocity / cFrequency, cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box1.GetPosition(), RVec3(-cBoxExtent, 0, 0) - 2.0f * cVelocity / cFrequency, cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), -cVelocity);
 		CHECK_APPROX_EQUAL(box1.GetAngularVelocity(), Vec3::sZero());
-		CHECK_APPROX_EQUAL(box2.GetPosition(), Vec3(cBoxExtent, 0, 0) + 2.0f * cVelocity / cFrequency, cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box2.GetPosition(), RVec3(cBoxExtent, 0, 0) + 2.0f * cVelocity / cFrequency, cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box2.GetLinearVelocity(), cVelocity);
 		CHECK_APPROX_EQUAL(box2.GetAngularVelocity(), Vec3::sZero());
 	}
@@ -110,7 +111,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	// Two boxes colliding in the center, each has enough velocity to step over the other in 1 step, restitution = 0
 	TEST_CASE("TestLinearCastBoxVsLinearCastBoxInelastic")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		const float cPenetrationSlop = c.GetSystem()->GetPhysicsSettings().mPenetrationSlop;
@@ -131,10 +132,10 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		CHECK(listener.GetEntryCount() == 2);
 		CHECK(listener.Contains(LoggingContactListener::EType::Validate, box1.GetID(), box2.GetID()));
 		CHECK(listener.Contains(LoggingContactListener::EType::Add, box1.GetID(), box2.GetID()));
-		CHECK_APPROX_EQUAL(box1.GetPosition(), Vec3(-cBoxExtent, 0, 0), cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box1.GetPosition(), RVec3(-cBoxExtent, 0, 0), cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), Vec3::sZero());
 		CHECK_APPROX_EQUAL(box1.GetAngularVelocity(), Vec3::sZero());
-		CHECK_APPROX_EQUAL(box2.GetPosition(), Vec3(cBoxExtent, 0, 0), cPenetrationSlop);
+		CHECK_APPROX_EQUAL(box2.GetPosition(), RVec3(cBoxExtent, 0, 0), cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box2.GetLinearVelocity(), Vec3::sZero());
 		CHECK_APPROX_EQUAL(box2.GetAngularVelocity(), Vec3::sZero());
 
@@ -148,15 +149,15 @@ TEST_SUITE("MotionQualityLinearCastTests")
 			{
 				// Only in the first step we will receive a validate callback since after this step the contact cache will be used
 				CHECK(listener.GetEntryCount() == 2);
-				CHECK(listener.Contains(LoggingContactListener::EType::Validate, box1.GetID(), box2.GetID())); 
+				CHECK(listener.Contains(LoggingContactListener::EType::Validate, box1.GetID(), box2.GetID()));
 			}
 			else
 				CHECK(listener.GetEntryCount() == 1);
 			CHECK(listener.Contains(LoggingContactListener::EType::Persist, box1.GetID(), box2.GetID()));
-			CHECK_APPROX_EQUAL(box1.GetPosition(), Vec3(-cBoxExtent, 0, 0), cPenetrationSlop);
+			CHECK_APPROX_EQUAL(box1.GetPosition(), RVec3(-cBoxExtent, 0, 0), cPenetrationSlop);
 			CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), Vec3::sZero());
 			CHECK_APPROX_EQUAL(box1.GetAngularVelocity(), Vec3::sZero());
-			CHECK_APPROX_EQUAL(box2.GetPosition(), Vec3(cBoxExtent, 0, 0), cPenetrationSlop);
+			CHECK_APPROX_EQUAL(box2.GetPosition(), RVec3(cBoxExtent, 0, 0), cPenetrationSlop);
 			CHECK_APPROX_EQUAL(box2.GetLinearVelocity(), Vec3::sZero());
 			CHECK_APPROX_EQUAL(box2.GetAngularVelocity(), Vec3::sZero());
 		}
@@ -165,7 +166,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	// Two boxes colliding in the center, linear cast vs inactive linear cast
 	TEST_CASE("TestLinearCastBoxVsInactiveLinearCastBox")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		const float cPenetrationSlop = c.GetSystem()->GetPhysicsSettings().mPenetrationSlop;
@@ -216,7 +217,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	// Two boxes colliding in the center, linear cast vs inactive discrete
 	TEST_CASE("TestLinearCastBoxVsInactiveDiscreteBox")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		const float cPenetrationSlop = c.GetSystem()->GetPhysicsSettings().mPenetrationSlop;
@@ -270,7 +271,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		const Vec3 cAngledOffset1(1, 0, -2);
 		const Vec3 cAngledVelocity = -cFrequency * 2 * cAngledOffset1;
 
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		const float cPenetrationSlop = c.GetSystem()->GetPhysicsSettings().mPenetrationSlop;
@@ -282,13 +283,13 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		c.GetSystem()->SetBodyActivationListener(&activation);
 
 		// Make sure box1 exactly hits the face of box2 in the center
-		Vec3 pos1 = Vec3(2.0f * cBoxExtent, 0, 0) + cAngledOffset1;
+		RVec3 pos1 = RVec3(2.0f * cBoxExtent, 0, 0) + cAngledOffset1;
 		Body &box1 = c.CreateBox(pos1, Quat::sIdentity(), EMotionType::Dynamic, EMotionQuality::LinearCast, Layers::MOVING, Vec3::sReplicate(cBoxExtent));
 		box1.SetLinearVelocity(cAngledVelocity);
 		box1.SetRestitution(1.0f);
 		box1.SetFriction(0.0f);
 
-		Body &box2 = c.CreateBox(Vec3::sZero(), Quat::sIdentity(), EMotionType::Dynamic, EMotionQuality::Discrete, Layers::MOVING, Vec3::sReplicate(cBoxExtent), EActivation::DontActivate);
+		Body &box2 = c.CreateBox(RVec3::sZero(), Quat::sIdentity(), EMotionType::Dynamic, EMotionQuality::Discrete, Layers::MOVING, Vec3::sReplicate(cBoxExtent), EActivation::DontActivate);
 		box2.SetRestitution(1.0f);
 		box2.SetFriction(0.0f);
 		CHECK(!box2.IsActive());
@@ -301,10 +302,10 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		CHECK(listener.Contains(LoggingContactListener::EType::Add, box1.GetID(), box2.GetID()));
 		Vec3 new_velocity1 = Vec3(0, 0, cAngledVelocity.GetZ());
 		Vec3 new_velocity2 = Vec3(cAngledVelocity.GetX(), 0, 0);
-		CHECK_APPROX_EQUAL(box1.GetPosition(), Vec3(2.0f * cBoxExtent, 0, 0), 2.3f * cPenetrationSlop); // We're moving 2x as fast in the z direction and the slop is allowed in x direction: sqrt(1^2 + 2^2) ~ 2.3
+		CHECK_APPROX_EQUAL(box1.GetPosition(), RVec3(2.0f * cBoxExtent, 0, 0), 2.3f * cPenetrationSlop); // We're moving 2x as fast in the z direction and the slop is allowed in x direction: sqrt(1^2 + 2^2) ~ 2.3
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), new_velocity1, 1.0e-4f);
 		CHECK_APPROX_EQUAL(box1.GetAngularVelocity(), Vec3::sZero(), 2.0e-4f);
-		CHECK_APPROX_EQUAL(box2.GetPosition(), Vec3::sZero());
+		CHECK_APPROX_EQUAL(box2.GetPosition(), RVec3::sZero());
 		CHECK_APPROX_EQUAL(box2.GetLinearVelocity(), new_velocity2, 1.0e-4f);
 		CHECK_APPROX_EQUAL(box2.GetAngularVelocity(), Vec3::sZero(), 2.0e-4f);
 		CHECK(box2.IsActive());
@@ -314,7 +315,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	// Two boxes colliding in the center, linear cast vs fast moving discrete, should tunnel through because all discrete bodies are moved before linear cast bodies are tested
 	TEST_CASE("TestLinearCastBoxVsFastDiscreteBox")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		// Register listener
@@ -329,7 +330,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 
 		c.SimulateSingleStep();
 
-		// No collisions should be reported and the bodies should have moved according to their velocity (tunneling through eachother)
+		// No collisions should be reported and the bodies should have moved according to their velocity (tunneling through each other)
 		CHECK(listener.GetEntryCount() == 0);
 		CHECK_APPROX_EQUAL(box1.GetPosition(), cPos1 + cVelocity / cFrequency);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), cVelocity);
@@ -342,7 +343,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 	// Two boxes colliding in the center, linear cast vs moving discrete, discrete is slow enough not to tunnel through linear cast body
 	TEST_CASE("TestLinearCastBoxVsSlowDiscreteBox")
 	{
-		PhysicsTestContext c(1.0f / cFrequency, 1, 1);
+		PhysicsTestContext c(1.0f / cFrequency, 1);
 		c.ZeroGravity();
 
 		const float cPenetrationSlop = c.GetSystem()->GetPhysicsSettings().mPenetrationSlop;
@@ -366,7 +367,7 @@ TEST_SUITE("MotionQualityLinearCastTests")
 		CHECK(listener.GetEntryCount() == 2);
 		CHECK(listener.Contains(LoggingContactListener::EType::Validate, box1.GetID(), box2.GetID()));
 		CHECK(listener.Contains(LoggingContactListener::EType::Add, box1.GetID(), box2.GetID()));
-		Vec3 new_pos2 = cPos2 + cBox2Velocity / cFrequency;
+		RVec3 new_pos2 = cPos2 + cBox2Velocity / cFrequency;
 		Vec3 new_velocity = 0.5f * (cVelocity + cBox2Velocity);
 		CHECK_APPROX_EQUAL(box1.GetPosition(), new_pos2 - Vec3(2.0f * cBoxExtent, 0, 0), cPenetrationSlop);
 		CHECK_APPROX_EQUAL(box1.GetLinearVelocity(), new_velocity);

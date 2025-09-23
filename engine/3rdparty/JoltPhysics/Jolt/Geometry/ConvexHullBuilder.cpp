@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -7,11 +8,13 @@
 #include <Jolt/Geometry/ConvexHullBuilder2D.h>
 #include <Jolt/Geometry/ClosestPoint.h>
 #include <Jolt/Core/StringTools.h>
+#include <Jolt/Core/UnorderedSet.h>
 
+#ifdef JPH_CONVEX_BUILDER_DUMP_SHAPE
 JPH_SUPPRESS_WARNINGS_STD_BEGIN
-#include <unordered_set>
 #include <fstream>
 JPH_SUPPRESS_WARNINGS_STD_END
+#endif // JPH_CONVEX_BUILDER_DUMP_SHAPE
 
 #ifdef JPH_CONVEX_BUILDER_DEBUG
 	#include <Jolt/Renderer/DebugRenderer.h>
@@ -25,8 +28,8 @@ ConvexHullBuilder::Face::~Face()
 	Edge *e = mFirstEdge;
 	if (e != nullptr)
 	{
-		do 
-		{ 
+		do
+		{
 			Edge *next = e->mNextEdge;
 			delete e;
 			e = next;
@@ -112,7 +115,7 @@ ConvexHullBuilder::ConvexHullBuilder(const Positions &inPositions) :
 	mIteration = 0;
 
 	// Center the drawing of the first hull around the origin and calculate the delta offset between states
-	mOffset = Vec3::sZero();
+	mOffset = RVec3::sZero();
 	if (mPositions.empty())
 	{
 		// No hull will be generated
@@ -127,7 +130,7 @@ ConvexHullBuilder::ConvexHullBuilder(const Positions &inPositions) :
 			maxv = Vec3::sMax(maxv, v);
 			mOffset -= v;
 		}
-		mOffset /= float(mPositions.size());
+		mOffset /= Real(mPositions.size());
 		mDelta = Vec3((maxv - minv).GetX() + 0.5f, 0, 0);
 		mOffset += mDelta; // Don't start at origin, we're already drawing the final hull there
 	}
@@ -141,46 +144,97 @@ void ConvexHullBuilder::FreeFaces()
 	mFaces.clear();
 }
 
-void ConvexHullBuilder::AssignPointToFace(int inPositionIdx, const Faces &inFaces) const
+void ConvexHullBuilder::GetFaceForPoint(Vec3Arg inPoint, const Faces &inFaces, Face *&outFace, float &outDistSq) const
 {
-	Vec3 point = mPositions[inPositionIdx];
+	outFace = nullptr;
+	outDistSq = 0.0f;
 
-	Face *best_face = nullptr;
-	float best_dist_sq = 0.0f;
-
-	// Test against all faces
 	for (Face *f : inFaces)
 		if (!f->mRemoved)
 		{
 			// Determine distance to face
-			float dot = f->mNormal.Dot(point - f->mCentroid);
+			float dot = f->mNormal.Dot(inPoint - f->mCentroid);
 			if (dot > 0.0f)
 			{
 				float dist_sq = dot * dot / f->mNormal.LengthSq();
-				if (dist_sq > best_dist_sq)
+				if (dist_sq > outDistSq)
 				{
-					best_face = f;
-					best_dist_sq = dist_sq;
+					outFace = f;
+					outDistSq = dist_sq;
 				}
 			}
 		}
+}
 
-	// If this point is in front of the face, add it to the conflict list
+float ConvexHullBuilder::GetDistanceToEdgeSq(Vec3Arg inPoint, const Face *inFace) const
+{
+	bool all_inside = true;
+	float edge_dist_sq = FLT_MAX;
+
+	// Test if it is inside the edges of the polygon
+	Edge *edge = inFace->mFirstEdge;
+	Vec3 p1 = mPositions[edge->GetPreviousEdge()->mStartIdx];
+	do
+	{
+		Vec3 p2 = mPositions[edge->mStartIdx];
+		if ((p2 - p1).Cross(inPoint - p1).Dot(inFace->mNormal) < 0.0f)
+		{
+			// It is outside
+			all_inside = false;
+
+			// Measure distance to this edge
+			uint32 s;
+			edge_dist_sq = min(edge_dist_sq, ClosestPoint::GetClosestPointOnLine(p1 - inPoint, p2 - inPoint, s).LengthSq());
+		}
+		p1 = p2;
+		edge = edge->mNextEdge;
+	} while (edge != inFace->mFirstEdge);
+
+	return all_inside? 0.0f : edge_dist_sq;
+}
+
+bool ConvexHullBuilder::AssignPointToFace(int inPositionIdx, const Faces &inFaces, float inToleranceSq)
+{
+	Vec3 point = mPositions[inPositionIdx];
+
+	// Find the face for which the point is furthest away
+	Face *best_face;
+	float best_dist_sq;
+	GetFaceForPoint(point, inFaces, best_face, best_dist_sq);
+
 	if (best_face != nullptr)
 	{
-		if (best_dist_sq > best_face->mFurthestPointDistanceSq)
+		// Check if this point is within the tolerance margin to the plane
+		if (best_dist_sq <= inToleranceSq)
 		{
-			// This point is futher away than any others, update the distance and add point as last point
-			best_face->mFurthestPointDistanceSq = best_dist_sq;
-			best_face->mConflictList.push_back(inPositionIdx);
+			// Check distance to edges
+			float dist_to_edge_sq = GetDistanceToEdgeSq(point, best_face);
+			if (dist_to_edge_sq > inToleranceSq)
+			{
+				// Point is outside of the face and too far away to discard
+				mCoplanarList.push_back({ inPositionIdx, dist_to_edge_sq });
+			}
 		}
 		else
 		{
-			// Not the furthest point, add it as the before last point
-			best_face->mConflictList.push_back(best_face->mConflictList.back());
-			best_face->mConflictList[best_face->mConflictList.size() - 2] = inPositionIdx;
+			// This point is in front of the face, add it to the conflict list
+			if (best_dist_sq > best_face->mFurthestPointDistanceSq)
+			{
+				// This point is further away than any others, update the distance and add point as last point
+				best_face->mFurthestPointDistanceSq = best_dist_sq;
+				best_face->mConflictList.push_back(inPositionIdx);
+			}
+			else
+			{
+				// Not the furthest point, add it as the before last point
+				best_face->mConflictList.insert(best_face->mConflictList.begin() + best_face->mConflictList.size() - 1, inPositionIdx);
+			}
+
+			return true;
 		}
 	}
+
+	return false;
 }
 
 float ConvexHullBuilder::DetermineCoplanarDistance() const
@@ -194,12 +248,13 @@ float ConvexHullBuilder::DetermineCoplanarDistance() const
 
 int ConvexHullBuilder::GetNumVerticesUsed() const
 {
-	unordered_set<int> used_verts;
+	UnorderedSet<int> used_verts;
+	used_verts.reserve(UnorderedSet<int>::size_type(mPositions.size()));
 	for (Face *f : mFaces)
 	{
 		Edge *e = f->mFirstEdge;
-		do 
-		{ 
+		do
+		{
 			used_verts.insert(e->mStartIdx);
 			e = e->mNextEdge;
 		} while (e != f->mFirstEdge);
@@ -207,25 +262,25 @@ int ConvexHullBuilder::GetNumVerticesUsed() const
 	return (int)used_verts.size();
 }
 
-bool ConvexHullBuilder::ContainsFace(const vector<int> &inIndices) const
+bool ConvexHullBuilder::ContainsFace(const Array<int> &inIndices) const
 {
 	for (Face *f : mFaces)
 	{
 		Edge *e = f->mFirstEdge;
-		vector<int>::const_iterator index = find(inIndices.begin(), inIndices.end(), e->mStartIdx);
+		Array<int>::const_iterator index = std::find(inIndices.begin(), inIndices.end(), e->mStartIdx);
 		if (index != inIndices.end())
 		{
 			size_t matches = 0;
 
-			do 
-			{ 
+			do
+			{
 				// Check if index matches
 				if (*index != e->mStartIdx)
 					break;
 
 				// Increment number of matches
 				matches++;
-				
+
 				// Next index in list of inIndices
 				index++;
 				if (index == inIndices.end())
@@ -234,7 +289,7 @@ bool ConvexHullBuilder::ContainsFace(const vector<int> &inIndices) const
 				// Next edge
 				e = e->mNextEdge;
 			} while (e != f->mFirstEdge);
-			
+
 			if (matches == inIndices.size())
 				return true;
 		}
@@ -260,7 +315,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 
 	// Increase desired tolerance if accuracy doesn't allow it
 	float tolerance_sq = max(coplanar_tolerance_sq, Square(inTolerance));
-	
+
 	// Find point furthest from the origin
 	int idx1 = -1;
 	float max_dist_sq = -1.0f;
@@ -304,7 +359,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 			}
 		}
 	JPH_ASSERT(idx3 >= 0);
-	if (best_triangle_area_sq < FLT_EPSILON)
+	if (best_triangle_area_sq < cMinTriangleAreaSq)
 	{
 		outError = "Could not find a suitable initial triangle because its area was too small";
 		return EResult::Degenerate;
@@ -352,13 +407,13 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 		// First project all points in 2D space
 		Vec3 base1 = initial_plane_normal.GetNormalizedPerpendicular();
 		Vec3 base2 = initial_plane_normal.Cross(base1);
-		vector<Vec3> positions_2d;
+		Array<Vec3> positions_2d;
 		positions_2d.reserve(mPositions.size());
 		for (Vec3 v : mPositions)
-			positions_2d.push_back(Vec3(base1.Dot(v), base2.Dot(v), 0));
+			positions_2d.emplace_back(base1.Dot(v), base2.Dot(v), 0.0f);
 
 		// Build hull
-		vector<int> edges_2d;
+		Array<int> edges_2d;
 		ConvexHullBuilder2D builder_2d(positions_2d);
 		ConvexHullBuilder2D::EResult result = builder_2d.Initialize(idx1, idx2, idx3, inMaxVertices, inTolerance, edges_2d);
 
@@ -367,7 +422,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 		Face *f2 = CreateFace();
 
 		// Create edges for face 1
-		vector<Edge *> edges_f1;
+		Array<Edge *> edges_f1;
 		edges_f1.reserve(edges_2d.size());
 		for (int start_idx : edges_2d)
 		{
@@ -381,7 +436,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 		edges_f1.back()->mNextEdge = f1->mFirstEdge;
 
 		// Create edges for face 2
-		vector<Edge *> edges_f2;
+		Array<Edge *> edges_f2;
 		edges_f2.reserve(edges_2d.size());
 		for (int i = (int)edges_2d.size() - 1; i >= 0; --i)
 		{
@@ -413,7 +468,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 
 	// Ensure the planes are facing outwards
 	if (max_dist < 0.0f)
-		swap(idx2, idx3);
+		std::swap(idx2, idx3);
 
 	// Create tetrahedron
 	Face *t1 = CreateTriangle(idx1, idx2, idx4);
@@ -433,7 +488,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 	Faces faces { t1, t2, t3, t4 };
 	for (int idx = 0; idx < (int)mPositions.size(); ++idx)
 		if (idx != idx1 && idx != idx2 && idx != idx3 && idx != idx4)
-			AssignPointToFace(idx, faces);
+			AssignPointToFace(idx, faces, tolerance_sq);
 
 #ifdef JPH_CONVEX_BUILDER_DEBUG
 	// Draw current state including conflict list
@@ -459,9 +514,64 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 				face_with_furthest_point = f;
 			}
 
-		// If there is none closer than our tolerance value, we're done
-		if (face_with_furthest_point == nullptr || furthest_dist_sq < tolerance_sq)
+		int furthest_point_idx;
+		if (face_with_furthest_point != nullptr)
+		{
+			// Take the furthest point
+			furthest_point_idx = face_with_furthest_point->mConflictList.back();
+			face_with_furthest_point->mConflictList.pop_back();
+		}
+		else if (!mCoplanarList.empty())
+		{
+			// Try to assign points to faces (this also recalculates the distance to the hull for the coplanar vertices)
+			CoplanarList coplanar;
+			mCoplanarList.swap(coplanar);
+			bool added = false;
+			for (const Coplanar &c : coplanar)
+				added |= AssignPointToFace(c.mPositionIdx, mFaces, tolerance_sq);
+
+			// If we were able to assign a point, loop again to pick it up
+			if (added)
+				continue;
+
+			// If the coplanar list is empty, there are no points left and we're done
+			if (mCoplanarList.empty())
+				break;
+
+			do
+			{
+				// Find the vertex that is furthest from the hull
+				CoplanarList::size_type best_idx = 0;
+				float best_dist_sq = mCoplanarList.front().mDistanceSq;
+				for (CoplanarList::size_type idx = 1; idx < mCoplanarList.size(); ++idx)
+				{
+					const Coplanar &c = mCoplanarList[idx];
+					if (c.mDistanceSq > best_dist_sq)
+					{
+						best_idx = idx;
+						best_dist_sq = c.mDistanceSq;
+					}
+				}
+
+				// Swap it to the end
+				std::swap(mCoplanarList[best_idx], mCoplanarList.back());
+
+				// Remove it
+				furthest_point_idx = mCoplanarList.back().mPositionIdx;
+				mCoplanarList.pop_back();
+
+				// Find the face for which the point is furthest away
+				GetFaceForPoint(mPositions[furthest_point_idx], mFaces, face_with_furthest_point, best_dist_sq);
+			} while (!mCoplanarList.empty() && face_with_furthest_point == nullptr);
+
+			if (face_with_furthest_point == nullptr)
+				break;
+		}
+		else
+		{
+			// If there are no more vertices, we're done
 			break;
+		}
 
 		// Check if we have a limit on the max vertices that we should produce
 		if (num_vertices_used >= inMaxVertices)
@@ -477,10 +587,6 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 		// We're about to add another vertex
 		++num_vertices_used;
 
-		// Take the furthest point
-		int furthest_point_idx = face_with_furthest_point->mConflictList.back();
-		face_with_furthest_point->mConflictList.pop_back();
-
 		// Add the point to the hull
 		Faces new_faces;
 		AddPoint(face_with_furthest_point, furthest_point_idx, coplanar_tolerance_sq, new_faces);
@@ -489,7 +595,7 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 		for (const Face *face : mFaces)
 			if (face->mRemoved)
 				for (int idx : face->mConflictList)
-					AssignPointToFace(idx, new_faces);
+					AssignPointToFace(idx, new_faces, tolerance_sq);
 
 		// Permanently delete faces that we removed in AddPoint()
 		GarbageCollectFaces();
@@ -501,6 +607,13 @@ ConvexHullBuilder::EResult ConvexHullBuilder::Initialize(int inMaxVertices, floa
 		// Increment iteration counter
 		++mIteration;
 #endif
+	}
+
+	// Check if we are left with a hull. It is possible that hull building fails if the points are nearly coplanar.
+	if (mFaces.size() < 2)
+	{
+		outError = "Too few faces in hull";
+		return EResult::TooFewFaces;
 	}
 
 	return EResult::Success;
@@ -535,7 +648,7 @@ void ConvexHullBuilder::AddPoint(Face *inFacingFace, int inIdx, float inCoplanar
 		Face *f = CreateTriangle(e.mStartIdx, e.mEndIdx, inIdx);
 		outNewFaces.push_back(f);
 	}
-		
+
 	// Link edges
 	for (Faces::size_type i = 0; i < outNewFaces.size(); ++i)
 	{
@@ -554,7 +667,7 @@ void ConvexHullBuilder::AddPoint(Face *inFacingFace, int inIdx, float inCoplanar
 		if (!face->mRemoved)
 		{
 			// Merge with neighbour if this is a degenerate face
-			MergeDegenerateFace(face, 1.0e-12f, affected_faces);
+			MergeDegenerateFace(face, affected_faces);
 
 			// Merge with coplanar neighbours (or when the neighbour forms a concave edge)
 			if (!face->mRemoved)
@@ -611,8 +724,8 @@ void ConvexHullBuilder::FreeFace(Face *inFace)
 	// Make sure that this face is not connected
 	Edge *e = inFace->mFirstEdge;
 	if (e != nullptr)
-		do 
-		{ 
+		do
+		{
 			JPH_ASSERT(e->mNeighbourEdge == nullptr);
 			e = e->mNextEdge;
 		} while (e != inFace->mFirstEdge);
@@ -642,8 +755,8 @@ void ConvexHullBuilder::sUnlinkFace(Face *inFace)
 {
 	// Unlink from neighbours
 	Edge *e = inFace->mFirstEdge;
-	do 
-	{ 
+	do
+	{
 		if (e->mNeighbourEdge != nullptr)
 		{
 			// Validate that neighbour points to us
@@ -748,7 +861,7 @@ void ConvexHullBuilder::FindEdge(Face *inFacingFace, Vec3Arg inVertex, FullEdges
 #ifdef JPH_CONVEX_BUILDER_DEBUG
 	// Draw edge of facing faces
 	for (int i = 0; i < (int)outEdges.size(); ++i)
-		DebugRenderer::sInstance->DrawArrow(cDrawScale * (mPositions[outEdges[i].mStartIdx] + mOffset), cDrawScale * (mPositions[outEdges[i].mEndIdx] + mOffset), Color::sWhite, 0.01f);
+		DebugRenderer::sInstance->DrawArrow(cDrawScale * (mOffset + mPositions[outEdges[i].mStartIdx]), cDrawScale * (mOffset + mPositions[outEdges[i].mEndIdx]), Color::sWhite, 0.01f);
 	DrawState();
 #endif
 }
@@ -827,10 +940,10 @@ void ConvexHullBuilder::MergeFaces(Edge *inEdge)
 #endif
 }
 
-void ConvexHullBuilder::MergeDegenerateFace(Face *inFace, float inMinAreaSq, Faces &ioAffectedFaces)
+void ConvexHullBuilder::MergeDegenerateFace(Face *inFace, Faces &ioAffectedFaces)
 {
 	// Check area of face
-	if (inFace->mNormal.LengthSq() < inMinAreaSq)
+	if (inFace->mNormal.LengthSq() < cMinTriangleAreaSq)
 	{
 		// Find longest edge, since this face is a sliver this should keep the face convex
 		float max_length_sq = 0.0f;
@@ -847,7 +960,7 @@ void ConvexHullBuilder::MergeDegenerateFace(Face *inFace, float inMinAreaSq, Fac
 				max_length_sq = length_sq;
 				longest_edge = e;
 			}
-			p1 = p2;	
+			p1 = p2;
 			e = next;
 		} while (e != inFace->mFirstEdge);
 
@@ -879,7 +992,7 @@ void ConvexHullBuilder::MergeCoplanarOrConcaveFaces(Face *inFace, float inCoplan
 		float signed_dist_face_centroid_sq = abs(dist_face_centroid) * dist_face_centroid;
 		float face_normal_len_sq = inFace->mNormal.LengthSq();
 		float other_face_normal_len_sq = other_face->mNormal.LengthSq();
-		if ((signed_dist_other_face_centroid_sq > -inCoplanarToleranceSq * face_normal_len_sq 
+		if ((signed_dist_other_face_centroid_sq > -inCoplanarToleranceSq * face_normal_len_sq
 			|| signed_dist_face_centroid_sq > -inCoplanarToleranceSq * other_face_normal_len_sq)
 			&& inFace->mNormal.Dot(other_face->mNormal) > 0.0f) // Never merge faces that are back to back
 		{
@@ -896,13 +1009,13 @@ void ConvexHullBuilder::MergeCoplanarOrConcaveFaces(Face *inFace, float inCoplan
 
 void ConvexHullBuilder::sMarkAffected(Face *inFace, Faces &ioAffectedFaces)
 {
-	if (find(ioAffectedFaces.begin(), ioAffectedFaces.end(), inFace) == ioAffectedFaces.end())
+	if (std::find(ioAffectedFaces.begin(), ioAffectedFaces.end(), inFace) == ioAffectedFaces.end())
 		ioAffectedFaces.push_back(inFace);
 }
 
 void ConvexHullBuilder::RemoveInvalidEdges(Face *inFace, Faces &ioAffectedFaces)
 {
-	// This marks that the plane needs to be recalculated (we delay this until the end of the 
+	// This marks that the plane needs to be recalculated (we delay this until the end of the
 	// function since we don't use the plane and we want to avoid calculating it multiple times)
 	bool recalculate_plane = false;
 
@@ -1055,7 +1168,7 @@ bool ConvexHullBuilder::RemoveTwoEdgeFace(Face *inFace, Faces &ioAffectedFaces) 
 
 	return false;
 }
-	
+
 #ifdef JPH_ENABLE_ASSERTS
 
 void ConvexHullBuilder::DumpFace(const Face *inFace) const
@@ -1063,8 +1176,8 @@ void ConvexHullBuilder::DumpFace(const Face *inFace) const
 	Trace("f:0x%p", inFace);
 
 	const Edge *e = inFace->mFirstEdge;
-	do 
-	{ 
+	do
+	{
 		Trace("\te:0x%p { i:%d e:0x%p f:0x%p }", e, e->mStartIdx, e->mNeighbourEdge, e->mNeighbourEdge->mFace);
 		e = e->mNextEdge;
 	} while (e != inFace->mFirstEdge);
@@ -1085,8 +1198,8 @@ void ConvexHullBuilder::ValidateFace(const Face *inFace) const
 	{
 		const Edge *e = inFace->mFirstEdge;
 		if (e != nullptr)
-			do 
-			{ 
+			do
+			{
 				JPH_ASSERT(e->mNeighbourEdge == nullptr);
 				e = e->mNextEdge;
 			} while (e != inFace->mFirstEdge);
@@ -1096,8 +1209,8 @@ void ConvexHullBuilder::ValidateFace(const Face *inFace) const
 		int edge_count = 0;
 
 		const Edge *e = inFace->mFirstEdge;
-		do 
-		{ 
+		do
+		{
 			// Count edge
 			++edge_count;
 
@@ -1164,7 +1277,7 @@ void ConvexHullBuilder::GetCenterOfMassAndVolume(Vec3 &outCenterOfMass, float &o
 		Vec3 v2 = mPositions[e->mStartIdx];
 
 		for (e = e->mNextEdge; e != f->mFirstEdge; e = e->mNextEdge)
-		{ 
+		{
 			// Fetch the last point of the triangle
 			Vec3 v3 = mPositions[e->mStartIdx];
 
@@ -1179,7 +1292,7 @@ void ConvexHullBuilder::GetCenterOfMassAndVolume(Vec3 &outCenterOfMass, float &o
 
 			// Update v2 for next triangle
 			v2 = v3;
-		} while (e != f->mFirstEdge);
+		}
 	}
 
 	// Calculate center of mass, fall back to average point in case there is no volume (everything is on a plane in this case)
@@ -1208,7 +1321,7 @@ void ConvexHullBuilder::DetermineMaxError(Face *&outFaceWithMaxError, float &out
 		// Note that we take the min of all faces since there may be multiple near coplanar faces so if we were to test this per face
 		// we may find that a point is outside of a polygon and mark it as an error, while it is actually inside a nearly coplanar
 		// polygon.
-		float min_edge_dist = FLT_MAX;
+		float min_edge_dist_sq = FLT_MAX;
 		Face *min_edge_dist_face = nullptr;
 
 		for (Face *f : mFaces)
@@ -1219,50 +1332,26 @@ void ConvexHullBuilder::DetermineMaxError(Face *&outFaceWithMaxError, float &out
 			float plane_dist = f->mNormal.Dot(v - f->mCentroid) / normal_len;
 			if (plane_dist > -outCoplanarDistance)
 			{
-				bool all_inside = true;
-
-				// Test if it is inside the edges of the polygon
-				Edge *edge = f->mFirstEdge;
-				Vec3 p1 = mPositions[edge->GetPreviousEdge()->mStartIdx];
-				do
+				// Check distance to the edges of this face
+				float edge_dist_sq = GetDistanceToEdgeSq(v, f);
+				if (edge_dist_sq < min_edge_dist_sq)
 				{
-					Vec3 p2 = mPositions[edge->mStartIdx];
-					if ((p2 - p1).Cross(v - p1).Dot(f->mNormal) < 0.0f)
-					{
-						// It is outside
-						all_inside = false;
-
-						// Measure distance to this edge
-						uint32 s;
-						float edge_dist = ClosestPoint::GetClosestPointOnLine(p1 - v, p2 - v, s).Length();
-						if (edge_dist < min_edge_dist)
-						{
-							min_edge_dist = edge_dist;
-							min_edge_dist_face = f;
-						}
-					}
-					p1 = p2;
-					edge = edge->mNextEdge;
-				} while (edge != f->mFirstEdge);
-
-				if (all_inside)
-				{
-					// The point is inside the polygon, reset distance to edge
-					min_edge_dist = 0.0f;
+					min_edge_dist_sq = edge_dist_sq;
 					min_edge_dist_face = f;
+				}
 
-					// If the point is in front of the plane, measure the distance
-					if (plane_dist > max_error)
-					{
-						max_error = plane_dist;
-						max_error_face = f;
-						max_error_point = i;
-					}
+				// If the point is inside the polygon and the point is in front of the plane, measure the distance
+				if (edge_dist_sq == 0.0f && plane_dist > max_error)
+				{
+					max_error = plane_dist;
+					max_error_face = f;
+					max_error_point = i;
 				}
 			}
 		}
 
 		// If the minimum distance to an edge is further than our current max error, we use that as max error
+		float min_edge_dist = sqrt(min_edge_dist_sq);
 		if (min_edge_dist_face != nullptr && min_edge_dist > max_error)
 		{
 			max_error = min_edge_dist;
@@ -1278,7 +1367,7 @@ void ConvexHullBuilder::DetermineMaxError(Face *&outFaceWithMaxError, float &out
 
 #ifdef JPH_CONVEX_BUILDER_DEBUG
 
-void ConvexHullBuilder::DrawState(bool inDrawConflictList)
+void ConvexHullBuilder::DrawState(bool inDrawConflictList) const
 {
 	// Draw origin
 	DebugRenderer::sInstance->DrawMarker(cDrawScale * mOffset, Color::sRed, 0.2f);
@@ -1294,11 +1383,11 @@ void ConvexHullBuilder::DrawState(bool inDrawConflictList)
 
 			// First point
 			const Edge *e = f->mFirstEdge;
-			Vec3 p1 = cDrawScale * (mPositions[e->mStartIdx] + mOffset);
+			RVec3 p1 = cDrawScale * (mOffset + mPositions[e->mStartIdx]);
 
 			// Second point
 			e = e->mNextEdge;
-			Vec3 p2 = cDrawScale * (mPositions[e->mStartIdx] + mOffset);
+			RVec3 p2 = cDrawScale * (mOffset + mPositions[e->mStartIdx]);
 
 			// First line
 			DebugRenderer::sInstance->DrawLine(p1, p2, Color::sGrey);
@@ -1307,7 +1396,7 @@ void ConvexHullBuilder::DrawState(bool inDrawConflictList)
 			{
 				// Third point
 				e = e->mNextEdge;
-				Vec3 p3 = cDrawScale * (mPositions[e->mStartIdx] + mOffset);
+				RVec3 p3 = cDrawScale * (mOffset + mPositions[e->mStartIdx]);
 
 				DebugRenderer::sInstance->DrawTriangle(p1, p2, p3, iteration_color);
 
@@ -1318,8 +1407,8 @@ void ConvexHullBuilder::DrawState(bool inDrawConflictList)
 			while (e != f->mFirstEdge);
 
 			// Draw normal
-			Vec3 centroid = cDrawScale * (f->mCentroid + mOffset);
-			DebugRenderer::sInstance->DrawArrow(centroid, centroid + f->mNormal.Normalized(), face_color, 0.01f);
+			RVec3 centroid = cDrawScale * (mOffset + f->mCentroid);
+			DebugRenderer::sInstance->DrawArrow(centroid, centroid + f->mNormal.NormalizedOr(Vec3::sZero()), face_color, 0.01f);
 
 			// Draw conflict list
 			if (inDrawConflictList)
@@ -1334,11 +1423,11 @@ void ConvexHullBuilder::DrawState(bool inDrawConflictList)
 void ConvexHullBuilder::DrawWireFace(const Face *inFace, ColorArg inColor) const
 {
 	const Edge *e = inFace->mFirstEdge;
-	Vec3 prev = cDrawScale * (mPositions[e->mStartIdx] + mOffset);
+	RVec3 prev = cDrawScale * (mOffset + mPositions[e->mStartIdx]);
 	do
-	{ 
+	{
 		const Edge *next = e->mNextEdge;
-		Vec3 cur = cDrawScale * (mPositions[next->mStartIdx] + mOffset);
+		RVec3 cur = cDrawScale * (mOffset + mPositions[next->mStartIdx]);
 		DebugRenderer::sInstance->DrawArrow(prev, cur, inColor, 0.01f);
 		DebugRenderer::sInstance->DrawText3D(prev, ConvertToString(e->mStartIdx), inColor);
 		e = next;
@@ -1348,8 +1437,8 @@ void ConvexHullBuilder::DrawWireFace(const Face *inFace, ColorArg inColor) const
 
 void ConvexHullBuilder::DrawEdge(const Edge *inEdge, ColorArg inColor) const
 {
-	Vec3 p1 = cDrawScale * (mPositions[inEdge->mStartIdx] + mOffset);
-	Vec3 p2 = cDrawScale * (mPositions[inEdge->mNextEdge->mStartIdx] + mOffset);
+	RVec3 p1 = cDrawScale * (mOffset + mPositions[inEdge->mStartIdx]);
+	RVec3 p2 = cDrawScale * (mOffset + mPositions[inEdge->mNextEdge->mStartIdx]);
 	DebugRenderer::sInstance->DrawArrow(p1, p2, inColor, 0.01f);
 }
 
@@ -1362,14 +1451,14 @@ void ConvexHullBuilder::DumpShape() const
 	static atomic<int> sShapeNo = 1;
 	int shape_no = sShapeNo++;
 
-	ofstream f;
-	f.open(StringFormat("dumped_shape%d.cpp", shape_no).c_str(), ofstream::out | ofstream::trunc);
-	if (!f.is_open()) 
+	std::ofstream f;
+	f.open(StringFormat("dumped_shape%d.cpp", shape_no).c_str(), std::ofstream::out | std::ofstream::trunc);
+	if (!f.is_open())
 		return;
 
 	f << "{\n";
 	for (Vec3 v : mPositions)
-		f << StringFormat("\tVec3(%.9gf, %.9gf, %.9gf),\n", v.GetX(), v.GetY(), v.GetZ());
+		f << StringFormat("\tVec3(%.9gf, %.9gf, %.9gf),\n", (double)v.GetX(), (double)v.GetY(), (double)v.GetZ());
 	f << "},\n";
 }
 

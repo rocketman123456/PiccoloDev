@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -6,14 +7,14 @@
 #include <Jolt/Physics/Collision/ContactListener.h>
 #include <Jolt/Physics/StateRecorder.h>
 #include <Jolt/Core/Mutex.h>
-#include <unordered_map>
+#include <Jolt/Core/UnorderedMap.h>
 
 // Tests the contact listener callbacks
 class ContactListenerImpl : public ContactListener
 {
 public:
 	// See: ContactListener
-	virtual ValidateResult	OnContactValidate(const Body &inBody1, const Body &inBody2, const CollideShapeResult &inCollisionResult) override;
+	virtual ValidateResult	OnContactValidate(const Body &inBody1, const Body &inBody2, RVec3Arg inBaseOffset, const CollideShapeResult &inCollisionResult) override;
 	virtual void			OnContactAdded(const Body &inBody1, const Body &inBody2, const ContactManifold &inManifold, ContactSettings &ioSettings) override;
 	virtual void			OnContactPersisted(const Body &inBody1, const Body &inBody2, const ContactManifold &inManifold, ContactSettings &ioSettings) override;
 	virtual void			OnContactRemoved(const SubShapeIDPair &inSubShapePair) override;
@@ -30,7 +31,8 @@ public:
 
 private:
 	// Map that keeps track of the current state of contacts based on the contact listener callbacks
-	using StateMap = unordered_map<SubShapeIDPair, ContactPoints>;
+	using StatePair = pair<RVec3, ContactPoints>;
+	using StateMap = UnorderedMap<SubShapeIDPair, StatePair>;
 	Mutex					mStateMutex;
 	StateMap				mState;
 

@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -24,7 +25,7 @@ public:
 		return "ConvexVsMesh";
 	}
 
-	virtual bool			Load() override
+	virtual bool			Load(const String &inAssetPath) override
 	{
 		const int n = 100;
 		const float cell_size = 3.0f;
@@ -38,7 +39,7 @@ public:
 		for (int x = 0; x <= n; ++x)
 			for (int z = 0; z <= n; ++z)
 			{
-				float height = sin(float(x) * 50.0f / n) * cos(float(z) * 50.0f / n);
+				float height = Sin(float(x) * 50.0f / n) * Cos(float(z) * 50.0f / n);
 				vertices[z * (n + 1) + x] = Float3(cell_size * x, max_height * height, cell_size * z);
 			}
 
@@ -70,7 +71,7 @@ public:
 		// Create mesh shape creation settings
 		mMeshSettings.mMotionType = EMotionType::Static;
 		mMeshSettings.mObjectLayer = Layers::NON_MOVING;
-		mMeshSettings.mPosition = Vec3(-center, max_height, -center);
+		mMeshSettings.mPosition = RVec3(Real(-center), Real(max_height), Real(-center));
 		mMeshSettings.mFriction = 0.5f;
 		mMeshSettings.mRestitution = 0.6f;
 		mMeshSettings.SetShapeSettings(mesh_shape_settings);
@@ -107,7 +108,7 @@ public:
 					creation_settings.mMotionType = EMotionType::Dynamic;
 					creation_settings.mMotionQuality = inMotionQuality;
 					creation_settings.mObjectLayer = Layers::MOVING;
-					creation_settings.mPosition = Vec3(7.5f * x, 15.0f + 2.0f * y, 7.5f * z);
+					creation_settings.mPosition = RVec3(7.5_r * x, 15.0_r + 2.0_r * y, 7.5_r * z);
 					creation_settings.mFriction = 0.5f;
 					creation_settings.mRestitution = 0.6f;
 					creation_settings.SetShape(mShapes[y]);
@@ -117,5 +118,5 @@ public:
 
 private:
 	BodyCreationSettings	mMeshSettings;
-	vector<Ref<Shape>>		mShapes;
+	Array<Ref<Shape>>		mShapes;
 };

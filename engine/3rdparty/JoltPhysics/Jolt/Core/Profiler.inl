@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -10,29 +11,31 @@ JPH_NAMESPACE_BEGIN
 ProfileThread::ProfileThread(const string_view &inThreadName) :
 	mThreadName(inThreadName)
 {
-	Profiler::sInstance.AddThread(this);
+	Profiler::sInstance->AddThread(this);
 }
 
 ProfileThread::~ProfileThread()
 {
-	Profiler::sInstance.RemoveThread(this);
+	Profiler::sInstance->RemoveThread(this);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // ProfileMeasurement
 //////////////////////////////////////////////////////////////////////////////////////////
 
-ProfileMeasurement::ProfileMeasurement(const char *inName, uint32 inColor)	
+JPH_TSAN_NO_SANITIZE // TSAN reports a race on sOutOfSamplesReported, however the worst case is that we report the out of samples message multiple times
+ProfileMeasurement::ProfileMeasurement(const char *inName, uint32 inColor)
 {
-	if (ProfileThread::sInstance == nullptr)
+	ProfileThread *current_thread = ProfileThread::sGetInstance();
+	if (current_thread == nullptr)
 	{
 		// Thread not instrumented
 		mSample = nullptr;
 	}
-	else if (ProfileThread::sInstance->mCurrentSample < ProfileThread::cMaxSamples)
+	else if (current_thread->mCurrentSample < ProfileThread::cMaxSamples)
 	{
 		// Get pointer to write data to
-		mSample = &ProfileThread::sInstance->mSamples[ProfileThread::sInstance->mCurrentSample++];
+		mSample = &current_thread->mSamples[current_thread->mCurrentSample++];
 
 		// Start constructing sample (will end up on stack)
 		mTemp.mName = inName;
@@ -46,8 +49,8 @@ ProfileMeasurement::ProfileMeasurement(const char *inName, uint32 inColor)
 		// Out of samples
 		if (!sOutOfSamplesReported)
 		{
-			Trace("ProfileMeasurement: Too many samples, some data will be lost!");
 			sOutOfSamplesReported = true;
+			Trace("ProfileMeasurement: Too many samples, some data will be lost!");
 		}
 		mSample = nullptr;
 	}
@@ -78,7 +81,7 @@ ProfileMeasurement::~ProfileMeasurement()
 		val = vld1q_s32(src + 4);
 		vst1q_s32(dst + 4, val);
 	#else
-		#error Unsupported CPU architecture
+		memcpy(mSample, &mTemp, sizeof(ProfileSample));
 	#endif
 		mSample = nullptr;
 	}

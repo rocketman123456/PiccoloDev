@@ -1,20 +1,20 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #pragma once
 
 #include <Jolt/Core/RTTI.h>
-
-JPH_SUPPRESS_WARNINGS_STD_BEGIN
-#include <unordered_map>
-JPH_SUPPRESS_WARNINGS_STD_END
+#include <Jolt/Core/UnorderedMap.h>
 
 JPH_NAMESPACE_BEGIN
 
-/// Factory, to create RTTI objects
-class Factory
+/// This class is responsible for creating instances of classes based on their name or hash and is mainly used for deserialization of saved data.
+class JPH_EXPORT Factory
 {
 public:
+	JPH_OVERRIDE_NEW_DELETE
+
 	/// Create an object
 	void *						CreateObject(const char *inName);
 
@@ -34,15 +34,15 @@ public:
 	void						Clear();
 
 	/// Get all registered classes
-	vector<const RTTI *>		GetAllClasses() const;
+	Array<const RTTI *>			GetAllClasses() const;
 
 	/// Singleton factory instance
 	static Factory *			sInstance;
 
 private:
-	using ClassNameMap = unordered_map<string_view, const RTTI *>;
+	using ClassNameMap = UnorderedMap<string_view, const RTTI *>;
 
-	using ClassHashMap = unordered_map<uint32, const RTTI *>;
+	using ClassHashMap = UnorderedMap<uint32, const RTTI *>;
 
 	/// Map of class names to type info
 	ClassNameMap				mClassNameMap;

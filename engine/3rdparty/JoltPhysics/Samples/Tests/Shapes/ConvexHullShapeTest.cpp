@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -8,28 +9,27 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Layers.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(ConvexHullShapeTest) 
-{ 
-	JPH_ADD_BASE_CLASS(ConvexHullShapeTest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(ConvexHullShapeTest)
+{
+	JPH_ADD_BASE_CLASS(ConvexHullShapeTest, Test)
 }
 
-void ConvexHullShapeTest::Initialize() 
+void ConvexHullShapeTest::Initialize()
 {
 	// Floor
 	CreateFloor();
 
 	// Create tetrahedron
-	vector<Vec3> tetrahedron;
+	Array<Vec3> tetrahedron;
 	tetrahedron.push_back(Vec3(-5, 0, -5));
 	tetrahedron.push_back(Vec3(0, 0, 5));
 	tetrahedron.push_back(Vec3(5, 0, -5));
 	tetrahedron.push_back(Vec3(0, -5, 0));
 
-	Body &body_tetrahedron = *mBodyInterface->CreateBody(BodyCreationSettings(new ConvexHullShapeSettings(tetrahedron), Vec3(0, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-	mBodyInterface->AddBody(body_tetrahedron.GetID(), EActivation::Activate);
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ConvexHullShapeSettings(tetrahedron), RVec3(0, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 	// Create box
-	vector<Vec3> box;
+	Array<Vec3> box;
 	box.push_back(Vec3(5, 5, 5));
 	box.push_back(Vec3(-5, 5, 5));
 	box.push_back(Vec3(5, -5, 5));
@@ -39,31 +39,28 @@ void ConvexHullShapeTest::Initialize()
 	box.push_back(Vec3(5, -5, -5));
 	box.push_back(Vec3(-5, -5, -5));
 
-	Body &body_box = *mBodyInterface->CreateBody(BodyCreationSettings(new ConvexHullShapeSettings(box), Vec3(20, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-	mBodyInterface->AddBody(body_box.GetID(), EActivation::Activate);
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ConvexHullShapeSettings(box), RVec3(20, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 	// Add a sphere of many points
-	vector <Vec3> sphere;
+	Array<Vec3> sphere;
 	for (float theta = 0.0f; theta <= JPH_PI; theta += JPH_PI / 20.0f)
 		for (float phi = 0.0f; phi <= 2.0f * JPH_PI; phi += 2.0f * JPH_PI / 20.0f)
 			sphere.push_back(5.0f * Vec3::sUnitSpherical(theta, phi));
 
-	Body &body_sphere = *mBodyInterface->CreateBody(BodyCreationSettings(new ConvexHullShapeSettings(sphere), Vec3(40, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-	mBodyInterface->AddBody(body_sphere.GetID(), EActivation::Activate);
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ConvexHullShapeSettings(sphere), RVec3(40, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 	// Add a tapered cylinder of many points
-	vector <Vec3> tapered_cylinder;
+	Array<Vec3> tapered_cylinder;
 	for (float theta = 0.0f; theta <= 2.0f * JPH_PI; theta += JPH_PI / 128.0f)
 	{
-		tapered_cylinder.push_back(4.0f * Vec3(-0.1f, sin(theta), cos(theta)));
-		tapered_cylinder.push_back(4.5f * Vec3(0.1f, sin(theta), cos(theta)));
+		tapered_cylinder.push_back(4.0f * Vec3(-0.1f, Sin(theta), Cos(theta)));
+		tapered_cylinder.push_back(4.5f * Vec3(0.1f, Sin(theta), Cos(theta)));
 	}
 
-	Body &body_tapered_cylinder = *mBodyInterface->CreateBody(BodyCreationSettings(new ConvexHullShapeSettings(tapered_cylinder), Vec3(60, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-	mBodyInterface->AddBody(body_tapered_cylinder.GetID(), EActivation::Activate);
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ConvexHullShapeSettings(tapered_cylinder), RVec3(60, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 	// Create convex hull with on one side nearly coplanar faces
-	vector<Vec3> coplanar;
+	Array<Vec3> coplanar;
 	coplanar.push_back(Vec3(1.04298747f, 4.68531752f, 0.858853102f));
 	coplanar.push_back(Vec3(-1.00753999f, 4.63935566f, -0.959064901f));
 	coplanar.push_back(Vec3(-1.01861656f, 4.72096348f, 0.846121550f));
@@ -85,8 +82,7 @@ void ConvexHullShapeTest::Initialize()
 	coplanar.push_back(Vec3(2.74527335f, 3.06491613f, 1.77647924f));
 	coplanar.push_back(Vec3(-1.53122997f, -2.18120861f, 2.31516361f));
 
-	Body &body_coplanar = *mBodyInterface->CreateBody(BodyCreationSettings(new ConvexHullShapeSettings(coplanar), Vec3(80, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-	mBodyInterface->AddBody(body_coplanar.GetID(), EActivation::Activate);
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ConvexHullShapeSettings(coplanar), RVec3(80, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 
 	// Bodies with random convex shapes
 	default_random_engine random;
@@ -94,19 +90,18 @@ void ConvexHullShapeTest::Initialize()
 	for (int i = 0; i < 10; ++i)
 	{
 		// Create random points
-		vector<Vec3> points;
+		Array<Vec3> points;
 		for (int j = 0; j < 20; ++j)
 			points.push_back(hull_size(random) * Vec3::sRandom(random));
 
-		Body &body = *mBodyInterface->CreateBody(BodyCreationSettings(new ConvexHullShapeSettings(points), Vec3(-90.0f + i * 18.0f, 10, 20), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-		mBodyInterface->AddBody(body.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(BodyCreationSettings(new ConvexHullShapeSettings(points), RVec3(-90.0f + i * 18.0f, 10, 20), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 	}
 
 	// Bodies with random convex polygons (this is not something you should be doing, but this tests the 2D convex hull shape generation and allows you to test the probe against them)
 	for (int i = 0; i < 10; ++i)
 	{
 		// Create random points
-		vector<Vec3> points;
+		Array<Vec3> points;
 		for (int j = 0; j < 20; ++j)
 		{
 			Vec3 v = hull_size(random) * Vec3::sRandom(random);
@@ -117,14 +112,13 @@ void ConvexHullShapeTest::Initialize()
 		// Convex hull needs to be created with convex radius of 0 because the shape has no volume, so we cannot move the planes backwards to make space for the convex radius
 		Ref<ShapeSettings> shape_settings = new ConvexHullShapeSettings(points, 0.0f);
 
-		BodyCreationSettings creation_settings(shape_settings, Vec3(-90.0f + i * 18.0f, 10, 40), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING);
+		BodyCreationSettings creation_settings(shape_settings, RVec3(-90.0f + i * 18.0f, 10, 40), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING);
 
 		// The polygon has no volume, so we need to provide a dummy mass and inertia for this shape
 		creation_settings.mOverrideMassProperties = EOverrideMassProperties::MassAndInertiaProvided;
 		creation_settings.mMassPropertiesOverride.mMass = 1.0f;
 		creation_settings.mMassPropertiesOverride.mInertia = Mat44::sIdentity();
 
-		Body &body = *mBodyInterface->CreateBody(creation_settings);
-		mBodyInterface->AddBody(body.GetID(), EActivation::Activate);
+		mBodyInterface->CreateAndAddBody(creation_settings, EActivation::Activate);
 	}
 }

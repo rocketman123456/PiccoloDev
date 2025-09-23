@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -58,5 +59,5 @@ public:
 
 private:
 	Mutex				mLogMutex; // Callbacks are made from a thread, make sure we don't corrupt the log
-	vector<LogEntry>	mLog;
+	Array<LogEntry>		mLog;
 };

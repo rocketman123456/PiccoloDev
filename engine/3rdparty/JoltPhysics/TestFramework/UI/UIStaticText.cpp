@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -47,16 +48,16 @@ void UIStaticText::AutoLayout()
 		Float2 size = mFont->MeasureText(GetWrappedText());
 		int w = int(size.x * mFont->GetCharHeight()) + mTextPadLeft + mTextPadRight;
 		int h = int(size.y * mFont->GetCharHeight()) + mTextPadTop + mTextPadBottom;
-		if (GetWidth() <= 0) 
+		if (GetWidth() <= 0)
 			mWidth.Set(w, PIXELS);
-		if (GetHeight() <= 0) 
+		if (GetHeight() <= 0)
 			mHeight.Set(h, PIXELS);
 	}
 }
 
-string UIStaticText::GetWrappedText() const
+String UIStaticText::GetWrappedText() const
 {
-	string text;
+	String text;
 
 	if (mWrap)
 	{
@@ -67,11 +68,11 @@ string UIStaticText::GetWrappedText() const
 		{
 			// Find next space or end of text
 			size_t end_pos = mText.find(' ', prev_end_pos + 1);
-			if (end_pos == string::npos)
+			if (end_pos == String::npos)
 				end_pos = mText.length();
 
 			// Get line to test for width
-			string sub = mText.substr(start_pos, end_pos - start_pos);
+			String sub = mText.substr(start_pos, end_pos - start_pos);
 
 			// Measure width
 			Float2 size = mFont->MeasureText(sub);
@@ -120,7 +121,7 @@ void UIStaticText::DrawCustom(ColorArg inColor) const
 {
 	if (mFont != nullptr && !mText.empty())
 	{
-		string text = GetWrappedText();
+		String text = GetWrappedText();
 
 		int y = GetY() + mTextPadTop;
 
@@ -131,14 +132,14 @@ void UIStaticText::DrawCustom(ColorArg inColor) const
 		else if (mTextAlignment == CENTER)
 		{
 			// Split lines
-			vector<string> lines;
+			Array<String> lines;
 			StringToVector(text, lines, "\n");
 
 			// Amount of space we have horizontally
 			int width = GetWidth() - mTextPadLeft - mTextPadRight;
 
 			// Center each line individually
-			for (const string &l : lines)
+			for (const String &l : lines)
 			{
 				Float2 size = mFont->MeasureText(l);
 				int w = int(size.x * mFont->GetCharHeight());
@@ -151,11 +152,11 @@ void UIStaticText::DrawCustom(ColorArg inColor) const
 			JPH_ASSERT(mTextAlignment == RIGHT);
 
 			// Split lines
-			vector<string> lines;
+			Array<String> lines;
 			StringToVector(text, lines, "\n");
 
 			// Center each line individually
-			for (const string &l : lines)
+			for (const String &l : lines)
 			{
 				Float2 size = mFont->MeasureText(l);
 				int w = int(size.x * mFont->GetCharHeight());

@@ -1,7 +1,7 @@
 /*
  * Boost Software License - Version 1.0
  *
- * Mustache v4.1
+ * Mustache
  * Copyright 2015-2020 Kevin Wojniak
  *
  * Permission is hereby granted, free of charge, to any person or organization
@@ -38,6 +38,10 @@
 #include <sstream>
 #include <unordered_map>
 #include <vector>
+
+#define KAINJOW_MUSTACHE_VERSION_MAJOR 5
+#define KAINJOW_MUSTACHE_VERSION_MINOR 0
+#define KAINJOW_MUSTACHE_VERSION_PATCH 0
 
 namespace kainjow {
 namespace mustache {
@@ -660,7 +664,7 @@ private:
         std::vector<component<string_type>*> sections{&root_component};
         std::vector<string_size_type> section_starts;
         string_type current_text;
-        string_size_type current_text_position = -1;
+        string_size_type current_text_position = string_type::npos;
 
         current_text.reserve(input_size);
 
@@ -669,7 +673,7 @@ private:
                 const component<string_type> comp{current_text, current_text_position};
                 sections.back()->children.push_back(comp);
                 current_text.clear();
-                current_text_position = -1;
+                current_text_position = string_type::npos;
             }
         };
 

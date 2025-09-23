@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -5,10 +6,7 @@
 
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Core/NonCopyable.h>
-
-JPH_SUPPRESS_WARNINGS_STD_BEGIN
-#include <atomic>
-JPH_SUPPRESS_WARNINGS_STD_END
+#include <Jolt/Core/Atomics.h>
 
 JPH_NAMESPACE_BEGIN
 
@@ -23,7 +21,7 @@ public:
 	/// Destructor
 							~IslandBuilder();
 
-	/// Initialize the island builder with the maximum amount of bodies that could be active						
+	/// Initialize the island builder with the maximum amount of bodies that could be active
 	void					Init(uint32 inMaxActiveBodies);
 
 	/// Prepare for simulation step by allocating space for the contact constraints
@@ -52,6 +50,10 @@ public:
 	bool					GetConstraintsInIsland(uint32 inIslandIndex, uint32 *&outConstraintsBegin, uint32 *&outConstraintsEnd) const;
 	bool					GetContactsInIsland(uint32 inIslandIndex, uint32 *&outContactsBegin, uint32 *&outContactsEnd) const;
 
+	/// The number of position iterations for each island
+	void					SetNumPositionSteps(uint32 inIslandIndex, uint inNumPositionSteps)	{ JPH_ASSERT(inIslandIndex < mNumIslands); JPH_ASSERT(inNumPositionSteps < 256); mNumPositionSteps[inIslandIndex] = uint8(inNumPositionSteps); }
+	uint					GetNumPositionSteps(uint32 inIslandIndex) const						{ JPH_ASSERT(inIslandIndex < mNumIslands); return mNumPositionSteps[inIslandIndex]; }
+
 	/// After you're done calling the three functions above, call this function to free associated data
 	void					ResetIslands(TempAllocator *inTempAllocator);
 
@@ -74,6 +76,8 @@ private:
 	/// Intermediate data structure that for each body keeps track what the lowest index of the body is that it is connected to
 	struct BodyLink
 	{
+		JPH_OVERRIDE_NEW_DELETE
+
 		atomic<uint32>		mLinkedTo;										///< An index in mBodyLinks pointing to another body in this island with a lower index than this body
 		uint32				mIslandIndex;									///< The island index of this body (filled in during Finalize)
 	};
@@ -89,15 +93,17 @@ private:
 
 	uint32 *				mConstraintIslands = nullptr;					///< Constraints ordered by island
 	uint32 *				mConstraintIslandEnds = nullptr;				///< End index of each constraint island
-	
+
 	uint32 *				mContactIslands = nullptr;						///< Contacts ordered by island
 	uint32 *				mContactIslandEnds = nullptr;					///< End index of each contact island
 
 	uint32 *				mIslandsSorted = nullptr;						///< A list of island indices in order of most constraints first
 
+	uint8 *					mNumPositionSteps = nullptr;					///< Number of position steps for each island
+
 	// Counters
 	uint32					mMaxActiveBodies;								///< Maximum size of the active bodies list (see BodyManager::mActiveBodies)
-	uint32					mNumActiveBodies = 0;							///< Number of active bodies passed to 
+	uint32					mNumActiveBodies = 0;							///< Number of active bodies passed to
 	uint32					mNumConstraints = 0;							///< Size of the constraint list (see ConstraintManager::mConstraints)
 	uint32					mMaxContacts = 0;								///< Maximum amount of contacts supported
 	uint32					mNumContacts = 0;								///< Size of the contacts list (see ContactConstraintManager::mNumConstraints)

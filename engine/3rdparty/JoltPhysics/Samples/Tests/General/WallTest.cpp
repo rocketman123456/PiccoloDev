@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -8,12 +9,12 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Layers.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(WallTest) 
-{ 
-	JPH_ADD_BASE_CLASS(WallTest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(WallTest)
+{
+	JPH_ADD_BASE_CLASS(WallTest, Test)
 }
 
-void WallTest::Initialize() 
+void WallTest::Initialize()
 {
 	// Floor
 	CreateFloor();
@@ -24,8 +25,7 @@ void WallTest::Initialize()
 	for (int i = 0; i < 10; ++i)
 		for (int j = i / 2; j < 50 - (i + 1) / 2; ++j)
 		{
-			Vec3 position(-50 + j * 2.0f + (i & 1? 1.0f : 0.0f), 1.0f + i * 3.0f, 0);
-			Body &wall = *mBodyInterface->CreateBody(BodyCreationSettings(box_shape, position, Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-			mBodyInterface->AddBody(wall.GetID(), EActivation::Activate);
+			RVec3 position(-50 + j * 2.0f + (i & 1? 1.0f : 0.0f), 1.0f + i * 3.0f, 0);
+			mBodyInterface->CreateAndAddBody(BodyCreationSettings(box_shape, position, Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 		}
 }

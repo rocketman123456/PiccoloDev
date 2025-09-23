@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -24,11 +25,11 @@ JPH_IMPLEMENT_SERIALIZABLE_VIRTUAL(PointConstraintSettings)
 }
 
 void PointConstraintSettings::SaveBinaryState(StreamOut &inStream) const
-{ 
+{
 	ConstraintSettings::SaveBinaryState(inStream);
 
 	inStream.Write(mSpace);
-	inStream.Write(mPoint1);	
+	inStream.Write(mPoint1);
 	inStream.Write(mPoint2);
 }
 
@@ -47,26 +48,58 @@ TwoBodyConstraint *PointConstraintSettings::Create(Body &inBody1, Body &inBody2)
 }
 
 PointConstraint::PointConstraint(Body &inBody1, Body &inBody2, const PointConstraintSettings &inSettings) :
-	TwoBodyConstraint(inBody1, inBody2, inSettings),
-	mLocalSpacePosition1(inSettings.mPoint1),
-	mLocalSpacePosition2(inSettings.mPoint2)
+	TwoBodyConstraint(inBody1, inBody2, inSettings)
 {
 	if (inSettings.mSpace == EConstraintSpace::WorldSpace)
 	{
 		// If all properties were specified in world space, take them to local space now
-		mLocalSpacePosition1 = inBody1.GetInverseCenterOfMassTransform() * mLocalSpacePosition1;
-		mLocalSpacePosition2 = inBody2.GetInverseCenterOfMassTransform() * mLocalSpacePosition2;
+		mLocalSpacePosition1 = Vec3(inBody1.GetInverseCenterOfMassTransform() * inSettings.mPoint1);
+		mLocalSpacePosition2 = Vec3(inBody2.GetInverseCenterOfMassTransform() * inSettings.mPoint2);
+	}
+	else
+	{
+		mLocalSpacePosition1 = Vec3(inSettings.mPoint1);
+		mLocalSpacePosition2 = Vec3(inSettings.mPoint2);
 	}
 }
 
+void PointConstraint::NotifyShapeChanged(const BodyID &inBodyID, Vec3Arg inDeltaCOM)
+{
+	if (mBody1->GetID() == inBodyID)
+		mLocalSpacePosition1 -= inDeltaCOM;
+	else if (mBody2->GetID() == inBodyID)
+		mLocalSpacePosition2 -= inDeltaCOM;
+}
+
+void PointConstraint::SetPoint1(EConstraintSpace inSpace, RVec3Arg inPoint1)
+{
+	if (inSpace == EConstraintSpace::WorldSpace)
+		mLocalSpacePosition1 = Vec3(mBody1->GetInverseCenterOfMassTransform() * inPoint1);
+	else
+		mLocalSpacePosition1 = Vec3(inPoint1);
+}
+
+void PointConstraint::SetPoint2(EConstraintSpace inSpace, RVec3Arg inPoint2)
+{
+	if (inSpace == EConstraintSpace::WorldSpace)
+		mLocalSpacePosition2 = Vec3(mBody2->GetInverseCenterOfMassTransform() * inPoint2);
+	else
+		mLocalSpacePosition2 = Vec3(inPoint2);
+}
+
 void PointConstraint::CalculateConstraintProperties()
-{	
+{
 	mPointConstraintPart.CalculateConstraintProperties(*mBody1, Mat44::sRotation(mBody1->GetRotation()), mLocalSpacePosition1, *mBody2, Mat44::sRotation(mBody2->GetRotation()), mLocalSpacePosition2);
 }
 
 void PointConstraint::SetupVelocityConstraint(float inDeltaTime)
 {
 	CalculateConstraintProperties();
+}
+
+void PointConstraint::ResetWarmStart()
+{
+	mPointConstraintPart.Deactivate();
 }
 
 void PointConstraint::WarmStartVelocityConstraint(float inWarmStartImpulseRatio)
@@ -116,8 +149,8 @@ Ref<ConstraintSettings> PointConstraint::GetConstraintSettings() const
 	PointConstraintSettings *settings = new PointConstraintSettings;
 	ToConstraintSettings(*settings);
 	settings->mSpace = EConstraintSpace::LocalToBodyCOM;
-	settings->mPoint1 = mLocalSpacePosition1;
-	settings->mPoint2 = mLocalSpacePosition2;
+	settings->mPoint1 = RVec3(mLocalSpacePosition1);
+	settings->mPoint2 = RVec3(mLocalSpacePosition2);
 	return settings;
 }
 

@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -12,7 +13,7 @@ class Result
 public:
 	/// Default constructor
 						Result()									{ }
-						
+
 	/// Copy constructor
 						Result(const Result<Type> &inRHS) :
 		mState(inRHS.mState)
@@ -24,7 +25,7 @@ public:
 			break;
 
 		case EState::Error:
-			new (&mError) string(inRHS.mError);
+			new (&mError) String(inRHS.mError);
 			break;
 
 		case EState::Invalid:
@@ -39,18 +40,18 @@ public:
 		switch (inRHS.mState)
 		{
 		case EState::Valid:
-			new (&mResult) Type (move(inRHS.mResult));
+			new (&mResult) Type (std::move(inRHS.mResult));
 			break;
 
 		case EState::Error:
-			new (&mError) string(move(inRHS.mError));
+			new (&mError) String(std::move(inRHS.mError));
 			break;
 
 		case EState::Invalid:
 			break;
 		}
 
-		inRHS.mState = EState::Invalid;
+		// Don't reset the state of inRHS, the destructors still need to be called after a move operation
 	}
 
 	/// Destructor
@@ -70,7 +71,7 @@ public:
 			break;
 
 		case EState::Error:
-			new (&mError) string(inRHS.mError);
+			new (&mError) String(inRHS.mError);
 			break;
 
 		case EState::Invalid:
@@ -90,33 +91,33 @@ public:
 		switch (inRHS.mState)
 		{
 		case EState::Valid:
-			new (&mResult) Type (move(inRHS.mResult));
+			new (&mResult) Type (std::move(inRHS.mResult));
 			break;
 
 		case EState::Error:
-			new (&mError) string(move(inRHS.mError));
+			new (&mError) String(std::move(inRHS.mError));
 			break;
 
 		case EState::Invalid:
 			break;
 		}
 
-		inRHS.mState = EState::Invalid;
+		// Don't reset the state of inRHS, the destructors still need to be called after a move operation
 
 		return *this;
 	}
 
 	/// Clear result or error
 	void				Clear()
-	{ 
-		switch (mState) 
-		{ 
-		case EState::Valid: 
-			mResult.~Type(); 
-			break; 
+	{
+		switch (mState)
+		{
+		case EState::Valid:
+			mResult.~Type();
+			break;
 
 		case EState::Error:
-			mError.~string();
+			mError.~String();
 			break;
 
 		case EState::Invalid:
@@ -139,24 +140,24 @@ public:
 	void				Set(const Type &inResult)					{ Clear(); new (&mResult) Type(inResult); mState = EState::Valid; }
 
 	/// Set the result value (move value)
-	void				Set(const Type &&inResult)					{ Clear(); new (&mResult) Type(move(inResult)); mState = EState::Valid; }
+	void				Set(Type &&inResult)						{ Clear(); new (&mResult) Type(std::move(inResult)); mState = EState::Valid; }
 
 	/// Check if we had an error
 	bool				HasError() const							{ return mState == EState::Error; }
 
 	/// Get the error value
-	const string &		GetError() const							{ JPH_ASSERT(HasError()); return mError; }
+	const String &		GetError() const							{ JPH_ASSERT(HasError()); return mError; }
 
 	/// Set an error value
-	void				SetError(const char *inError)				{ Clear(); new (&mError) string(inError); mState = EState::Error; }
-	void				SetError(const string_view &inError)		{ Clear(); new (&mError) string(inError); mState = EState::Error; }
-	void				SetError(string &&inError)					{ Clear(); new (&mError) string(move(inError)); mState = EState::Error; }
+	void				SetError(const char *inError)				{ Clear(); new (&mError) String(inError); mState = EState::Error; }
+	void				SetError(const string_view &inError)		{ Clear(); new (&mError) String(inError); mState = EState::Error; }
+	void				SetError(String &&inError)					{ Clear(); new (&mError) String(std::move(inError)); mState = EState::Error; }
 
 private:
 	union
 	{
 		Type			mResult;									///< The actual result object
-		string			mError;										///< The error description if the result failed
+		String			mError;										///< The error description if the result failed
 	};
 
 	/// State of the result

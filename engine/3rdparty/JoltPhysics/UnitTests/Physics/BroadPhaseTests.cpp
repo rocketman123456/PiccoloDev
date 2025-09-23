@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -15,19 +16,20 @@ TEST_SUITE("BroadPhaseTests")
 {
 	TEST_CASE("TestBroadPhaseOptimize")
 	{
-		BPLayerInterfaceImpl broad_phase_layer_interface; 
+		BPLayerInterfaceImpl broad_phase_layer_interface;
 
 		// Create body manager
 		BodyManager body_manager;
 		body_manager.Init(1, 0, broad_phase_layer_interface);
-		
+
 		// Create quad tree
 		BroadPhaseQuadTree broadphase;
 		broadphase.Init(&body_manager, broad_phase_layer_interface);
 
 		// Create a box
-		BodyCreationSettings settings(new BoxShape(Vec3::sReplicate(1.0f)), Vec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING);
-		Body &body = *body_manager.CreateBody(settings);
+		BodyCreationSettings settings(new BoxShape(Vec3::sOne()), RVec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING);
+		Body &body = *body_manager.AllocateBody(settings);
+		body_manager.AddBody(&body);
 
 		// Add it to the broadphase
 		BodyID id = body.GetID();
@@ -47,7 +49,7 @@ TEST_SUITE("BroadPhaseTests")
 		CHECK(collector.mHits.empty());
 
 		// Move the body
-		body.SetPositionAndRotationInternal(Vec3(2, 0, 0), Quat::sIdentity());
+		body.SetPositionAndRotationInternal(RVec3(2, 0, 0), Quat::sIdentity());
 		broadphase.NotifyBodiesAABBChanged(&id, 1, true);
 
 		// Test that we hit the box at its previous and current location
@@ -79,7 +81,7 @@ TEST_SUITE("BroadPhaseTests")
 		CHECK(collector.mHits.empty());
 
 		// Move the body again (so that for the next optimize we'll have to discard a tree)
-		body.SetPositionAndRotationInternal(Vec3(4, 0, 0), Quat::sIdentity());
+		body.SetPositionAndRotationInternal(RVec3(4, 0, 0), Quat::sIdentity());
 		broadphase.NotifyBodiesAABBChanged(&id, 1, true);
 
 		// Test that we hit the box at its previous and current location

@@ -1,25 +1,27 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <TestFramework.h>
 
 #include <Tests/Test.h>
-#include <Math/Perlin.h>
+#include <External/Perlin.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Layers.h>
+#include <Renderer/DebugRendererImp.h>
 
 JPH_IMPLEMENT_RTTI_ABSTRACT(Test)
 {
 }
 
-Body &Test::CreateFloor()
+Body &Test::CreateFloor(float inSize)
 {
 	const float scale = GetWorldScale();
 
-	Body &floor = *mBodyInterface->CreateBody(BodyCreationSettings(new BoxShape(scale * Vec3(100.0f, 1.0f, 100.0f), 0.0f), scale * Vec3(0.0f, -1.0f, 0.0f), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
+	Body &floor = *mBodyInterface->CreateBody(BodyCreationSettings(new BoxShape(scale * Vec3(0.5f * inSize, 1.0f, 0.5f * inSize), 0.0f), RVec3(scale * Vec3(0.0f, -1.0f, 0.0f)), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
 	mBodyInterface->AddBody(floor.GetID(), EActivation::DontActivate);
 	return floor;
 }
@@ -95,7 +97,7 @@ Body &Test::CreateLargeTriangleFloor()
 	};
 	MeshShapeSettings mesh_settings(triangles);
 	mesh_settings.SetEmbedded();
-	BodyCreationSettings floor_settings(&mesh_settings, Vec3(-256.0f, 0.0f, 256.0f), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING);
+	BodyCreationSettings floor_settings(&mesh_settings, RVec3(-256.0f, 0.0f, 256.0f), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING);
 	Body &floor = *mBodyInterface->CreateBody(floor_settings);
 	mBodyInterface->AddBody(floor.GetID(), EActivation::DontActivate);
 	return floor;
@@ -105,7 +107,7 @@ Body &Test::CreateMeshTerrain()
 {
 	const float scale = GetWorldScale();
 
-#ifdef _DEBUG
+#ifdef JPH_DEBUG
 	const int n = 50;
 	const float cell_size = scale * 2.0f;
 #else
@@ -142,7 +144,7 @@ Body &Test::CreateMeshTerrain()
 		}
 
 	// Floor
-	Body &floor = *mBodyInterface->CreateBody(BodyCreationSettings(new MeshShapeSettings(triangles), Vec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
+	Body &floor = *mBodyInterface->CreateBody(BodyCreationSettings(new MeshShapeSettings(triangles), RVec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
 	mBodyInterface->AddBody(floor.GetID(), EActivation::DontActivate);
 	return floor;
 }
@@ -165,7 +167,20 @@ Body &Test::CreateHeightFieldTerrain()
 	RefConst<ShapeSettings> height_field = new HeightFieldShapeSettings(heights, Vec3(-0.5f * cell_size * n, 0.0f, -0.5f * cell_size * n), Vec3(cell_size, 1.0f, cell_size), n);
 
 	// Floor
-	Body &floor = *mBodyInterface->CreateBody(BodyCreationSettings(height_field, Vec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
+	Body &floor = *mBodyInterface->CreateBody(BodyCreationSettings(height_field, RVec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
 	mBodyInterface->AddBody(floor.GetID(), EActivation::DontActivate);
 	return floor;
+}
+
+void Test::DrawBodyLabels()
+{
+	for (const BodyLabels::value_type &l : mBodyLabels)
+	{
+		BodyLockRead body_lock(mPhysicsSystem->GetBodyLockInterface(), l.first);
+		if (body_lock.Succeeded())
+		{
+			const Body &body = body_lock.GetBody();
+			mDebugRenderer->DrawText3D(body.GetPosition(), l.second, Color::sWhite, GetWorldScale() * 0.5f);
+		}
+	}
 }

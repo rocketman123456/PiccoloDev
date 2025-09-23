@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -8,6 +9,15 @@ JPH_SUPPRESS_WARNINGS_STD_BEGIN
 JPH_SUPPRESS_WARNINGS_STD_END
 
 JPH_NAMESPACE_BEGIN
+
+// Things we're using from STL
+using std::atomic;
+using std::memory_order;
+using std::memory_order_relaxed;
+using std::memory_order_acquire;
+using std::memory_order_release;
+using std::memory_order_acq_rel;
+using std::memory_order_seq_cst;
 
 /// Atomically compute the min(ioAtomic, inValue) and store it in ioAtomic, returns true if value was updated
 template <class T>

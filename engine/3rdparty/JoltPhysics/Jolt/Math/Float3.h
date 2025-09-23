@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -11,14 +12,17 @@ JPH_NAMESPACE_BEGIN
 class [[nodiscard]] Float3
 {
 public:
+	JPH_OVERRIDE_NEW_DELETE
+
 				Float3() = default; ///< Intentionally not initialized for performance reasons
 				Float3(const Float3 &inRHS) = default;
-				Float3(float inX, float inY, float inZ) : x(inX), y(inY), z(inZ) { }
+	Float3 &	operator = (const Float3 &inRHS) = default;
+	constexpr	Float3(float inX, float inY, float inZ) : x(inX), y(inY), z(inZ) { }
 
-	float		operator [] (int inCoordinate) const	
-	{ 
-		JPH_ASSERT(inCoordinate < 3); 
-		return *(&x + inCoordinate); 
+	float		operator [] (int inCoordinate) const
+	{
+		JPH_ASSERT(inCoordinate < 3);
+		return *(&x + inCoordinate);
 	}
 
 	bool		operator == (const Float3 &inRHS) const
@@ -36,11 +40,11 @@ public:
 	float		z;
 };
 
-using VertexList = vector<Float3>;
+using VertexList = Array<Float3>;
 
-static_assert(is_trivial<Float3>(), "Is supposed to be a trivial type!");
+static_assert(std::is_trivial<Float3>(), "Is supposed to be a trivial type!");
 
 JPH_NAMESPACE_END
 
-// Create a std::hash for Float3
+// Create a std::hash/JPH::Hash for Float3
 JPH_MAKE_HASHABLE(JPH::Float3, t.x, t.y, t.z)

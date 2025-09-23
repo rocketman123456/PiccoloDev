@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -5,11 +6,7 @@
 
 #include <Jolt/Core/NonCopyable.h>
 #include <Jolt/Core/Mutex.h>
-#include <Jolt/Core/Memory.h>
-
-JPH_SUPPRESS_WARNINGS_STD_BEGIN
-#include <atomic>
-JPH_SUPPRESS_WARNINGS_STD_END
+#include <Jolt/Core/Atomics.h>
 
 JPH_NAMESPACE_BEGIN
 
@@ -21,14 +18,10 @@ class FixedSizeFreeList : public NonCopyable
 {
 private:
 	/// Storage type for an Object
-	struct alignas(Object) ObjectStorage
+	struct ObjectStorage
 	{
-		/// Constructor to satisfy the vector class
-							ObjectStorage() = default;
-							ObjectStorage(const ObjectStorage &inRHS) : mNextFreeObject(inRHS.mNextFreeObject.load()) { memcpy(mData, inRHS.mData, sizeof(Object)); }
-
-		/// Storage space for the Object, stored as uninitialized data
-		uint8				mData[sizeof(Object)];
+		/// The object we're storing
+		Object				mObject;
 
 		/// When the object is freed (or in the process of being freed as a batch) this will contain the next free object
 		/// When an object is in use it will contain the object's index in the free list
@@ -40,17 +33,6 @@ private:
 	/// Access the object storage given the object index
 	const ObjectStorage &	GetStorage(uint32 inObjectIndex) const	{ return mPages[inObjectIndex >> mPageShift][inObjectIndex & mObjectMask]; }
 	ObjectStorage &			GetStorage(uint32 inObjectIndex)		{ return mPages[inObjectIndex >> mPageShift][inObjectIndex & mObjectMask]; }
-
-	/// Number of objects that we currently have in the free list / new pages
-#ifdef JPH_ENABLE_ASSERTS
-	atomic<uint32>			mNumFreeObjects;
-#endif // JPH_ENABLE_ASSERTS
-
-	/// Simple counter that makes the first free object pointer update with every CAS so that we don't suffer from the ABA problem
-	atomic<uint32>			mAllocationTag;
-
-	/// Index of first free object, the first 32 bits of an object are used to point to the next free object
-	atomic<uint64>			mFirstFreeObjectAndTag;
 
 	/// Size (in objects) of a single page
 	uint32					mPageSize;
@@ -67,14 +49,27 @@ private:
 	/// Total number of objects that have been allocated
 	uint32					mNumObjectsAllocated;
 
-	/// The first free object to use when the free list is empty (may need to allocate a new page)
-	atomic<uint32>			mFirstFreeObjectInNewPage;
-
 	/// Array of pages of objects
 	ObjectStorage **		mPages = nullptr;
 
 	/// Mutex that is used to allocate a new page if the storage runs out
-	Mutex					mPageMutex;
+	/// This variable is aligned to the cache line to prevent false sharing with
+	/// the constants used to index into the list via `Get()`.
+	alignas(JPH_CACHE_LINE_SIZE) Mutex mPageMutex;
+
+	/// Number of objects that we currently have in the free list / new pages
+#ifdef JPH_ENABLE_ASSERTS
+	atomic<uint32>			mNumFreeObjects;
+#endif // JPH_ENABLE_ASSERTS
+
+	/// Simple counter that makes the first free object pointer update with every CAS so that we don't suffer from the ABA problem
+	atomic<uint32>			mAllocationTag;
+
+	/// Index of first free object, the first 32 bits of an object are used to point to the next free object
+	atomic<uint64>			mFirstFreeObjectAndTag;
+
+	/// The first free object to use when the free list is empty (may need to allocate a new page)
+	atomic<uint32>			mFirstFreeObjectInNewPage;
 
 public:
 	/// Invalid index
@@ -116,10 +111,10 @@ public:
 	inline void				DestructObjectBatch(Batch &ioBatch);
 
 	/// Access an object by index.
-	inline Object &			Get(uint32 inObjectIndex)				{ return reinterpret_cast<Object &>(GetStorage(inObjectIndex).mData); }
+	inline Object &			Get(uint32 inObjectIndex)				{ return GetStorage(inObjectIndex).mObject; }
 
 	/// Access an object by index.
-	inline const Object &	Get(uint32 inObjectIndex) const			{ return reinterpret_cast<const Object &>(GetStorage(inObjectIndex).mData); }
+	inline const Object &	Get(uint32 inObjectIndex) const			{ return GetStorage(inObjectIndex).mObject; }
 };
 
 JPH_NAMESPACE_END

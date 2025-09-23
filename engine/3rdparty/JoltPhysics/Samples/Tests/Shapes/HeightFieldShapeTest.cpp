@@ -1,40 +1,44 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <TestFramework.h>
 
 #include <Tests/Shapes/HeightFieldShapeTest.h>
-#include <Math/Perlin.h>
+#include <External/Perlin.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/PhysicsMaterialSimple.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/RayCast.h>
-#include <Renderer/DebugRendererImp.h>
 #include <Application/DebugUI.h>
 #include <Utils/ReadData.h>
 #include <Utils/Log.h>
+#include <Utils/DebugRendererSP.h>
 #include <Layers.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(HeightFieldShapeTest) 
-{ 
-	JPH_ADD_BASE_CLASS(HeightFieldShapeTest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(HeightFieldShapeTest)
+{
+	JPH_ADD_BASE_CLASS(HeightFieldShapeTest, Test)
 }
 
 static int sTerrainType = 0;
 
 static const char *sTerrainTypes[] = {
-	"Procedural Terrain",
+	"Procedural Terrain 2^N",
+	"Procedural Terrain 2^N + 1",
 	"Heightfield 1",
-	"Flat",
-	"No Collision"
+	"Flat 2^N",
+	"Flat 2^N + 1",
+	"No Collision 2^N",
+	"No Collision 2^N + 1"
 };
 
 void HeightFieldShapeTest::Initialize()
 {
-	if (sTerrainType == 0)
+	if (sTerrainType == 0 || sTerrainType == 1)
 	{
-		const int n = 128;
+		const int n = sTerrainType == 0? 128 : 129;
 		const float cell_size = 1.0f;
 		const float max_height = 5.0f;
 
@@ -80,13 +84,13 @@ void HeightFieldShapeTest::Initialize()
 		mTerrainOffset = Vec3(-0.5f * cell_size * n, -2.0f, -0.5f * cell_size * n);
 		mTerrainScale = Vec3(cell_size, 1.5f, cell_size);
 	}
-	else if (sTerrainType == 1)
+	else if (sTerrainType == 2)
 	{
 		const int n = 1024;
 		const float cell_size = 0.5f;
-		
+
 		// Get height samples
-		vector<uint8> data = ReadData("Assets/heightfield1.bin");
+		Array<uint8> data = ReadData("heightfield1.bin");
 		if (data.size() != sizeof(float) * n * n)
 			FatalError("Invalid file size");
 		mTerrainSize = n;
@@ -97,9 +101,9 @@ void HeightFieldShapeTest::Initialize()
 		mTerrainOffset = Vec3(-0.5f * cell_size * n, 0.0f, -0.5f * cell_size * n);
 		mTerrainScale = Vec3(cell_size, 1.0f, cell_size);
 	}
-	else if (sTerrainType == 2)
+	else if (sTerrainType == 3 || sTerrainType == 4)
 	{
-		const int n = 128;
+		const int n = sTerrainType == 3? 128 : 129;
 		const float cell_size = 1.0f;
 		const float height = JPH_PI;
 
@@ -107,15 +111,15 @@ void HeightFieldShapeTest::Initialize()
 		mTerrainOffset = Vec3(-0.5f * cell_size * n, 0.0f, -0.5f * cell_size * n);
 		mTerrainScale = Vec3(cell_size, 1.0f, cell_size);
 
-		// Mark the entire terrain as no collision
+		// Mark the entire terrain as single height
 		mTerrainSize = n;
 		mTerrain.resize(n * n);
 		for (float &v : mTerrain)
 			v = height;
 	}
-	else if (sTerrainType == 3)
+	else if (sTerrainType == 5 || sTerrainType == 6)
 	{
-		const int n = 128;
+		const int n = sTerrainType == 4? 128 : 129;
 		const float cell_size = 1.0f;
 
 		// Determine scale and offset
@@ -133,9 +137,8 @@ void HeightFieldShapeTest::Initialize()
 	HeightFieldShapeSettings settings(mTerrain.data(), mTerrainOffset, mTerrainScale, mTerrainSize, mMaterialIndices.data(), mMaterials);
 	settings.mBlockSize = 1 << sBlockSizeShift;
 	settings.mBitsPerSample = sBitsPerSample;
-	mHeightField = static_cast<const HeightFieldShape *>(settings.Create().Get().GetPtr());
-	Body &terrain = *mBodyInterface->CreateBody(BodyCreationSettings(mHeightField, Vec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING));
-	mBodyInterface->AddBody(terrain.GetID(), EActivation::DontActivate);
+	mHeightField = StaticCast<HeightFieldShape>(settings.Create().Get());
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(mHeightField, RVec3::sZero(), Quat::sIdentity(), EMotionType::Static, Layers::NON_MOVING), EActivation::DontActivate);
 
 	// Validate it
 	float max_diff = -1.0f;
@@ -188,27 +191,26 @@ void HeightFieldShapeTest::Initialize()
 
 	// Determine terrain height
 	RayCastResult result;
-	Vec3 start(0, 1000, 0);
+	RVec3 start(0, 1000, 0);
 	Vec3 direction(0, -2000, 0);
-	RayCast ray { start, direction };
+	RRayCast ray { start, direction };
 	if (mPhysicsSystem->GetNarrowPhaseQuery().CastRay(ray, result, SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING), SpecifiedObjectLayerFilter(Layers::NON_MOVING)))
-		mHitPos = start + result.mFraction * direction;
+		mHitPos = ray.GetPointOnRay(result.mFraction);
 
 	// Dynamic body
-	Body &body1 = *mBodyInterface->CreateBody(BodyCreationSettings(new BoxShape(Vec3(0.5f, 1.0f, 2.0f)), mHitPos + Vec3(0, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING));
-	mBodyInterface->AddBody(body1.GetID(), EActivation::Activate);
+	mBodyInterface->CreateAndAddBody(BodyCreationSettings(new BoxShape(Vec3(0.5f, 1.0f, 2.0f)), mHitPos + Vec3(0, 10, 0), Quat::sIdentity(), EMotionType::Dynamic, Layers::MOVING), EActivation::Activate);
 }
 
 void HeightFieldShapeTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 {
 	// Test the 'GetHeight' function and draw a marker on the surface
-	Vec3 test_pos = inParams.mCameraState.mPos + 10.0f * inParams.mCameraState.mForward, surface_pos;
+	Vec3 test_pos = Vec3(inParams.mCameraState.mPos) + 10.0f * inParams.mCameraState.mForward, surface_pos;
 	SubShapeID sub_shape_id;
 	if (mHeightField->ProjectOntoSurface(test_pos, surface_pos, sub_shape_id))
 	{
 		Vec3 surface_normal = mHeightField->GetSurfaceNormal(sub_shape_id, surface_pos);
-		mDebugRenderer->DrawMarker(surface_pos, Color::sWhite, 1.0f);
-		mDebugRenderer->DrawArrow(surface_pos, surface_pos + surface_normal, Color::sRed, 0.1f);
+		DrawMarkerSP(mDebugRenderer, surface_pos, Color::sWhite, 1.0f);
+		DrawArrowSP(mDebugRenderer, surface_pos, surface_pos + surface_normal, Color::sRed, 0.1f);
 	}
 
 	// Draw the original uncompressed terrain
@@ -231,7 +233,7 @@ void HeightFieldShapeTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 				const float cMaxError = 0.1f;
 				float error = (original - compressed).Length();
 				uint8 c = uint8(round(255.0f * min(error / cMaxError, 1.0f)));
-				mDebugRenderer->DrawMarker(original, Color(c, 255 - c, 0, 255), 0.1f);
+				DrawMarkerSP(mDebugRenderer, original, Color(c, 255 - c, 0, 255), 0.1f);
 			}
 }
 
@@ -243,21 +245,21 @@ void HeightFieldShapeTest::GetInitialCamera(CameraState &ioState) const
 
 void HeightFieldShapeTest::CreateSettingsMenu(DebugUI *inUI, UIElement *inSubMenu)
 {
-	inUI->CreateTextButton(inSubMenu, "Select Terrain", [this, inUI]() { 
+	inUI->CreateTextButton(inSubMenu, "Select Terrain", [this, inUI]() {
 		UIElement *terrain_name = inUI->CreateMenu();
 		for (uint i = 0; i < size(sTerrainTypes); ++i)
 			inUI->CreateTextButton(terrain_name, sTerrainTypes[i], [this, i]() { sTerrainType = i; RestartTest(); });
 		inUI->ShowMenu(terrain_name);
 	});
 
-	inUI->CreateTextButton(inSubMenu, "Configuration Settings", [this, inUI]() { 
+	inUI->CreateTextButton(inSubMenu, "Configuration Settings", [this, inUI]() {
 		UIElement *terrain_settings = inUI->CreateMenu();
 		inUI->CreateComboBox(terrain_settings, "Block Size", { "2", "4", "8" }, sBlockSizeShift - 1, [=](int inItem) { sBlockSizeShift = inItem + 1; });
 		inUI->CreateSlider(terrain_settings, "Bits Per Sample", (float)sBitsPerSample, 1.0f, 8.0f, 1.0f, [=](float inValue) { sBitsPerSample = (int)inValue; });
 		inUI->CreateTextButton(terrain_settings, "Accept", [this]() { RestartTest(); });
 		inUI->ShowMenu(terrain_settings);
 	});
-	
+
 	inUI->CreateCheckBox(inSubMenu, "Show Original Terrain", sShowOriginalTerrain, [](UICheckBox::EState inState) { sShowOriginalTerrain = inState == UICheckBox::STATE_CHECKED; });
 }
 

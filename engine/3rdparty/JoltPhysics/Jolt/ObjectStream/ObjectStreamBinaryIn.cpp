@@ -1,7 +1,10 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <Jolt/Jolt.h>
+
+#ifdef JPH_OBJECT_STREAM
 
 #include <Jolt/ObjectStream/ObjectStreamBinaryIn.h>
 
@@ -21,7 +24,7 @@ bool ObjectStreamBinaryIn::ReadDataType(EOSDataType &outType)
 	return true;
 }
 
-bool ObjectStreamBinaryIn::ReadName(string &outName)
+bool ObjectStreamBinaryIn::ReadName(String &outName)
 {
 	return ReadPrimitiveData(outName);
 }
@@ -98,6 +101,15 @@ bool ObjectStreamBinaryIn::ReadPrimitiveData(float &outPrimitive)
 	return true;
 }
 
+bool ObjectStreamBinaryIn::ReadPrimitiveData(double &outPrimitive)
+{
+	double primitive;
+	mStream.read((char *)&primitive, sizeof(primitive));
+	if (mStream.fail()) return false;
+	outPrimitive = primitive;
+	return true;
+}
+
 bool ObjectStreamBinaryIn::ReadPrimitiveData(bool &outPrimitive)
 {
 	bool primitive;
@@ -107,7 +119,7 @@ bool ObjectStreamBinaryIn::ReadPrimitiveData(bool &outPrimitive)
 	return true;
 }
 
-bool ObjectStreamBinaryIn::ReadPrimitiveData(string &outPrimitive)
+bool ObjectStreamBinaryIn::ReadPrimitiveData(String &outPrimitive)
 {
 	// Read length or ID of string
 	uint32 len;
@@ -125,7 +137,7 @@ bool ObjectStreamBinaryIn::ReadPrimitiveData(string &outPrimitive)
 	if (len & 0x80000000)
 	{
 		StringTable::iterator i = mStringTable.find(len);
-		if (i == mStringTable.end()) 
+		if (i == mStringTable.end())
 			return false;
 		outPrimitive = i->second;
 		return true;
@@ -153,6 +165,24 @@ bool ObjectStreamBinaryIn::ReadPrimitiveData(Float3 &outPrimitive)
 	return true;
 }
 
+bool ObjectStreamBinaryIn::ReadPrimitiveData(Float4 &outPrimitive)
+{
+	Float4 primitive;
+	mStream.read((char *)&primitive, sizeof(Float4));
+	if (mStream.fail()) return false;
+	outPrimitive = primitive;
+	return true;
+}
+
+bool ObjectStreamBinaryIn::ReadPrimitiveData(Double3 &outPrimitive)
+{
+	Double3 primitive;
+	mStream.read((char *)&primitive, sizeof(Double3));
+	if (mStream.fail()) return false;
+	outPrimitive = primitive;
+	return true;
+}
+
 bool ObjectStreamBinaryIn::ReadPrimitiveData(Vec3 &outPrimitive)
 {
 	Float3 primitive;
@@ -162,9 +192,27 @@ bool ObjectStreamBinaryIn::ReadPrimitiveData(Vec3 &outPrimitive)
 	return true;
 }
 
+bool ObjectStreamBinaryIn::ReadPrimitiveData(DVec3 &outPrimitive)
+{
+	Double3 primitive;
+	mStream.read((char *)&primitive, sizeof(Double3));
+	if (mStream.fail()) return false;
+	outPrimitive = DVec3(primitive); // Use Float3 constructor so that we initialize W too
+	return true;
+}
+
 bool ObjectStreamBinaryIn::ReadPrimitiveData(Vec4 &outPrimitive)
 {
 	Vec4 primitive;
+	mStream.read((char *)&primitive, sizeof(primitive));
+	if (mStream.fail()) return false;
+	outPrimitive = primitive;
+	return true;
+}
+
+bool ObjectStreamBinaryIn::ReadPrimitiveData(UVec4 &outPrimitive)
+{
+	UVec4 primitive;
 	mStream.read((char *)&primitive, sizeof(primitive));
 	if (mStream.fail()) return false;
 	outPrimitive = primitive;
@@ -189,4 +237,16 @@ bool ObjectStreamBinaryIn::ReadPrimitiveData(Mat44 &outPrimitive)
 	return true;
 }
 
+bool ObjectStreamBinaryIn::ReadPrimitiveData(DMat44 &outPrimitive)
+{
+	Vec4 c0, c1, c2;
+	DVec3 c3;
+	if (!ReadPrimitiveData(c0) || !ReadPrimitiveData(c1) || !ReadPrimitiveData(c2) || !ReadPrimitiveData(c3))
+		return false;
+	outPrimitive = DMat44(c0, c1, c2, c3);
+	return true;
+}
+
 JPH_NAMESPACE_END
+
+#endif // JPH_OBJECT_STREAM

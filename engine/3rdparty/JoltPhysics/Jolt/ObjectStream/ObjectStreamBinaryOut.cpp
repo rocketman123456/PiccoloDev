@@ -1,7 +1,10 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #include <Jolt/Jolt.h>
+
+#ifdef JPH_OBJECT_STREAM
 
 #include <Jolt/ObjectStream/ObjectStreamBinaryOut.h>
 #include <Jolt/Core/StringTools.h>
@@ -11,7 +14,7 @@ JPH_NAMESPACE_BEGIN
 ObjectStreamBinaryOut::ObjectStreamBinaryOut(ostream &inStream) :
 	ObjectStreamOut(inStream)
 {
-	string header;
+	String header;
 	header = StringFormat("BOS%2d.%02d", ObjectStream::sVersion, ObjectStream::sRevision);
 	mStream.write(header.c_str(), header.size());
 }
@@ -23,7 +26,7 @@ void ObjectStreamBinaryOut::WriteDataType(EOSDataType inType)
 
 void ObjectStreamBinaryOut::WriteName(const char *inName)
 {
-	WritePrimitiveData(string(inName));
+	WritePrimitiveData(String(inName));
 }
 
 void ObjectStreamBinaryOut::WriteIdentifier(Identifier inIdentifier)
@@ -66,12 +69,17 @@ void ObjectStreamBinaryOut::WritePrimitiveData(const float &inPrimitive)
 	mStream.write((const char *)&inPrimitive, sizeof(inPrimitive));
 }
 
+void ObjectStreamBinaryOut::WritePrimitiveData(const double &inPrimitive)
+{
+	mStream.write((const char *)&inPrimitive, sizeof(inPrimitive));
+}
+
 void ObjectStreamBinaryOut::WritePrimitiveData(const bool &inPrimitive)
 {
 	mStream.write((const char *)&inPrimitive, sizeof(inPrimitive));
 }
 
-void ObjectStreamBinaryOut::WritePrimitiveData(const string &inPrimitive)
+void ObjectStreamBinaryOut::WritePrimitiveData(const String &inPrimitive)
 {
 	// Empty strings are trivial
 	if (inPrimitive.empty())
@@ -103,12 +111,32 @@ void ObjectStreamBinaryOut::WritePrimitiveData(const Float3 &inPrimitive)
 	mStream.write((const char *)&inPrimitive, sizeof(Float3));
 }
 
+void ObjectStreamBinaryOut::WritePrimitiveData(const Float4 &inPrimitive)
+{
+	mStream.write((const char *)&inPrimitive, sizeof(Float4));
+}
+
+void ObjectStreamBinaryOut::WritePrimitiveData(const Double3 &inPrimitive)
+{
+	mStream.write((const char *)&inPrimitive, sizeof(Double3));
+}
+
 void ObjectStreamBinaryOut::WritePrimitiveData(const Vec3 &inPrimitive)
 {
 	mStream.write((const char *)&inPrimitive, 3 * sizeof(float));
 }
 
+void ObjectStreamBinaryOut::WritePrimitiveData(const DVec3 &inPrimitive)
+{
+	mStream.write((const char *)&inPrimitive, 3 * sizeof(double));
+}
+
 void ObjectStreamBinaryOut::WritePrimitiveData(const Vec4 &inPrimitive)
+{
+	mStream.write((const char *)&inPrimitive, sizeof(inPrimitive));
+}
+
+void ObjectStreamBinaryOut::WritePrimitiveData(const UVec4 &inPrimitive)
 {
 	mStream.write((const char *)&inPrimitive, sizeof(inPrimitive));
 }
@@ -123,4 +151,15 @@ void ObjectStreamBinaryOut::WritePrimitiveData(const Mat44 &inPrimitive)
 	mStream.write((const char *)&inPrimitive, sizeof(inPrimitive));
 }
 
+void ObjectStreamBinaryOut::WritePrimitiveData(const DMat44 &inPrimitive)
+{
+	WritePrimitiveData(inPrimitive.GetColumn4(0));
+	WritePrimitiveData(inPrimitive.GetColumn4(1));
+	WritePrimitiveData(inPrimitive.GetColumn4(2));
+	WritePrimitiveData(inPrimitive.GetTranslation());
+}
+
 JPH_NAMESPACE_END
+
+#endif // JPH_OBJECT_STREAM
+

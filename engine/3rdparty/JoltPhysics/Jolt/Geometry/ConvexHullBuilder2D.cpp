@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -18,10 +19,10 @@ void ConvexHullBuilder2D::Edge::CalculateNormalAndCenter(const Vec3 *inPositions
 
 	// Center of edge
 	mCenter = 0.5f * (p1 + p2);
-			
-	// Create outward pointing normal. 
+
+	// Create outward pointing normal.
 	// We have two choices for the normal (which satisfies normal . edge = 0):
-	// normal1 = (-edge.y, edge.x, 0) 
+	// normal1 = (-edge.y, edge.x, 0)
 	// normal2 = (edge.y, -edge.x, 0)
 	// We want (normal x edge).z > 0 so that the normal points out of the polygon. Only normal2 satisfies this condition.
 	Vec3 edge = p2 - p1;
@@ -33,7 +34,7 @@ ConvexHullBuilder2D::ConvexHullBuilder2D(const Positions &inPositions) :
 {
 #ifdef JPH_CONVEX_BUILDER_2D_DEBUG
 	// Center the drawing of the first hull around the origin and calculate the delta offset between states
-	mOffset = Vec3::sZero();
+	mOffset = RVec3::sZero();
 	if (mPositions.empty())
 	{
 		// No hull will be generated
@@ -48,7 +49,7 @@ ConvexHullBuilder2D::ConvexHullBuilder2D(const Positions &inPositions) :
 			maxv = Vec3::sMax(maxv, v);
 			mOffset -= v;
 		}
-		mOffset /= float(mPositions.size());
+		mOffset /= Real(mPositions.size());
 		mDelta = Vec3((maxv - minv).GetX() + 0.5f, 0, 0);
 		mOffset += mDelta; // Don't start at origin, we're already drawing the final hull there
 	}
@@ -98,7 +99,7 @@ void ConvexHullBuilder2D::ValidateEdges() const
 
 		++count;
 		edge = edge->mNextEdge;
-	} while (edge != mFirstEdge);	
+	} while (edge != mFirstEdge);
 
 	// Validate that count matches
 	JPH_ASSERT(count == mNumEdges);
@@ -106,7 +107,7 @@ void ConvexHullBuilder2D::ValidateEdges() const
 
 #endif // JPH_ENABLE_ASSERTS
 
-void ConvexHullBuilder2D::AssignPointToEdge(int inPositionIdx, const vector<Edge *> &inEdges) const
+void ConvexHullBuilder2D::AssignPointToEdge(int inPositionIdx, const Array<Edge *> &inEdges) const
 {
 	Vec3 point = mPositions[inPositionIdx];
 
@@ -134,15 +135,14 @@ void ConvexHullBuilder2D::AssignPointToEdge(int inPositionIdx, const vector<Edge
 	{
 		if (best_dist_sq > best_edge->mFurthestPointDistanceSq)
 		{
-			// This point is futher away than any others, update the distance and add point as last point
+			// This point is further away than any others, update the distance and add point as last point
 			best_edge->mFurthestPointDistanceSq = best_dist_sq;
 			best_edge->mConflictList.push_back(inPositionIdx);
 		}
 		else
 		{
 			// Not the furthest point, add it as the before last point
-			best_edge->mConflictList.push_back(best_edge->mConflictList.back());
-			best_edge->mConflictList[best_edge->mConflictList.size() - 2] = inPositionIdx;
+			best_edge->mConflictList.insert(best_edge->mConflictList.begin() + best_edge->mConflictList.size() - 1, inPositionIdx);
 		}
 	}
 }
@@ -169,7 +169,7 @@ ConvexHullBuilder2D::EResult ConvexHullBuilder2D::Initialize(int inIdx1, int inI
 	// Start with the initial indices in counter clockwise order
 	float z = (mPositions[inIdx2] - mPositions[inIdx1]).Cross(mPositions[inIdx3] - mPositions[inIdx1]).GetZ();
 	if (z < 0.0f)
-		swap(inIdx1, inIdx2);
+		std::swap(inIdx1, inIdx2);
 
 	// Create and link edges
 	Edge *e1 = new Edge(inIdx1);
@@ -185,7 +185,7 @@ ConvexHullBuilder2D::EResult ConvexHullBuilder2D::Initialize(int inIdx1, int inI
 	mNumEdges = 3;
 
 	// Build the initial conflict lists
-	vector<Edge *> edges { e1, e2, e3 };
+	Array<Edge *> edges { e1, e2, e3 };
 	for (Edge *edge : edges)
 		edge->CalculateNormalAndCenter(mPositions.data());
 	for (int idx = 0; idx < (int)mPositions.size(); ++idx)
@@ -262,7 +262,7 @@ ConvexHullBuilder2D::EResult ConvexHullBuilder2D::Initialize(int inIdx1, int inI
 		mNumEdges += 2;
 
 		// Calculate normals
-		vector<Edge *> new_edges { e1, e2 };
+		Array<Edge *> new_edges { e1, e2 };
 		for (Edge *new_edge : new_edges)
 			new_edge->CalculateNormalAndCenter(mPositions.data());
 
@@ -317,8 +317,8 @@ void ConvexHullBuilder2D::DrawState()
 		Color color = Color::sGetDistinctColor(color_idx++);
 
 		// Draw edge and normal
-		DebugRenderer::sInstance->DrawArrow(cDrawScale * (mPositions[edge->mStartIdx] + mOffset), cDrawScale * (mPositions[next->mStartIdx] + mOffset), color, 0.1f);
-		DebugRenderer::sInstance->DrawArrow(cDrawScale * (edge->mCenter + mOffset), cDrawScale * (edge->mCenter + mOffset) + edge->mNormal.NormalizedOr(Vec3::sZero()), Color::sGreen, 0.1f);
+		DebugRenderer::sInstance->DrawArrow(cDrawScale * (mOffset + mPositions[edge->mStartIdx]), cDrawScale * (mOffset + mPositions[next->mStartIdx]), color, 0.1f);
+		DebugRenderer::sInstance->DrawArrow(cDrawScale * (mOffset + edge->mCenter), cDrawScale * (mOffset + edge->mCenter) + edge->mNormal.NormalizedOr(Vec3::sZero()), Color::sGreen, 0.1f);
 
 		// Draw points that belong to this edge in the same color
 		for (int idx : edge->mConflictList)

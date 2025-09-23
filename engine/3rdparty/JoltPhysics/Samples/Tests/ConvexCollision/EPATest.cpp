@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -8,11 +9,11 @@
 #include <Jolt/Geometry/AABox.h>
 #include <Jolt/Geometry/ConvexSupport.h>
 #include <Jolt/Geometry/EPAPenetrationDepth.h>
-#include <Renderer/DebugRendererImp.h>
+#include <Utils/DebugRendererSP.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(EPATest) 
-{ 
-	JPH_ADD_BASE_CLASS(EPATest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(EPATest)
+{
+	JPH_ADD_BASE_CLASS(EPATest, Test)
 }
 
 void EPATest::PrePhysicsUpdate(const PreUpdateParams &inParams)
@@ -28,12 +29,12 @@ void EPATest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 bool EPATest::CollideBoxSphere(Mat44Arg inMatrix, const AABox &inBox, const Sphere &inSphere) const
 {
 	// Draw the box and shere
-	mDebugRenderer->DrawBox(inMatrix, inBox, Color::sGrey);
-	mDebugRenderer->DrawSphere(inMatrix * inSphere.GetCenter(), inSphere.GetRadius(), Color::sGrey); 
+	DrawBoxSP(mDebugRenderer, inMatrix, inBox, Color::sGrey);
+	DrawSphereSP(mDebugRenderer, inMatrix * inSphere.GetCenter(), inSphere.GetRadius(), Color::sGrey);
 
 	// Transform the box and sphere according to inMatrix
-	TransformedConvexObject<AABox> transformed_box(inMatrix, inBox);
-	TransformedConvexObject<Sphere> transformed_sphere(inMatrix, inSphere);
+	TransformedConvexObject transformed_box(inMatrix, inBox);
+	TransformedConvexObject transformed_sphere(inMatrix, inSphere);
 
 	// Run the EPA algorithm
 	EPAPenetrationDepth epa;
@@ -43,9 +44,9 @@ bool EPATest::CollideBoxSphere(Mat44Arg inMatrix, const AABox &inBox, const Sphe
 	// Draw iterative solution
 	if (intersect1)
 	{
-		mDebugRenderer->DrawMarker(pa1, Color::sRed, 1.0f);
-		mDebugRenderer->DrawMarker(pb1, Color::sGreen, 1.0f);
-		mDebugRenderer->DrawArrow(pb1 + Vec3(0, 1, 0), pb1 + Vec3(0, 1, 0) + v1, Color::sYellow, 0.1f);
+		DrawMarkerSP(mDebugRenderer, pa1, Color::sRed, 1.0f);
+		DrawMarkerSP(mDebugRenderer, pb1, Color::sGreen, 1.0f);
+		DrawArrowSP(mDebugRenderer, pb1 + Vec3(0, 1, 0), pb1 + Vec3(0, 1, 0) + v1, Color::sYellow, 0.1f);
 	}
 
 	// Calculate analytical solution
@@ -64,13 +65,13 @@ bool EPATest::CollideBoxSphere(Mat44Arg inMatrix, const AABox &inBox, const Sphe
 		pb2 = inMatrix * pb2;
 
 		// Draw analytical solution
-		mDebugRenderer->DrawMarker(pa2, Color::sOrange, 1.0f);
-		mDebugRenderer->DrawMarker(pb2, Color::sYellow, 1.0f);
+		DrawMarkerSP(mDebugRenderer, pa2, Color::sOrange, 1.0f);
+		DrawMarkerSP(mDebugRenderer, pb2, Color::sYellow, 1.0f);
 
 		// Check angle between v1 and v2
 		float dot = v1.Dot(v2);
 		float len = v1.Length() * v2.Length();
-		float angle = RadiansToDegrees(acos(Clamp(dot / len, -1.0f, 1.0f)));
+		float angle = RadiansToDegrees(ACos(dot / len));
 		JPH_ASSERT(angle < 0.1f);
 		Trace("Angle = %.9g", (double)angle);
 

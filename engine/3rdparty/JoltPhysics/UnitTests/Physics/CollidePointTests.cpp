@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -78,7 +79,7 @@ TEST_SUITE("CollidePointTests")
 		CHECK(collector.mHits.size() == 1);
 	}
 
-	static void sTestHit(const NarrowPhaseQuery &inNarrowPhase, Vec3Arg inPosition, const BodyID &inBodyID)
+	static void sTestHit(const NarrowPhaseQuery &inNarrowPhase, RVec3Arg inPosition, const BodyID &inBodyID)
 	{
 		AllHitCollisionCollector<CollidePointCollector> collector;
 		inNarrowPhase.CollidePoint(inPosition, collector);
@@ -93,7 +94,7 @@ TEST_SUITE("CollidePointTests")
 		CHECK(collector.mHits.empty());
 	}
 
-	static void sTestMiss(const NarrowPhaseQuery &inNarrowPhase, Vec3Arg inPosition)
+	static void sTestMiss(const NarrowPhaseQuery &inNarrowPhase, RVec3Arg inPosition)
 	{
 		AllHitCollisionCollector<CollidePointCollector> collector;
 		inNarrowPhase.CollidePoint(inPosition, collector);
@@ -393,11 +394,11 @@ TEST_SUITE("CollidePointTests")
 					settings.mIndexedTriangles.resize(idx + size(indices));
 					for (uint i = 0; i < size(indices); ++i)
 						settings.mIndexedTriangles[idx + i] = IndexedTriangle(vtx + indices[i][0], vtx + indices[i][flip? 2 : 1], vtx + indices[i][flip? 1 : 2]);
-				}	
+				}
 
 		// Create body with random orientation
 		PhysicsTestContext context;
-		Body &mesh_body = context.CreateBody(&settings, Vec3::sRandom(random), Quat::sRandom(random), EMotionType::Static, EMotionQuality::Discrete, Layers::NON_MOVING, EActivation::DontActivate);
+		Body &mesh_body = context.CreateBody(&settings, RVec3(Vec3::sRandom(random)), Quat::sRandom(random), EMotionType::Static, EMotionQuality::Discrete, Layers::NON_MOVING, EActivation::DontActivate);
 
 		// Get the shape
 		ShapeRefC mesh_shape = mesh_body.GetShape();
@@ -406,8 +407,8 @@ TEST_SUITE("CollidePointTests")
 		const NarrowPhaseQuery &narrow_phase = context.GetSystem()->GetNarrowPhaseQuery();
 
 		// Get transform
-		Mat44 body_transform = mesh_body.GetWorldTransform();
-		CHECK(body_transform != Mat44::sIdentity());
+		RMat44 body_transform = mesh_body.GetWorldTransform();
+		CHECK(body_transform != RMat44::sIdentity());
 
 		// Test points
 		for (int x = -grid_size; x <= grid_size; ++x)

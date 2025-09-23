@@ -20,6 +20,7 @@
 #include "Jolt/Physics/Collision/CollideShape.h"
 #include "Jolt/Physics/Collision/CollisionCollectorImpl.h"
 #include "Jolt/Physics/Collision/NarrowPhaseQuery.h"
+#include "Jolt/Physics/Collision/ObjectLayer.h"
 #include "Jolt/Physics/Collision/RayCast.h"
 #include "Jolt/Physics/Collision/Shape/BoxShape.h"
 #include "Jolt/Physics/Collision/Shape/CapsuleShape.h"
@@ -45,17 +46,28 @@ namespace Piccolo
             new JPH::JobSystemThreadPool(m_config.m_max_job_count,
                                          m_config.m_max_barrier_count,
                                          static_cast<int>(m_config.m_max_concurrent_job_count));
-
+        // JobSystemThreadPool job_system(cMaxPhysicsJobs, cMaxPhysicsBarriers, thread::hardware_concurrency() - 1);
         // 16M temp memory
         m_physics.m_temp_allocator = new JPH::TempAllocatorImpl(16 * 1024 * 1024);
+
+        // Create class that filters object vs broadphase layers
+        // Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay
+        // alive! Also have a look at ObjectVsBroadPhaseLayerFilterTable or ObjectVsBroadPhaseLayerFilterMask for a
+        // simpler interface.
+        JPH::ObjectVsBroadPhaseLayerFilter object_vs_broadphase_layer_filter;
+
+        // Create class that filters object vs object layers
+        // Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay
+        // alive! Also have a look at ObjectLayerPairFilterTable or ObjectLayerPairFilterMask for a simpler interface.
+        JPH::ObjectLayerPairFilter object_vs_object_layer_filter;
 
         m_physics.m_jolt_physics_system->Init(m_config.m_max_body_count,
                                               m_config.m_body_mutex_count,
                                               m_config.m_max_body_pairs,
                                               m_config.m_max_contact_constraints,
                                               *(m_physics.m_jolt_broad_phase_layer_interface),
-                                              BroadPhaseCanCollide,
-                                              ObjectCanCollide);
+                                              object_vs_broadphase_layer_filter,
+                                              object_vs_object_layer_filter);
         // use the default setting
         m_physics.m_jolt_physics_system->SetPhysicsSettings(JPH::PhysicsSettings());
 
@@ -169,7 +181,7 @@ namespace Piccolo
 
         m_physics.m_jolt_physics_system->Update(time_step,
                                                 m_physics.m_collision_steps,
-                                                m_physics.m_integration_substeps,
+                                                // m_physics.m_integration_substeps,
                                                 m_physics.m_temp_allocator,
                                                 m_physics.m_jolt_job_system);
 
@@ -190,13 +202,17 @@ namespace Piccolo
     {
         const JPH::NarrowPhaseQuery& scene_query = m_physics.m_jolt_physics_system->GetNarrowPhaseQuery();
 
-        JPH::RayCast ray;
+        // JPH::RayCast ray;
+        JPH::RRayCast ray;
         ray.mOrigin    = toVec3(ray_origin);
         ray.mDirection = toVec3(ray_directory.normalisedCopy() * ray_length);
 
         JPH::RayCastSettings raycast_setting;
 
         JPH::AllHitCollisionCollector<JPH::CastRayCollector> collector;
+
+        JPH::BroadPhaseLayerFilter broad_phase_filter;
+        JPH::ShapeFilter           shape_filter;
 
         scene_query.CastRay(ray, raycast_setting, collector);
 
@@ -254,14 +270,14 @@ namespace Piccolo
             return false;
         }
 
-        JPH::ShapeCast shape_cast =
-            JPH::ShapeCast::sFromWorldTransform(jph_shape,
-                                                JPH::Vec3::sReplicate(1.f),
-                                                toMat44(shape_global_transform),
-                                                toVec3(sweep_direction.normalisedCopy() * sweep_length));
+        JPH::RShapeCast shape_cast =
+            JPH::RShapeCast::sFromWorldTransform(jph_shape,
+                                                 JPH::Vec3::sReplicate(1.f),
+                                                 toMat44(shape_global_transform),
+                                                 toVec3(sweep_direction.normalisedCopy() * sweep_length));
 
         JPH::AllHitCollisionCollector<JPH::CastShapeCollector> collector;
-        scene_query.CastShape(shape_cast, JPH::ShapeCastSettings(), collector);
+        scene_query.CastShape(shape_cast, JPH::ShapeCastSettings(), JPH::RVec3::sZero(), collector);
         if (!collector.HadHit())
         {
             return false;
@@ -306,12 +322,26 @@ namespace Piccolo
             return false;
         }
 
+        auto settings        = JPH::CollideShapeSettings();
+        auto shape_transform = toMat44(shape_global_transform);
+
+        JPH::SpecifiedBroadPhaseLayerFilter broadphase_moving_filter(BroadPhaseLayers::MOVING);
+        JPH::SpecifiedBroadPhaseLayerFilter broadphase_non_moving_filter(BroadPhaseLayers::NON_MOVING);
+        JPH::SpecifiedObjectLayerFilter     object_moving_filter(Layers::MOVING);
+        JPH::SpecifiedObjectLayerFilter     object_non_moving_filter(Layers::NON_MOVING);
+
+        JPH::SpecifiedBroadPhaseLayerFilter broadphase_filter({});
+        JPH::SpecifiedObjectLayerFilter     object_filter({});
+
         JPH::AnyHitCollisionCollector<JPH::CollideShapeCollector> collector;
         scene_query.CollideShape(jph_shape,
                                  JPH::Vec3::sReplicate(1.0f),
-                                 toMat44(shape_global_transform),
-                                 JPH::CollideShapeSettings(),
-                                 collector);
+                                 shape_transform,
+                                 settings,
+                                 JPH::Vec3::sZero(),
+                                 collector,
+                                 broadphase_filter,
+                                 object_filter);
 
         return collector.HadHit();
     }

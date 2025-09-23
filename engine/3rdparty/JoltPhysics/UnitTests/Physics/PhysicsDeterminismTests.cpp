@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -11,7 +12,7 @@ TEST_SUITE("PhysicsDeterminismTests")
 {
 	struct BodyProperties
 	{
-		Vec3	mPositionCOM;
+		RVec3	mPositionCOM;
 		Quat	mRotation;
 		Vec3	mLinearVelocity;
 		Vec3	mAngularVelocity;
@@ -90,7 +91,7 @@ TEST_SUITE("PhysicsDeterminismTests")
 		for (int x = 0; x < 5; ++x)
 			for (int z = 0; z < 5; ++z)
 			{
-				Body &body = ioContext.CreateBox(Vec3(float(x), 5.0f, float(z)), Quat::sRandom(random), EMotionType::Dynamic, EMotionQuality::Discrete, Layers::MOVING, Vec3::sReplicate(0.1f));
+				Body &body = ioContext.CreateBox(RVec3(float(x), 5.0f, float(z)), Quat::sRandom(random), EMotionType::Dynamic, EMotionQuality::Discrete, Layers::MOVING, Vec3::sReplicate(0.1f));
 				body.SetRestitution(restitution(random));
 				body.SetLinearVelocity(Vec3::sRandom(random));
 			}
@@ -98,10 +99,10 @@ TEST_SUITE("PhysicsDeterminismTests")
 
 	TEST_CASE("TestGridOfBoxesDiscrete")
 	{
-		PhysicsTestContext c1(1.0f / 60.0f, 1, 1, 0);
+		PhysicsTestContext c1(1.0f / 60.0f, 1, 0);
 		CreateGridOfBoxesDiscrete(c1);
 
-		PhysicsTestContext c2(1.0f / 60.0f, 1, 1, 15);
+		PhysicsTestContext c2(1.0f / 60.0f, 1, 15);
 		CreateGridOfBoxesDiscrete(c2);
 
 		CompareSimulations(c1, c2, 5.0f);
@@ -117,7 +118,7 @@ TEST_SUITE("PhysicsDeterminismTests")
 		for (int x = 0; x < 5; ++x)
 			for (int z = 0; z < 5; ++z)
 			{
-				Body &body = ioContext.CreateBox(Vec3(float(x), 5.0f, float(z)), Quat::sRandom(random), EMotionType::Dynamic, EMotionQuality::LinearCast, Layers::MOVING, Vec3::sReplicate(0.1f));
+				Body &body = ioContext.CreateBox(RVec3(float(x), 5.0f, float(z)), Quat::sRandom(random), EMotionType::Dynamic, EMotionQuality::LinearCast, Layers::MOVING, Vec3::sReplicate(0.1f));
 				body.SetRestitution(restitution(random));
 				body.SetLinearVelocity(Vec3::sRandom(random) - Vec3(0, -5.0f, 0));
 			}
@@ -125,10 +126,10 @@ TEST_SUITE("PhysicsDeterminismTests")
 
 	TEST_CASE("TestGridOfBoxesLinearCast")
 	{
-		PhysicsTestContext c1(1.0f / 60.0f, 1, 1, 0);
+		PhysicsTestContext c1(1.0f / 60.0f, 1, 0);
 		CreateGridOfBoxesLinearCast(c1);
 
-		PhysicsTestContext c2(1.0f / 60.0f, 1, 1, 15);
+		PhysicsTestContext c2(1.0f / 60.0f, 1, 15);
 		CreateGridOfBoxesLinearCast(c2);
 
 		CompareSimulations(c1, c2, 5.0f);
@@ -155,7 +156,7 @@ TEST_SUITE("PhysicsDeterminismTests")
 			Body *prev_body = nullptr;
 			for (int z = 0; z < cNumPerAxis; ++z)
 			{
-				Vec3 body_pos = Vec3(float(x), 5.0f, 0.2f * float(z));
+				RVec3 body_pos(float(x), 5.0f, 0.2f * float(z));
 				Body &body = ioContext.CreateBox(body_pos, Quat::sRandom(random), EMotionType::Dynamic, EMotionQuality::Discrete, Layers::MOVING, Vec3::sReplicate(0.1f));
 				body.SetRestitution(restitution(random));
 				body.SetLinearVelocity(Vec3::sRandom(random));
@@ -183,10 +184,10 @@ TEST_SUITE("PhysicsDeterminismTests")
 
 	TEST_CASE("TestGridOfBoxesConstrained")
 	{
-		PhysicsTestContext c1(1.0f / 60.0f, 1, 1, 0);
+		PhysicsTestContext c1(1.0f / 60.0f, 1, 0);
 		CreateGridOfBoxesConstrained(c1);
 
-		PhysicsTestContext c2(1.0f / 60.0f, 1, 1, 15);
+		PhysicsTestContext c2(1.0f / 60.0f, 1, 15);
 		CreateGridOfBoxesConstrained(c2);
 
 		CompareSimulations(c1, c2, 5.0f);

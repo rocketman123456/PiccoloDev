@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -8,16 +9,23 @@
 JPH_NAMESPACE_BEGIN
 
 /// Holds a 4x4 matrix of floats, but supports also operations on the 3x3 upper left part of the matrix.
-class [[nodiscard]] Mat44
+class [[nodiscard]] alignas(JPH_VECTOR_ALIGNMENT) Mat44
 {
 public:
+	JPH_OVERRIDE_NEW_DELETE
+
 	// Underlying column type
 	using Type = Vec4::Type;
+
+	// Argument type
+	using ArgType = Mat44Arg;
 
 	/// Constructor
 								Mat44() = default; ///< Intentionally not initialized for performance reasons
 	JPH_INLINE					Mat44(Vec4Arg inC1, Vec4Arg inC2, Vec4Arg inC3, Vec4Arg inC4);
+	JPH_INLINE					Mat44(Vec4Arg inC1, Vec4Arg inC2, Vec4Arg inC3, Vec3Arg inC4);
 								Mat44(const Mat44 &inM2) = default;
+	Mat44 &						operator = (const Mat44 &inM2) = default;
 	JPH_INLINE					Mat44(Type inC1, Type inC2, Type inC3, Type inC4);
 
 	/// Zero matrix
@@ -73,11 +81,20 @@ public:
 	/// Returns matrix MR so that \f$MR(q) \: p = p \: q\f$ (where p and q are quaternions)
 	static JPH_INLINE Mat44		sQuatRightMultiply(QuatArg inQ);
 
+	/// Returns a look at matrix that transforms from world space to view space
+	/// @param inPos Position of the camera
+	/// @param inTarget Target of the camera
+	/// @param inUp Up vector
+	static JPH_INLINE Mat44		sLookAt(Vec3Arg inPos, Vec3Arg inTarget, Vec3Arg inUp);
+
+	/// Returns a right-handed perspective projection matrix
+	static JPH_INLINE Mat44		sPerspective(float inFovY, float inAspect, float inNear, float inFar);
+
 	/// Get float component by element index
 	JPH_INLINE float			operator () (uint inRow, uint inColumn) const			{ JPH_ASSERT(inRow < 4); JPH_ASSERT(inColumn < 4); return mCol[inColumn].mF32[inRow]; }
 	JPH_INLINE float &			operator () (uint inRow, uint inColumn)					{ JPH_ASSERT(inRow < 4); JPH_ASSERT(inColumn < 4); return mCol[inColumn].mF32[inRow]; }
-	
-	/// Comparsion
+
+	/// Comparison
 	JPH_INLINE bool				operator == (Mat44Arg inM2) const;
 	JPH_INLINE bool				operator != (Mat44Arg inM2) const						{ return !(*this == inM2); }
 
@@ -167,6 +184,9 @@ public:
 	/// Inverse 3x3 matrix
 	JPH_INLINE Mat44			Inversed3x3() const;
 
+	/// *this = inM.Inversed3x3(), returns false if the matrix is singular in which case *this is unchanged
+	JPH_INLINE bool				SetInversed3x3(Mat44Arg inM);
+
 	/// Get rotation part only (note: retains the first 3 values from the bottom row)
 	JPH_INLINE Mat44			GetRotation() const;
 
@@ -200,6 +220,11 @@ public:
 	/// will be made orthogonal using the modified Gram-Schmidt algorithm (see: https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process)
 	JPH_INLINE Mat44			Decompose(Vec3 &outScale) const;
 
+#ifndef JPH_DOUBLE_PRECISION
+	/// In single precision mode just return the matrix itself
+	JPH_INLINE Mat44			ToMat44() const											{ return *this; }
+#endif // !JPH_DOUBLE_PRECISION
+
 	/// To String
 	friend ostream &			operator << (ostream &inStream, Mat44Arg inM)
 	{
@@ -211,7 +236,7 @@ private:
 	Vec4						mCol[4];												///< Column
 };
 
-static_assert(is_trivial<Mat44>(), "Is supposed to be a trivial type!");
+static_assert(std::is_trivial<Mat44>(), "Is supposed to be a trivial type!");
 
 JPH_NAMESPACE_END
 

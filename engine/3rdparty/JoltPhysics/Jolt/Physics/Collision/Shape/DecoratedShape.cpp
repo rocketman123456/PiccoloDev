@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -48,19 +49,24 @@ const PhysicsMaterial *DecoratedShape::GetMaterial(const SubShapeID &inSubShapeI
 	return mInnerShape->GetMaterial(inSubShapeID);
 }
 
+void DecoratedShape::GetSupportingFace(const SubShapeID &inSubShapeID, Vec3Arg inDirection, Vec3Arg inScale, Mat44Arg inCenterOfMassTransform, SupportingFace &outVertices) const
+{
+	mInnerShape->GetSupportingFace(inSubShapeID, inDirection, inScale, inCenterOfMassTransform, outVertices);
+}
+
 uint64 DecoratedShape::GetSubShapeUserData(const SubShapeID &inSubShapeID) const
 {
 	return mInnerShape->GetSubShapeUserData(inSubShapeID);
 }
 
 void DecoratedShape::SaveSubShapeState(ShapeList &outSubShapes) const
-{ 
+{
 	outSubShapes.clear();
 	outSubShapes.push_back(mInnerShape);
 }
 
 void DecoratedShape::RestoreSubShapeState(const ShapeRefC *inSubShapes, uint inNumShapes)
-{ 
+{
 	JPH_ASSERT(inNumShapes == 1);
 	mInnerShape = inSubShapes[0];
 }
@@ -74,7 +80,7 @@ Shape::Stats DecoratedShape::GetStatsRecursive(VisitedShapes &ioVisitedShapes) c
 	Stats child_stats = mInnerShape->GetStatsRecursive(ioVisitedShapes);
 	stats.mSizeBytes += child_stats.mSizeBytes;
 	stats.mNumTriangles += child_stats.mNumTriangles;
-	
+
 	return stats;
 }
 

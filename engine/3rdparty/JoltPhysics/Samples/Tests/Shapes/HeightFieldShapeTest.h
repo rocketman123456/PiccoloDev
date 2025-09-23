@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -9,7 +10,7 @@
 class HeightFieldShapeTest : public Test
 {
 public:
-	JPH_DECLARE_RTTI_VIRTUAL(HeightFieldShapeTest)
+	JPH_DECLARE_RTTI_VIRTUAL(JPH_NO_EXPORT, HeightFieldShapeTest)
 
 	// Initialize the test
 	virtual void		Initialize() override;
@@ -25,9 +26,9 @@ public:
 	virtual void		CreateSettingsMenu(DebugUI *inUI, UIElement *inSubMenu) override;
 
 	// Original (uncompressed) terrain
-	vector<float>		mTerrain;
+	Array<float>		mTerrain;
 	PhysicsMaterialList mMaterials;
-	vector<uint8>		mMaterialIndices;
+	Array<uint8>		mMaterialIndices;
 	uint				mTerrainSize;
 	Vec3				mTerrainOffset;
 	Vec3				mTerrainScale;
@@ -43,5 +44,5 @@ public:
 
 	RefConst<HeightFieldShape> mHeightField;
 
-	Vec3				mHitPos = Vec3::sZero();
+	RVec3				mHitPos = RVec3::sZero();
 };

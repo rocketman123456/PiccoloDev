@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -13,6 +14,14 @@ JPH_SUPPRESS_WARNINGS_STD_BEGIN
 JPH_SUPPRESS_WARNINGS_STD_END
 
 JPH_NAMESPACE_BEGIN
+
+// Things we're using from STL
+using std::mutex;
+using std::shared_mutex;
+using std::thread;
+using std::lock_guard;
+using std::shared_lock;
+using std::unique_lock;
 
 #ifdef JPH_PLATFORM_BLUE
 
@@ -107,17 +116,17 @@ using SharedMutexBase = shared_mutex;
 
 #if defined(JPH_ENABLE_ASSERTS) || defined(JPH_PROFILE_ENABLED) || defined(JPH_EXTERNAL_PROFILE)
 
-/// Very simple wrapper around MutexBase which tracks lock contention in the profiler 
+/// Very simple wrapper around MutexBase which tracks lock contention in the profiler
 /// and asserts that locks/unlocks take place on the same thread
 class Mutex : public MutexBase
 {
 public:
 	inline bool		try_lock()
 	{
-		JPH_ASSERT(mLockedThreadID != this_thread::get_id());
+		JPH_ASSERT(mLockedThreadID != std::this_thread::get_id());
 		if (MutexBase::try_lock())
 		{
-			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = this_thread::get_id();)
+			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = std::this_thread::get_id();)
 			return true;
 		}
 		return false;
@@ -129,13 +138,13 @@ public:
 		{
 			JPH_PROFILE("Lock", 0xff00ffff);
 			MutexBase::lock();
-			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = this_thread::get_id();)
+			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = std::this_thread::get_id();)
 		}
 	}
 
 	inline void		unlock()
 	{
-		JPH_ASSERT(mLockedThreadID == this_thread::get_id());
+		JPH_ASSERT(mLockedThreadID == std::this_thread::get_id());
 		JPH_IF_ENABLE_ASSERTS(mLockedThreadID = thread::id();)
 		MutexBase::unlock();
 	}
@@ -158,10 +167,10 @@ class SharedMutex : public SharedMutexBase
 public:
 	inline bool		try_lock()
 	{
-		JPH_ASSERT(mLockedThreadID != this_thread::get_id());
+		JPH_ASSERT(mLockedThreadID != std::this_thread::get_id());
 		if (SharedMutexBase::try_lock())
 		{
-			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = this_thread::get_id();)
+			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = std::this_thread::get_id();)
 			return true;
 		}
 		return false;
@@ -173,13 +182,13 @@ public:
 		{
 			JPH_PROFILE("WLock", 0xff00ffff);
 			SharedMutexBase::lock();
-			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = this_thread::get_id();)
+			JPH_IF_ENABLE_ASSERTS(mLockedThreadID = std::this_thread::get_id();)
 		}
 	}
 
 	inline void		unlock()
 	{
-		JPH_ASSERT(mLockedThreadID == this_thread::get_id());
+		JPH_ASSERT(mLockedThreadID == std::this_thread::get_id());
 		JPH_IF_ENABLE_ASSERTS(mLockedThreadID = thread::id();)
 		SharedMutexBase::unlock();
 	}

@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -13,9 +14,9 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Application/DebugUI.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(ChangeShapeTest) 
-{ 
-	JPH_ADD_BASE_CLASS(ChangeShapeTest, Test) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(ChangeShapeTest)
+{
+	JPH_ADD_BASE_CLASS(ChangeShapeTest, Test)
 }
 
 void ChangeShapeTest::Initialize()
@@ -39,15 +40,15 @@ void ChangeShapeTest::Initialize()
 	// Create dynamic body that changes shape
 	BodyCreationSettings settings;
 	settings.SetShape(mShapes[mShapeIdx]);
-	settings.mPosition = Vec3(0, 10, 0);
-	settings.mMotionType = EMotionType::Dynamic; 
+	settings.mPosition = RVec3(0, 10, 0);
+	settings.mMotionType = EMotionType::Dynamic;
 	settings.mObjectLayer = Layers::MOVING;
 	mBodyID = mBodyInterface->CreateBody(settings)->GetID();
 	mBodyInterface->AddBody(mBodyID, EActivation::Activate);
 }
 
 void ChangeShapeTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
-{ 
+{
 	const float cSwitchTime = 3.0f;
 
 	// Increment time

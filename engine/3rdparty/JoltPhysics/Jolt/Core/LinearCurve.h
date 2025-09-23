@@ -1,9 +1,11 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
 #pragma once
 
 #include <Jolt/ObjectStream/SerializableObject.h>
+#include <Jolt/Core/QuickSort.h>
 
 JPH_NAMESPACE_BEGIN
 
@@ -11,17 +13,17 @@ class StreamOut;
 class StreamIn;
 
 // A set of points (x, y) that form a linear curve
-class LinearCurve
+class JPH_EXPORT LinearCurve
 {
-public:
-	JPH_DECLARE_SERIALIZABLE_NON_VIRTUAL(LinearCurve)
+	JPH_DECLARE_SERIALIZABLE_NON_VIRTUAL(JPH_EXPORT, LinearCurve)
 
+public:
 	/// A point on the curve
 	class Point
 	{
-	public:
-		JPH_DECLARE_SERIALIZABLE_NON_VIRTUAL(Point)
+		JPH_DECLARE_SERIALIZABLE_NON_VIRTUAL(JPH_EXPORT, Point)
 
+	public:
 		float			mX = 0.0f;
 		float			mY = 0.0f;
 	};
@@ -38,7 +40,7 @@ public:
 	void				AddPoint(float inX, float inY)					{ mPoints.push_back({ inX, inY }); }
 
 	/// Sort the points on X ascending
-	void				Sort()											{ sort(mPoints.begin(), mPoints.end(), [](const Point &inLHS, const Point &inRHS) { return inLHS.mX < inRHS.mX; }); }
+	void				Sort()											{ QuickSort(mPoints.begin(), mPoints.end(), [](const Point &inLHS, const Point &inRHS) { return inLHS.mX < inRHS.mX; }); }
 
 	/// Get the lowest X value
 	float				GetMinX() const									{ return mPoints.empty()? 0.0f : mPoints.front().mX; }
@@ -58,7 +60,7 @@ public:
 	void				RestoreBinaryState(StreamIn &inStream);
 
 	/// The points on the curve, should be sorted ascending by x
-	using Points = vector<Point>;
+	using Points = Array<Point>;
 	Points				mPoints;
 };
 

@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -9,7 +10,7 @@
 class ConvexHullShrinkTest : public Test
 {
 public:
-	JPH_DECLARE_RTTI_VIRTUAL(ConvexHullShrinkTest)
+	JPH_DECLARE_RTTI_VIRTUAL(JPH_NO_EXPORT, ConvexHullShrinkTest)
 
 	// Initialize the test
 	virtual void			Initialize() override;
@@ -22,8 +23,8 @@ public:
 
 private:
 	// A list of predefined points to feed the convex hull algorithm
-	using Points = vector<Vec3>;
-	vector<Points>			mPoints;
+	using Points = Array<Vec3>;
+	Array<Points>			mPoints;
 
 	// Which index in the list we're currently using
 	size_t					mIteration = 0;

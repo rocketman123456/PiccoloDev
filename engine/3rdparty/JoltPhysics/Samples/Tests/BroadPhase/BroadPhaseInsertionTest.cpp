@@ -1,3 +1,4 @@
+// Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
 
@@ -9,11 +10,11 @@
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Geometry/RayAABox.h>
 #include <Utils/Log.h>
-#include <Renderer/DebugRendererImp.h>
+#include <Utils/DebugRendererSP.h>
 
-JPH_IMPLEMENT_RTTI_VIRTUAL(BroadPhaseInsertionTest) 
-{ 
-	JPH_ADD_BASE_CLASS(BroadPhaseInsertionTest, BroadPhaseTest) 
+JPH_IMPLEMENT_RTTI_VIRTUAL(BroadPhaseInsertionTest)
+{
+	JPH_ADD_BASE_CLASS(BroadPhaseInsertionTest, BroadPhaseTest)
 }
 
 void BroadPhaseInsertionTest::Initialize()
@@ -91,9 +92,9 @@ void BroadPhaseInsertionTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 	Trace("Before update: %d results found", num_before);
 
 	// Draw results
-	mDebugRenderer->DrawLine(ray.mOrigin, ray.mOrigin + ray.mDirection, Color::sRed);
+	DrawLineSP(mDebugRenderer, ray.mOrigin, ray.mOrigin + ray.mDirection, Color::sRed);
 	for (int i = 0; i < num_before; ++i)
-		mDebugRenderer->DrawMarker(ray.mOrigin + results_before[i].mFraction * ray.mDirection, Color::sGreen, 10.0f);
+		DrawMarkerSP(mDebugRenderer, ray.GetPointOnRay(results_before[i].mFraction), Color::sGreen, 10.0f);
 
 	// Update the broadphase
 	mBroadPhase->Optimize();
@@ -132,7 +133,7 @@ void BroadPhaseInsertionTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 				break;
 			}
 
-		if (b->IsInBroadPhase() 
+		if (b->IsInBroadPhase()
 			&& RayAABoxHits(ray.mOrigin, ray.mDirection, b->GetWorldSpaceBounds().mMin, b->GetWorldSpaceBounds().mMax))
 		{
 			if (!found)
@@ -144,7 +145,7 @@ void BroadPhaseInsertionTest::PrePhysicsUpdate(const PreUpdateParams &inParams)
 				FatalError("BroadPhaseInsertionTest: Is not intersecting but was found");
 		}
 	}
-	
+
 	if (mDirection > 0)
 		mCurrentBody += num_this_step;
 }
