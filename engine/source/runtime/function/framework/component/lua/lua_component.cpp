@@ -150,15 +150,32 @@ namespace Piccolo
         m_parent_object = parent_object;
         m_lua_state.open_libraries(sol::lib::base);
         m_lua_state.set_function("set_float", &LuaComponent::set<float>);
+        m_lua_state.set_function("get_float", &LuaComponent::get<float>);
+        m_lua_state.set_function("set_bool", &LuaComponent::set<bool>);
         m_lua_state.set_function("get_bool", &LuaComponent::get<bool>);
         m_lua_state.set_function("invoke", &LuaComponent::invoke);
         m_lua_state["GameObject"] = m_parent_object;
+
+        // load scripts
+        m_lua_script_res.loadScriptContent();
     }
 
     void LuaComponent::tick(float delta_time)
     {
         // LOG_INFO(m_lua_script);
-        m_lua_state.script(m_lua_script);
+        // m_lua_state.script(m_lua_script);
+
+        if (!m_parent_object.lock())
+            return;
+
+        try
+        {
+            m_lua_state.script(m_lua_script_res.m_script_content);
+        }
+        catch (std::exception& e)
+        {
+            LOG_ERROR("lua script error: " + e.what());
+        }
     }
 
 } // namespace Piccolo
