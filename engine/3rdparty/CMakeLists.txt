@@ -97,3 +97,13 @@ if(NOT TARGET glslang)
     set("ENABLE_OPT" 0)
     add_subdirectory(glslang)
 endif()
+
+if(NOT TARGET soloud)
+    include(soloud.cmake)
+endif()
+
+if(NOT TARGET ImGuiFileDialog)
+    add_subdirectory(ImGuiFileDialog)
+    target_include_directories(ImGuiFileDialog PUBLIC imgui)
+    target_link_libraries(ImGuiFileDialog PUBLIC imgui)
+endif()
