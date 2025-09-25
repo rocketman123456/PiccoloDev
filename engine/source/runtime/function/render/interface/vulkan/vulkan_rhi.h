@@ -324,7 +324,12 @@ namespace Piccolo
         const std::vector<char const*> m_validation_layers {"VK_LAYER_KHRONOS_validation"};
         uint32_t                       m_vulkan_api_version {VK_API_VERSION_1_0};
 
-        std::vector<char const*> m_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"};
+        std::vector<char const*> m_device_extensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+#ifdef __APPLE__
+            "VK_KHR_portability_subset"
+#endif
+        };
 
         // default sampler cache
         RHISampler*                     m_linear_sampler  = nullptr;
