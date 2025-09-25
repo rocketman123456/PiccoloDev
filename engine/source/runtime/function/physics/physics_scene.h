@@ -10,6 +10,8 @@ namespace JPH
     class JobSystem;
     class TempAllocator;
     class BroadPhaseLayerInterface;
+    class ObjectVsBroadPhaseLayerFilter;
+    class ObjectLayerPairFilter;
 #ifdef ENABLE_PHYSICS_DEBUG_RENDERER
     class DebugRenderer;
 #endif
@@ -35,10 +37,13 @@ namespace Piccolo
     {
         struct JoltPhysics
         {
-            JPH::PhysicsSystem*            m_jolt_physics_system {nullptr};
-            JPH::JobSystem*                m_jolt_job_system {nullptr};
-            JPH::TempAllocator*            m_temp_allocator {nullptr};
-            JPH::BroadPhaseLayerInterface* m_jolt_broad_phase_layer_interface {nullptr};
+            JPH::PhysicsSystem* m_jolt_physics_system {nullptr};
+            JPH::JobSystem*     m_jolt_job_system {nullptr};
+            JPH::TempAllocator* m_temp_allocator {nullptr};
+
+            JPH::BroadPhaseLayerInterface*      m_jolt_broad_phase_layer_interface {nullptr};
+            JPH::ObjectVsBroadPhaseLayerFilter* m_jolt_object_vs_broadphase_layer_filter {nullptr};
+            JPH::ObjectLayerPairFilter*         m_jolt_object_vs_object_layer_filter {nullptr};
 
             int m_collision_steps {1};
             int m_integration_substeps {1};
@@ -63,8 +68,7 @@ namespace Piccolo
         /// @ray_length: ray length, anything beyond this length will not be reported as a hit
         /// @out_hits: the found hits, sorted by distance
         /// @return: true if any hits found, else false
-        bool
-        raycast(Vector3 ray_origin, Vector3 ray_direction, float ray_length, std::vector<PhysicsHitInfo>& out_hits);
+        bool raycast(Vector3 ray_origin, Vector3 ray_direction, float ray_length, std::vector<PhysicsHitInfo>& out_hits);
 
         /// cast a shape and find the hits
         /// @shape: the casted rigidbody shape
@@ -73,11 +77,13 @@ namespace Piccolo
         /// @sweep_length: sweep length, anything beyond this length will not be reported as a hit
         /// @out_hits: the found hits, sorted by distance
         /// @return: true if any hits found, else false
-        bool sweep(const RigidBodyShape&        shape,
-                   const Matrix4x4&             shape_transform,
-                   Vector3                      sweep_direction,
-                   float                        sweep_length,
-                   std::vector<PhysicsHitInfo>& out_hits);
+        bool sweep(
+            const RigidBodyShape&        shape,
+            const Matrix4x4&             shape_transform,
+            Vector3                      sweep_direction,
+            float                        sweep_length,
+            std::vector<PhysicsHitInfo>& out_hits
+        );
 
         /// overlap test
         /// @shape: rigidbody shape

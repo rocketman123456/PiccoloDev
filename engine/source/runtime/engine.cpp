@@ -8,14 +8,16 @@
 #include "runtime/function/input/input_system.h"
 #include "runtime/function/particle/particle_manager.h"
 #include "runtime/function/physics/physics_manager.h"
+#include "runtime/function/render/debugdraw/debug_draw_manager.h"
 #include "runtime/function/render/render_system.h"
 #include "runtime/function/render/window_system.h"
-#include "runtime/function/render/debugdraw/debug_draw_manager.h"
 
 namespace Piccolo
 {
     bool                            g_is_editor_mode {false};
     std::unordered_set<std::string> g_editor_tick_component_types {};
+
+    const float PiccoloEngine::s_fps_alpha = 1.f / 100.f;
 
     void PiccoloEngine::startEngine(const std::string& config_file_path)
     {
@@ -36,6 +38,7 @@ namespace Piccolo
     }
 
     void PiccoloEngine::initialize() {}
+
     void PiccoloEngine::clear() {}
 
     void PiccoloEngine::run()
@@ -57,8 +60,8 @@ namespace Piccolo
             using namespace std::chrono;
 
             steady_clock::time_point tick_time_point = steady_clock::now();
-            duration<float> time_span = duration_cast<duration<float>>(tick_time_point - m_last_tick_time_point);
-            delta_time                = time_span.count();
+            duration<float>          time_span       = duration_cast<duration<float>>(tick_time_point - m_last_tick_time_point);
+            delta_time                               = time_span.count();
 
             m_last_tick_time_point = tick_time_point;
         }
@@ -82,9 +85,7 @@ namespace Piccolo
 
         g_runtime_global_context.m_window_system->pollEvents();
 
-
-        g_runtime_global_context.m_window_system->setTitle(
-            std::string("Piccolo - " + std::to_string(getFPS()) + " FPS").c_str());
+        g_runtime_global_context.m_window_system->setTitle(std::string("Piccolo - " + std::to_string(getFPS()) + " FPS").c_str());
 
         const bool should_window_close = g_runtime_global_context.m_window_system->shouldClose();
         return !should_window_close;
@@ -102,8 +103,7 @@ namespace Piccolo
         return true;
     }
 
-    const float PiccoloEngine::s_fps_alpha = 1.f / 100;
-    void        PiccoloEngine::calculateFPS(float delta_time)
+    void PiccoloEngine::calculateFPS(float delta_time)
     {
         m_frame_count++;
 

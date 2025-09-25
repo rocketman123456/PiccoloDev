@@ -30,6 +30,14 @@
 #include "Jolt/Physics/Collision/ShapeCast.h"
 #include "Jolt/Physics/PhysicsSystem.h"
 
+#ifndef JPH_DEBUG_RENDERER
+// Hack to still compile DebugRenderer inside the test framework when Jolt is compiled without
+#define JPH_DEBUG_RENDERER
+#include "Jolt/Renderer/DebugRendererPlayback.cpp"
+#include "Jolt/Renderer/DebugRendererRecorder.cpp"
+#undef JPH_DEBUG_RENDERER
+#endif
+
 namespace Piccolo
 {
     PhysicsScene::PhysicsScene(const Vector3& gravity)
@@ -39,40 +47,39 @@ namespace Piccolo
         JPH::Factory::sInstance = new JPH::Factory();
         JPH::RegisterTypes();
 
-        m_physics.m_jolt_physics_system              = new JPH::PhysicsSystem();
-        m_physics.m_jolt_broad_phase_layer_interface = new BPLayerInterfaceImpl();
+        m_physics.m_jolt_physics_system                    = new JPH::PhysicsSystem();
+        m_physics.m_jolt_broad_phase_layer_interface       = new BPLayerInterfaceImpl();
+        m_physics.m_jolt_object_vs_broadphase_layer_filter = new ObjectVsBroadPhaseLayerFilterImpl();
+        m_physics.m_jolt_object_vs_object_layer_filter     = new ObjectLayerPairFilterImpl();
 
         m_physics.m_jolt_job_system =
-            new JPH::JobSystemThreadPool(m_config.m_max_job_count,
-                                         m_config.m_max_barrier_count,
-                                         static_cast<int>(m_config.m_max_concurrent_job_count));
+            new JPH::JobSystemThreadPool(m_config.m_max_job_count, m_config.m_max_barrier_count, static_cast<int>(m_config.m_max_concurrent_job_count));
         // JobSystemThreadPool job_system(cMaxPhysicsJobs, cMaxPhysicsBarriers, thread::hardware_concurrency() - 1);
         // 16M temp memory
         m_physics.m_temp_allocator = new JPH::TempAllocatorImpl(16 * 1024 * 1024);
 
-        // Create class that filters object vs broadphase layers
-        // Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay
-        // alive! Also have a look at ObjectVsBroadPhaseLayerFilterTable or ObjectVsBroadPhaseLayerFilterMask for a
-        // simpler interface.
-        JPH::ObjectVsBroadPhaseLayerFilter object_vs_broadphase_layer_filter;
-
-        // Create class that filters object vs object layers
-        // Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay
-        // alive! Also have a look at ObjectLayerPairFilterTable or ObjectLayerPairFilterMask for a simpler interface.
-        JPH::ObjectLayerPairFilter object_vs_object_layer_filter;
-
-        m_physics.m_jolt_physics_system->Init(m_config.m_max_body_count,
-                                              m_config.m_body_mutex_count,
-                                              m_config.m_max_body_pairs,
-                                              m_config.m_max_contact_constraints,
-                                              *(m_physics.m_jolt_broad_phase_layer_interface),
-                                              object_vs_broadphase_layer_filter,
-                                              object_vs_object_layer_filter);
+        m_physics.m_jolt_physics_system->Init(
+            m_config.m_max_body_count,
+            m_config.m_body_mutex_count,
+            m_config.m_max_body_pairs,
+            m_config.m_max_contact_constraints,
+            *(m_physics.m_jolt_broad_phase_layer_interface),
+            *(m_physics.m_jolt_object_vs_broadphase_layer_filter),
+            *(m_physics.m_jolt_object_vs_object_layer_filter)
+        );
         // use the default setting
         m_physics.m_jolt_physics_system->SetPhysicsSettings(JPH::PhysicsSettings());
 
         m_physics.m_jolt_physics_system->SetGravity(toVec3(gravity));
         m_config.m_gravity = gravity;
+
+        // JPH::DebugRendererRecorder recorder;
+        // physics_system.SetDebugRenderer(&recorder);
+
+        // Optional step: Before starting the physics simulation you can optimize the broad phase. This improves collision detection performance (it's pointless
+        // here because we only have 2 bodies). You should definitely not call this every frame or when e.g. streaming in a new level section as it is an
+        // expensive operation. Instead insert all new objects in batches instead of 1 at a time to keep the broad phase efficient.
+        m_physics.m_jolt_physics_system->OptimizeBroadPhase();
     }
 
     PhysicsScene::~PhysicsScene()
@@ -81,13 +88,14 @@ namespace Piccolo
         delete m_physics.m_jolt_job_system;
         delete m_physics.m_temp_allocator;
         delete m_physics.m_jolt_broad_phase_layer_interface;
+        delete m_physics.m_jolt_object_vs_broadphase_layer_filter;
+        delete m_physics.m_jolt_object_vs_object_layer_filter;
 
         delete JPH::Factory::sInstance;
         JPH::Factory::sInstance = nullptr;
     }
 
-    uint32_t PhysicsScene::createRigidBody(const Transform&             global_transform,
-                                           const RigidBodyComponentRes& rigidbody_actor_res)
+    uint32_t PhysicsScene::createRigidBody(const Transform& global_transform, const RigidBodyComponentRes& rigidbody_actor_res)
     {
         JPH::BodyInterface& body_interface = m_physics.m_jolt_physics_system->GetBodyInterface();
 
@@ -117,8 +125,7 @@ namespace Piccolo
 
             if (jph_shape)
             {
-                jph_shapes.push_back(
-                    {jph_shape, shape.m_local_transform, global_position, global_scale, global_rotation});
+                jph_shapes.push_back({jph_shape, shape.m_local_transform, global_position, global_scale, global_rotation});
             }
         }
 
@@ -135,16 +142,14 @@ namespace Piccolo
         JPH::Ref<JPH::StaticCompoundShapeSettings> compund_shape_setting = new JPH::StaticCompoundShapeSettings;
         for (const JPHShapeData& shape_data : jph_shapes)
         {
-            compund_shape_setting->AddShape(toVec3(shape_data.local_transform.m_position * shape_data.global_scale),
-                                            toQuat(shape_data.local_transform.m_rotation),
-                                            shape_data.shape);
+            compund_shape_setting->AddShape(
+                toVec3(shape_data.local_transform.m_position * shape_data.global_scale), toQuat(shape_data.local_transform.m_rotation), shape_data.shape
+            );
         }
 
-        JPH::Body* jph_body = body_interface.CreateBody(JPH::BodyCreationSettings(compund_shape_setting,
-                                                                                  toVec3(global_transform.m_position),
-                                                                                  toQuat(global_transform.m_rotation),
-                                                                                  motion_type,
-                                                                                  layer));
+        JPH::Body* jph_body = body_interface.CreateBody(
+            JPH::BodyCreationSettings(compund_shape_setting, toVec3(global_transform.m_position), toQuat(global_transform.m_rotation), motion_type, layer)
+        );
 
         if (jph_body == nullptr)
         {
@@ -169,21 +174,18 @@ namespace Piccolo
     {
         JPH::BodyInterface& body_interface = m_physics.m_jolt_physics_system->GetBodyInterface();
 
-        body_interface.SetPositionAndRotation(JPH::BodyID(body_id),
-                                              toVec3(global_transform.m_position),
-                                              toQuat(global_transform.m_rotation),
-                                              JPH::EActivation::Activate);
+        body_interface.SetPositionAndRotation(
+            JPH::BodyID(body_id), toVec3(global_transform.m_position), toQuat(global_transform.m_rotation), JPH::EActivation::Activate
+        );
     }
 
     void PhysicsScene::tick(float delta_time)
     {
         const float time_step = 1.f / m_config.m_update_frequency;
 
-        m_physics.m_jolt_physics_system->Update(time_step,
-                                                m_physics.m_collision_steps,
-                                                // m_physics.m_integration_substeps,
-                                                m_physics.m_temp_allocator,
-                                                m_physics.m_jolt_job_system);
+        m_physics.m_jolt_physics_system->Update(time_step, m_physics.m_collision_steps, m_physics.m_temp_allocator, m_physics.m_jolt_job_system);
+        // m_physics.m_jolt_physics_system->Update(
+        //     time_step, m_physics.m_collision_steps, m_physics.m_integration_substeps, m_physics.m_temp_allocator, m_physics.m_jolt_job_system);
 
         JPH::BodyInterface& body_interface = m_physics.m_jolt_physics_system->GetBodyInterface();
         for (uint32_t body_id : m_pending_remove_bodies)
@@ -195,10 +197,7 @@ namespace Piccolo
         m_pending_remove_bodies.clear();
     }
 
-    bool PhysicsScene::raycast(Vector3                      ray_origin,
-                               Vector3                      ray_directory,
-                               float                        ray_length,
-                               std::vector<PhysicsHitInfo>& out_hits)
+    bool PhysicsScene::raycast(Vector3 ray_origin, Vector3 ray_directory, float ray_length, std::vector<PhysicsHitInfo>& out_hits)
     {
         const JPH::NarrowPhaseQuery& scene_query = m_physics.m_jolt_physics_system->GetNarrowPhaseQuery();
 
@@ -241,18 +240,19 @@ namespace Piccolo
             JPH::BodyLockRead body_lock(m_physics.m_jolt_physics_system->GetBodyLockInterface(), cast_result.mBodyID);
             const JPH::Body&  hit_body = body_lock.GetBody();
 
-            hit.hit_normal =
-                toVec3(hit_body.GetWorldSpaceSurfaceNormal(cast_result.mSubShapeID2, toVec3(hit.hit_position)));
+            hit.hit_normal = toVec3(hit_body.GetWorldSpaceSurfaceNormal(cast_result.mSubShapeID2, toVec3(hit.hit_position)));
         }
 
         return true;
     }
 
-    bool PhysicsScene::sweep(const RigidBodyShape&        shape,
-                             const Matrix4x4&             shape_transform,
-                             Vector3                      sweep_direction,
-                             float                        sweep_length,
-                             std::vector<PhysicsHitInfo>& out_hits)
+    bool PhysicsScene::sweep(
+        const RigidBodyShape&        shape,
+        const Matrix4x4&             shape_transform,
+        Vector3                      sweep_direction,
+        float                        sweep_length,
+        std::vector<PhysicsHitInfo>& out_hits
+    )
     {
         const JPH::NarrowPhaseQuery& scene_query = m_physics.m_jolt_physics_system->GetNarrowPhaseQuery();
 
@@ -267,19 +267,22 @@ namespace Piccolo
 
         if (jph_shape == nullptr)
         {
+            // LOG_WARN("empty jph shape");
             return false;
         }
 
-        JPH::RShapeCast shape_cast =
-            JPH::RShapeCast::sFromWorldTransform(jph_shape,
-                                                 JPH::Vec3::sReplicate(1.f),
-                                                 toMat44(shape_global_transform),
-                                                 toVec3(sweep_direction.normalisedCopy() * sweep_length));
+        JPH::RShapeCast shape_cast = JPH::RShapeCast::sFromWorldTransform(
+            jph_shape, JPH::Vec3::sReplicate(1.f), toMat44(shape_global_transform), toVec3(sweep_direction.normalisedCopy() * sweep_length)
+        );
+        // JPH::ShapeCast shape_cast = JPH::ShapeCast::sFromWorldTransform(
+        //     jph_shape, JPH::Vec3::sReplicate(1.f), toMat44(shape_global_transform), toVec3(sweep_direction.normalisedCopy() * sweep_length));
 
         JPH::AllHitCollisionCollector<JPH::CastShapeCollector> collector;
         scene_query.CastShape(shape_cast, JPH::ShapeCastSettings(), JPH::RVec3::sZero(), collector);
+        // scene_query.CastShape(shape_cast, JPH::ShapeCastSettings(), collector);
         if (!collector.HadHit())
         {
+            // LOG_INFO("empty hit");
             return false;
         }
 
@@ -334,14 +337,11 @@ namespace Piccolo
         JPH::SpecifiedObjectLayerFilter     object_filter({});
 
         JPH::AnyHitCollisionCollector<JPH::CollideShapeCollector> collector;
-        scene_query.CollideShape(jph_shape,
-                                 JPH::Vec3::sReplicate(1.0f),
-                                 shape_transform,
-                                 settings,
-                                 JPH::Vec3::sZero(),
-                                 collector,
-                                 broadphase_filter,
-                                 object_filter);
+        // scene_query.CollideShape(
+        //     jph_shape, JPH::Vec3::sReplicate(1.0f), toMat44(global_transform), JPH::CollideShapeSettings(), collector);
+        scene_query.CollideShape(
+            jph_shape, JPH::Vec3::sReplicate(1.0f), shape_transform, settings, JPH::Vec3::sZero(), collector, broadphase_filter, object_filter
+        );
 
         return collector.HadHit();
     }

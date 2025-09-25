@@ -175,12 +175,14 @@ CheckOptions:
     value: aNy_CasE
   - key: readability-identifier-naming.MemberCase
     value: lower_case
+  - key: readability-identifier-naming.MemberPrefix
+    value: _
   - key: readability-identifier-naming.ClassMemberPrefix
     value: m_
-  - key: readability-identifier-naming.PrivateMemberPrefix
-    value: ''
+  # - key: readability-identifier-naming.PrivateMemberPrefix
+  #   value: ''
   - key: readability-identifier-naming.ProtectedMemberPrefix
-    value: ''
+    value: '_'
   - key: readability-identifier-naming.PublicMemberCase
     value: lower_case
   - key: readability-identifier-naming.MethodCase

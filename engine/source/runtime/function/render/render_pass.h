@@ -5,7 +5,6 @@
 #include "runtime/function/render/render_resource.h"
 
 #include <vulkan/vulkan.h>
-// #include <volk.h>
 
 #include <memory>
 #include <vector>
@@ -37,6 +36,7 @@ namespace Piccolo
         _main_camera_subpass_forward_lighting,
         _main_camera_subpass_tone_mapping,
         _main_camera_subpass_color_grading,
+        _main_camera_subpass_vignette,
         _main_camera_subpass_fxaa,
         _main_camera_subpass_ui,
         _main_camera_subpass_combine_ui,
@@ -45,10 +45,10 @@ namespace Piccolo
 
     struct VisiableNodes
     {
-        std::vector<RenderMeshNode>*              p_directional_light_visible_mesh_nodes {nullptr};
-        std::vector<RenderMeshNode>*              p_point_lights_visible_mesh_nodes {nullptr};
-        std::vector<RenderMeshNode>*              p_main_camera_visible_mesh_nodes {nullptr};
-        RenderAxisNode*                           p_axis_node {nullptr};
+        std::vector<RenderMeshNode>* p_directional_light_visible_mesh_nodes {nullptr};
+        std::vector<RenderMeshNode>* p_point_lights_visible_mesh_nodes {nullptr};
+        std::vector<RenderMeshNode>* p_main_camera_visible_mesh_nodes {nullptr};
+        RenderAxisNode*              p_axis_node {nullptr};
     };
 
     class RenderPass : public RenderPassBase
@@ -59,13 +59,13 @@ namespace Piccolo
             RHIImage*        image;
             RHIDeviceMemory* mem;
             RHIImageView*    view;
-            RHIFormat       format;
+            RHIFormat        format;
         };
 
         struct Framebuffer
         {
-            int           width;
-            int           height;
+            int             width;
+            int             height;
             RHIFramebuffer* framebuffer;
             RHIRenderPass*  render_pass;
 
@@ -84,7 +84,7 @@ namespace Piccolo
             RHIPipeline*       pipeline;
         };
 
-        GlobalRenderResource*      m_global_render_resource {nullptr};
+        GlobalRenderResource* m_global_render_resource {nullptr};
 
         std::vector<Descriptor>         m_descriptor_infos;
         std::vector<RenderPipelineBase> m_render_pipelines;

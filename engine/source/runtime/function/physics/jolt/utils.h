@@ -65,6 +65,44 @@ namespace Piccolo
         JPH::BroadPhaseLayer m_object_to_broad_phase[Layers::NUM_LAYERS];
     };
 
+    class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter
+    {
+    public:
+        virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
+        {
+            // switch (inLayer1)
+            // {
+            //     case Layers::NON_MOVING:
+            //         return inLayer2 == BroadPhaseLayers::MOVING;
+            //     case Layers::MOVING:
+            //         return true;
+            //     default:
+            //         JPH_ASSERT(false);
+            //         return false;
+            // }
+            return true;
+        }
+    };
+
+    class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
+    {
+    public:
+        virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
+        {
+            // switch (inObject1)
+            // {
+            //     case Layers::NON_MOVING:
+            //         return inObject2 == Layers::MOVING; // Non moving only collides with moving
+            //     case Layers::MOVING:
+            //         return true; // Moving collides with everything
+            //     default:
+            //         JPH_ASSERT(false);
+            //         return false;
+            // }
+            return true;
+        }
+    };
+
     /// Function that determines if two object layers can collide
     bool ObjectCanCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2);
 

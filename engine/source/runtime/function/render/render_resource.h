@@ -6,7 +6,7 @@
 
 #include "runtime/function/render/render_common.h"
 
-// #include <vulkan/vulkan.h>
+#include <vulkan/vulkan.h>
 // #include <volk.h>
 #include <vk_mem_alloc.h>
 

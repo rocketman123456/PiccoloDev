@@ -91,8 +91,8 @@
                     "controller_config": {
                         "$context": {
                             "capsule_shape": {
-                                "half_height": 0.69999998807907104,
-                                "radius": 0.30000001192092896
+                                "half_height": 0.7,
+                                "radius": 0.3
                             }
                         },
                         "$typeName": "PhysicsControllerConfig"
@@ -123,12 +123,12 @@
             "$typeName": "CameraComponent"
         },
         {
-        "$context": {
-            "lua_script_res": {
-            "script_url": "scripts/player/hello_world.lua"
-            }
-        },
-        "$typeName": "LuaComponent"
+            "$context": {
+                "lua_script_res": {
+                "script_url": "scripts/player/hello_world.lua"
+                }
+            },
+            "$typeName": "LuaComponent"
         }
     ]
 }

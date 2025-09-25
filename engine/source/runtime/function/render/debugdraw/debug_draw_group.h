@@ -1,7 +1,8 @@
 #pragma once
 
-#include "debug_draw_primitive.h"
-#include "debug_draw_font.h"
+#include "runtime/function/render/debugdraw/debug_draw_primitive.h"
+#include "runtime/function/render/debugdraw/debug_draw_font.h"
+
 #include <mutex>
 #include <list>
 

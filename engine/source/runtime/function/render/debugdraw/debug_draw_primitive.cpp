@@ -1,4 +1,5 @@
-#include "debug_draw_primitive.h"
+#include "runtime/function/render/debugdraw/debug_draw_primitive.h"
+
 namespace Piccolo
 {
     bool Piccolo::DebugDrawPrimitive::isTimeOut(float delta_time)
@@ -14,7 +15,8 @@ namespace Piccolo
                 m_rendered = true;
                 return false;
             }
-            else return true;
+            else
+                return true;
         }
         else
         {
@@ -42,4 +44,4 @@ namespace Piccolo
             m_life_time = in_life_time;
         }
     }
-}
+} // namespace Piccolo

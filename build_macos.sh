@@ -30,6 +30,6 @@ fi
 cmake -S . -B build -G "Xcode" \
     -D CMAKE_C_COMPILER="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc" \
     -D CMAKE_CXX_COMPILER="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++" \
-    -D CMAKE_POLICY_VERSION_MINIMUM=3.5
+    -D CMAKE_POLICY_VERSION_MINIMUM=3.5 -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 cmake --build build --config "${CONFIG}"

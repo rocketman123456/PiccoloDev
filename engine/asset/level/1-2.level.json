@@ -67,6 +67,36 @@
       "definition": "asset/objects/character/player/player.object.json"
     },
     {
+      "name": "NPC1",
+      "instanced_components": [
+        {
+          "$typeName": "TransformComponent",
+          "$context": {
+            "transform": {
+              "position": {
+                "x": 5,
+                "y": 5,
+                "z": 0
+              },
+              "rotation": {
+                "w": 0.70710678118654752,
+                "x": 0,
+                "y": 0,
+                "z": 0.70710678118654752
+              },
+              "scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              }
+            }
+          }
+        }
+      ],
+      "active": true,
+      "definition": "asset/objects/character/npc/npc.object.json"
+    },
+    {
       "name": "Wall_1",
       "instanced_components": [
         {
