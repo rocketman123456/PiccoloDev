@@ -35,6 +35,8 @@ namespace Piccolo
         REFLECTION_BODY(BlendState);
 
     public:
+        virtual ~BlendState() = default;
+
         int                      clip_count;
         std::vector<std::string> blend_clip_file_path;
         std::vector<float>       blend_clip_file_length;
@@ -43,5 +45,46 @@ namespace Piccolo
         std::vector<std::string> blend_mask_file_path;
         std::vector<float>       blend_ratio;
     };
+
+    // REFLECTION_TYPE(BlendSpace1D)
+    // CLASS(BlendSpace1D : public BlendState, Fields)
+    // {
+    //     REFLECTION_BODY(BlendSpace1D);
+    //
+    // public:
+    //     virtual ~BlendSpace1D() = default;
+    //
+    //     // enum KeyType
+    //     //{TypeDouble, TypeInt};
+    //     std::string key;
+    //
+    //     std::vector<double> values;
+    // };
+
+    // REFLECTION_TYPE(ClipBase)
+    // CLASS(ClipBase, Fields)
+    // {
+    //     REFLECTION_BODY(ClipBase);
+    //
+    // public:
+    //     std::string name;
+    //
+    //     virtual ~ClipBase() = default;
+    //     virtual float getLength() const { return 0; }
+    // };
+
+    // REFLECTION_TYPE(BasicClip)
+    // CLASS(BasicClip : public ClipBase, Fields)
+    // {
+    //     REFLECTION_BODY(BasicClip);
+    //
+    // public:
+    //     std::string clip_file_path;
+    //     float       clip_file_length;
+    //     std::string anim_skel_map_path;
+    //
+    //     virtual ~BasicClip() override = default;
+    //     virtual float getLength() const override { return clip_file_length; }
+    // };
 
 } // namespace Piccolo

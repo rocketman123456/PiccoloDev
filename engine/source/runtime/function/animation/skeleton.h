@@ -1,5 +1,6 @@
 #pragma once
 
+// #include "runtime/function/animation/pose.h"
 #include "runtime/resource/res_type/components/animation.h"
 
 #include "runtime/function/animation/node.h"
@@ -25,5 +26,9 @@ namespace Piccolo
         void            resetSkeleton();
         const Bone*     getBones() const;
         int32_t         getBonesCount() const;
+
+        // void applyPose(const AnimationPose& pose);
+        // void applyAdditivePose(const AnimationPose& pose);
+        // void extractPose(AnimationPose& pose);
     };
 } // namespace Piccolo

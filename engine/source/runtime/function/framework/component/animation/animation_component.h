@@ -26,10 +26,26 @@ namespace Piccolo
 
         const Skeleton& getSkeleton() const;
 
+        // void animateBasicClip(float ratio, BasicClip* basic_clip);
+        // void blend(float desired_ratio, BlendState* blend_state);
+        // void blend1D(float desired_ratio, BlendSpace1D* blend_state);
+
+        template<typename T>
+        void updateSignal(const std::string& key, const T& value)
+        {
+            m_signal[key] = value;
+        }
+
     protected:
         META(Enable)
         AnimationComponentRes m_animation_res;
 
         Skeleton m_skeleton;
+
+        json11::Json::object m_signal;
+
+        // AnimationResult m_animation_result;
+        // AnimationFSM    m_animation_fsm;
+        // float           m_ratio {0};
     };
 } // namespace Piccolo
