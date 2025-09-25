@@ -10,9 +10,8 @@
 
 namespace Generator
 {
-    ReflectionGenerator::ReflectionGenerator(std::string                             source_directory,
-                                             std::function<std::string(std::string)> get_include_function) :
-        GeneratorInterface(source_directory + "/_generated/reflection", source_directory, get_include_function)
+    ReflectionGenerator::ReflectionGenerator(std::string source_directory, std::function<std::string(std::string)> get_include_function)
+        : GeneratorInterface(source_directory + "/_generated/reflection", source_directory, get_include_function)
     {
         prepareStatus(m_out_path);
     }
@@ -34,14 +33,13 @@ namespace Generator
     {
         static const std::string vector_prefix = "std::vector<";
 
-        std::string    file_path = processFileName(path);
+        std::string file_path = processFileName(path);
 
         Mustache::data mustache_data;
         Mustache::data include_headfiles(Mustache::data::type::list);
         Mustache::data class_defines(Mustache::data::type::list);
 
-        include_headfiles.push_back(
-            Mustache::data("headfile_name", Utils::makeRelativePath(m_root_path, path).string()));
+        include_headfiles.push_back(Mustache::data("headfile_name", Utils::makeRelativePath(m_root_path, path).string()));
 
         std::map<std::string, bool> class_names;
         // class defs
@@ -91,6 +89,8 @@ namespace Generator
                     std::string    array_useful_name = vector_item.second.first;
                     std::string    item_type         = vector_item.second.second;
                     Mustache::data vector_define;
+                    // TODO : check correct
+                    Utils::replace(array_useful_name, ',', '_');
                     vector_define.set("vector_useful_name", array_useful_name);
                     vector_define.set("vector_type_name", vector_item.first);
                     vector_define.set("vector_element_type_name", item_type);
@@ -107,8 +107,7 @@ namespace Generator
         std::string tmp = Utils::convertNameToUpperCamelCase(fs::path(path).stem().string(), "_");
         mustache_data.set("sourefile_name_upper_camel_case", tmp);
 
-        std::string render_string =
-            TemplateManager::getInstance()->renderByTemplate("commonReflectionFile", mustache_data);
+        std::string render_string = TemplateManager::getInstance()->renderByTemplate("commonReflectionFile", mustache_data);
         Utils::saveFile(render_string, file_path);
 
         m_sourcefile_list.emplace_back(tmp);
@@ -120,7 +119,7 @@ namespace Generator
     {
         Mustache::data mustache_data;
         Mustache::data include_headfiles = Mustache::data::type::list;
-        Mustache::data sourefile_names    = Mustache::data::type::list;
+        Mustache::data sourefile_names   = Mustache::data::type::list;
 
         for (auto& head_file : m_head_file_list)
         {
@@ -132,8 +131,7 @@ namespace Generator
         }
         mustache_data.set("include_headfiles", include_headfiles);
         mustache_data.set("sourefile_names", sourefile_names);
-        std::string render_string =
-            TemplateManager::getInstance()->renderByTemplate("allReflectionFile", mustache_data);
+        std::string render_string = TemplateManager::getInstance()->renderByTemplate("allReflectionFile", mustache_data);
         Utils::saveFile(render_string, m_out_path + "/all_reflection.h");
     }
 
