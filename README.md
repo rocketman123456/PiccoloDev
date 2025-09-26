@@ -52,6 +52,9 @@ sudo apt install mesa-vulkan-drivers
 
 ## Build Piccolo
 
+vcpkg packages:
+  glfw3 spdlog sol2 lua stb joltphysics glslang volk tinygltf tinyobjloader vulkanmemoryallocator
+
 ### Build on Windows
 You may execute the **build_windows.bat**. This batch file will generate the projects, and build the **Release** config of **Piccolo Engine** automatically. After successful build, you can find the PiccoloEditor.exe at the **bin** directory.
 

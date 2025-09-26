@@ -6,9 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(JSON_INCLUDE ${THIRD_PARTY_DIR}/json11)
-
 add_library(json11 ${JSON_INCLUDE}/json11.cpp)
 set_target_properties(json11 PROPERTIES FOLDER "ThirdParty/json11")
+
 # ---- Add source files ----
 
 # Note: globbing sources is considered bad practice as CMake's generators may not detect new files
@@ -40,31 +40,34 @@ set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "Engine")
 target_compile_options(${TARGET_NAME} PUBLIC "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/permissive->")
 target_compile_options(${TARGET_NAME} PUBLIC "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/WX->")
 
+target_include_directories(${TARGET_NAME} PRIVATE ${SOL2_INCLUDE_DIRS})
+
 # Link dependencies    
 target_link_libraries(${TARGET_NAME} PUBLIC spdlog::spdlog)
-target_link_libraries(${TARGET_NAME} PRIVATE tinyobjloader stb)
+target_link_libraries(${TARGET_NAME} PRIVATE tinyobjloader::tinyobjloader)
 target_link_libraries(${TARGET_NAME} PUBLIC glfw)
 target_link_libraries(${TARGET_NAME} PUBLIC imgui)
-target_link_libraries(${TARGET_NAME} PUBLIC Jolt)
-target_link_libraries(${TARGET_NAME} PUBLIC lua_static sol2)
-target_link_libraries(${TARGET_NAME} PUBLIC ${vulkan_lib})
-# target_link_libraries(${TARGET_NAME} PUBLIC volk)
-target_link_libraries(${TARGET_NAME} PRIVATE $<BUILD_INTERFACE:json11>)
+target_link_libraries(${TARGET_NAME} PUBLIC Jolt::Jolt)
+target_link_libraries(${TARGET_NAME} PUBLIC ${LUA_LIBRARIES})
+target_link_libraries(${TARGET_NAME} PRIVATE json11)
+target_link_libraries(${TARGET_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
+
+target_link_libraries(${TARGET_NAME} PRIVATE Vulkan::Vulkan)
+
+target_include_directories(${TARGET_NAME} PUBLIC ${LUA_INCLUDE_DIR})
+target_include_directories(${TARGET_NAME} PRIVATE ${Stb_INCLUDE_DIR})
+target_include_directories(${TARGET_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
 if(ENABLE_PHYSICS_DEBUG_RENDERER)
   add_compile_definitions(ENABLE_PHYSICS_DEBUG_RENDERER)
   target_link_libraries(${TARGET_NAME} PUBLIC TestFramework d3d12.lib shcore.lib)
 endif()
 
-target_include_directories(
-  ${TARGET_NAME}
-  PUBLIC $<BUILD_INTERFACE:${vulkan_include}>)
-
 add_dependencies(${TARGET_NAME} ${SHADER_COMPILE_TARGET})
 target_include_directories(
   ${TARGET_NAME}
-  PUBLIC $<BUILD_INTERFACE:${ENGINE_ROOT_DIR}/shader/generated/cpp>)
-
+  PUBLIC $<BUILD_INTERFACE:${ENGINE_ROOT_DIR}/shader/generated/cpp>
+)
 
 target_include_directories(
   ${TARGET_NAME} 
@@ -72,17 +75,15 @@ target_include_directories(
   $<INSTALL_INTERFACE:include/${TARGET_NAME}-${PROJECT_VERSION}>
 )
 
-
-
 target_include_directories(
   ${TARGET_NAME} 
   PUBLIC $<BUILD_INTERFACE:${JSON_INCLUDE}>
 )
 
-target_include_directories(
-  ${TARGET_NAME} 
-  PUBLIC $<BUILD_INTERFACE:${THIRD_PARTY_DIR}/vulkanmemoryallocator/include>
-)
+# target_include_directories(
+#   ${TARGET_NAME} 
+#   PUBLIC $<BUILD_INTERFACE:${THIRD_PARTY_DIR}/vulkanmemoryallocator/include>
+# )
 
 target_include_directories(
   ${TARGET_NAME} 
