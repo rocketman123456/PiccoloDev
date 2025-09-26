@@ -100,6 +100,14 @@ namespace Piccolo
 
             ImGui::Render();
 
+            // Update and Render additional Platform Windows
+            // ImGuiIO& io = ImGui::GetIO();
+            // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            // {
+            //     ImGui::UpdatePlatformWindows();
+            //     ImGui::RenderPlatformWindowsDefault();
+            // }
+
             ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<VulkanRHI>(m_rhi)->m_vk_current_command_buffer);
 
             m_rhi->popEvent(m_rhi->getCurrentCommandBuffer());

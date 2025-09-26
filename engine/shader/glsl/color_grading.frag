@@ -56,6 +56,6 @@ void main()
 
     // out_color = base_color;
     // out_color = mid_color;
-    out_color = vec4(mid_color.rgb, base_color.a);
-    // out_color = vec4(clamped_color.rgb, base_color.a);
+    // out_color = vec4(mid_color.rgb, base_color.a);
+    out_color = vec4(clamped_color.rgb, base_color.a);
 }

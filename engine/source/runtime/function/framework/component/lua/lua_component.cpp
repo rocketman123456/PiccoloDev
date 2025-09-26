@@ -4,18 +4,14 @@
 namespace Piccolo
 {
 
-    bool find_component_field(std::weak_ptr<GObject>     game_object,
-                              const char*                field_name,
-                              Reflection::FieldAccessor& field_accessor,
-                              void*&                     target_instance)
+    bool find_component_field(std::weak_ptr<GObject> game_object, const char* field_name, Reflection::FieldAccessor& field_accessor, void*& target_instance)
     {
         auto components = game_object.lock()->getComponents();
 
         std::istringstream iss(field_name);
         std::string        current_name;
         std::getline(iss, current_name, '.');
-        auto component_iter = std::find_if(
-            components.begin(), components.end(), [current_name](auto c) { return c.getTypeName() == current_name; });
+        auto component_iter = std::find_if(components.begin(), components.end(), [current_name](auto c) { return c.getTypeName() == current_name; });
         if (component_iter != components.end())
         {
             auto  meta           = Reflection::TypeMeta::newMetaFromName(current_name);
@@ -26,8 +22,7 @@ namespace Piccolo
             {
                 Reflection::FieldAccessor* fields;
                 int                        fields_count = meta.getFieldsList(fields);
-                auto                       field_iter   = std::find_if(
-                    fields, fields + fields_count, [current_name](auto f) { return f.getFieldName() == current_name; });
+                auto field_iter = std::find_if(fields, fields + fields_count, [current_name](auto f) { return f.getFieldName() == current_name; });
                 if (field_iter == fields + fields_count) // not found
                 {
                     delete[] fields;
@@ -51,7 +46,8 @@ namespace Piccolo
     template<typename T>
     void LuaComponent::set(std::weak_ptr<GObject> game_object, const char* name, T value)
     {
-        LOG_INFO(name);
+        // LOG_DEBUG(name);
+
         Reflection::FieldAccessor field_accessor;
         void*                     target_instance;
         if (find_component_field(game_object, name, field_accessor, target_instance))
@@ -67,8 +63,7 @@ namespace Piccolo
     template<typename T>
     T LuaComponent::get(std::weak_ptr<GObject> game_object, const char* name)
     {
-
-        LOG_INFO(name);
+        // LOG_DEBUG(name);
 
         Reflection::FieldAccessor field_accessor;
         void*                     target_instance;
@@ -101,8 +96,7 @@ namespace Piccolo
             // target is a component
             auto components = game_object.lock()->getComponents();
 
-            auto component_iter = std::find_if(
-                components.begin(), components.end(), [target_name](auto c) { return c.getTypeName() == target_name; });
+            auto component_iter = std::find_if(components.begin(), components.end(), [target_name](auto c) { return c.getTypeName() == target_name; });
             if (component_iter != components.end())
             {
                 meta            = Reflection::TypeMeta::newMetaFromName(target_name);
@@ -132,8 +126,7 @@ namespace Piccolo
         // invoke function
         Reflection::MethodAccessor* methods;
         size_t                      method_count = meta.getMethodsList(methods);
-        auto                        method_iter  = std::find_if(
-            methods, methods + method_count, [method_name](auto m) { return m.getMethodName() == method_name; });
+        auto method_iter = std::find_if(methods, methods + method_count, [method_name](auto m) { return m.getMethodName() == method_name; });
         if (method_iter != methods + method_count)
         {
             method_iter->invoke(target_instance);

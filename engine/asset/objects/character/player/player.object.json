@@ -125,7 +125,7 @@
         {
             "$context": {
                 "lua_script_res": {
-                "script_url": "scripts/player/hello_world.lua"
+                "script_url": "scripts/player/set_jump_height.lua"
                 }
             },
             "$typeName": "LuaComponent"

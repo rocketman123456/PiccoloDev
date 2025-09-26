@@ -33,14 +33,8 @@ namespace Piccolo
 {
     std::vector<std::pair<std::string, bool>> g_editor_node_state_array;
     int                                       g_node_depth = -1;
-    void                                      DrawVecControl(const std::string& label,
-                                                             Piccolo::Vector3&  values,
-                                                             float              resetValue  = 0.0f,
-                                                             float              columnWidth = 100.0f);
-    void                                      DrawVecControl(const std::string&   label,
-                                                             Piccolo::Quaternion& values,
-                                                             float                resetValue  = 0.0f,
-                                                             float                columnWidth = 100.0f);
+    void DrawVecControl(const std::string& label, Piccolo::Vector3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
+    void DrawVecControl(const std::string& label, Piccolo::Quaternion& values, float resetValue = 0.0f, float columnWidth = 100.0f);
 
     EditorUI::EditorUI()
     {
@@ -90,29 +84,21 @@ namespace Piccolo
                 DrawVecControl("Rotation", degrees_val);
                 DrawVecControl("Scale", trans_ptr->m_scale);
 
-                trans_ptr->m_rotation.w = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                trans_ptr->m_rotation.w = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::cos(Math::degreesToRadians(degrees_val.z / 2)) +
-                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::sin(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.x = Math::sin(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                trans_ptr->m_rotation.x = Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::cos(Math::degreesToRadians(degrees_val.z / 2)) -
-                                          Math::cos(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                          Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::sin(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.y = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                trans_ptr->m_rotation.y = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::cos(Math::degreesToRadians(degrees_val.z / 2)) +
-                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::sin(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.z = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                trans_ptr->m_rotation.z = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::sin(Math::degreesToRadians(degrees_val.z / 2)) -
-                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
                                               Math::cos(Math::degreesToRadians(degrees_val.z / 2));
                 trans_ptr->m_rotation.normalise();
 
@@ -277,10 +263,9 @@ namespace Piccolo
     void EditorUI::showEditorMenu(bool* p_open)
     {
         ImGuiDockNodeFlags dock_flags   = ImGuiDockNodeFlags_DockSpace;
-        ImGuiWindowFlags   window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar |
-                                        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground |
-                                        ImGuiConfigFlags_NoMouseCursorChange | ImGuiWindowFlags_NoBringToFrontOnFocus;
+        ImGuiWindowFlags   window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground | ImGuiConfigFlags_NoMouseCursorChange |
+                                        ImGuiWindowFlags_NoBringToFrontOnFocus;
 
         const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(main_viewport->WorkPos, ImGuiCond_Always);
@@ -297,10 +282,8 @@ namespace Piccolo
             ImGui::DockBuilderRemoveNode(main_docking_id);
 
             ImGui::DockBuilderAddNode(main_docking_id, dock_flags);
-            ImGui::DockBuilderSetNodePos(main_docking_id,
-                                         ImVec2(main_viewport->WorkPos.x, main_viewport->WorkPos.y + 18.0f));
-            ImGui::DockBuilderSetNodeSize(main_docking_id,
-                                          ImVec2((float)window_size[0], (float)window_size[1] - 18.0f));
+            ImGui::DockBuilderSetNodePos(main_docking_id, ImVec2(main_viewport->WorkPos.x, main_viewport->WorkPos.y + 18.0f));
+            ImGui::DockBuilderSetNodeSize(main_docking_id, ImVec2((float)window_size[0], (float)window_size[1] - 18.0f));
 
             ImGuiID center = main_docking_id;
             ImGuiID left;
@@ -310,8 +293,7 @@ namespace Piccolo
             ImGuiID left_file_content = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.30f, nullptr, &left_other);
 
             ImGuiID left_game_engine;
-            ImGuiID left_asset =
-                ImGui::DockBuilderSplitNode(left_other, ImGuiDir_Left, 0.30f, nullptr, &left_game_engine);
+            ImGuiID left_asset = ImGui::DockBuilderSplitNode(left_other, ImGuiDir_Left, 0.30f, nullptr, &left_game_engine);
 
             ImGui::DockBuilderDockWindow("World Objects", left_asset);
             ImGui::DockBuilderDockWindow("Components Details", right);
@@ -341,16 +323,12 @@ namespace Piccolo
                 {
                     if (ImGui::BeginMenu("Animation"))
                     {
-                        if (ImGui::MenuItem(g_runtime_global_context.m_render_debug_config->animation.show_skeleton ?
-                                                "off skeleton" :
-                                                "show skeleton"))
+                        if (ImGui::MenuItem(g_runtime_global_context.m_render_debug_config->animation.show_skeleton ? "off skeleton" : "show skeleton"))
                         {
                             g_runtime_global_context.m_render_debug_config->animation.show_skeleton =
                                 !g_runtime_global_context.m_render_debug_config->animation.show_skeleton;
                         }
-                        if (ImGui::MenuItem(g_runtime_global_context.m_render_debug_config->animation.show_bone_name ?
-                                                "off bone name" :
-                                                "show bone name"))
+                        if (ImGui::MenuItem(g_runtime_global_context.m_render_debug_config->animation.show_bone_name ? "off bone name" : "show bone name"))
                         {
                             g_runtime_global_context.m_render_debug_config->animation.show_bone_name =
                                 !g_runtime_global_context.m_render_debug_config->animation.show_bone_name;
@@ -359,9 +337,9 @@ namespace Piccolo
                     }
                     if (ImGui::BeginMenu("Camera"))
                     {
-                        if (ImGui::MenuItem(g_runtime_global_context.m_render_debug_config->camera.show_runtime_info ?
-                                                "off runtime info" :
-                                                "show runtime info"))
+                        if (ImGui::MenuItem(
+                                g_runtime_global_context.m_render_debug_config->camera.show_runtime_info ? "off runtime info" : "show runtime info"
+                            ))
                         {
                             g_runtime_global_context.m_render_debug_config->camera.show_runtime_info =
                                 !g_runtime_global_context.m_render_debug_config->camera.show_runtime_info;
@@ -371,9 +349,8 @@ namespace Piccolo
                     if (ImGui::BeginMenu("Game Object"))
                     {
                         if (ImGui::MenuItem(
-                                g_runtime_global_context.m_render_debug_config->gameObject.show_bounding_box ?
-                                    "off bounding box" :
-                                    "show bounding box"))
+                                g_runtime_global_context.m_render_debug_config->gameObject.show_bounding_box ? "off bounding box" : "show bounding box"
+                            ))
                         {
                             g_runtime_global_context.m_render_debug_config->gameObject.show_bounding_box =
                                 !g_runtime_global_context.m_render_debug_config->gameObject.show_bounding_box;
@@ -418,8 +395,7 @@ namespace Piccolo
             return;
         }
 
-        std::shared_ptr<Level> current_active_level =
-            g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
+        std::shared_ptr<Level> current_active_level = g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
         if (current_active_level == nullptr)
             return;
 
@@ -453,7 +429,7 @@ namespace Piccolo
     void EditorUI::createClassUI(Reflection::ReflectionInstance& instance)
     {
         Reflection::ReflectionInstance* reflection_instance;
-        int count = instance.m_meta.getBaseClassReflectionInstanceList(reflection_instance, instance.m_instance);
+        int                             count = instance.m_meta.getBaseClassReflectionInstanceList(reflection_instance, instance.m_instance);
         for (int index = 0; index < count; index++)
         {
             createClassUI(reflection_instance[index]);
@@ -479,20 +455,18 @@ namespace Piccolo
                 {
                     void* field_instance = field.get(instance.m_instance);
                     int   array_count    = array_accessor.getSize(field_instance);
-                    m_editor_ui_creator["TreeNodePush"](
-                        std::string(field.getFieldName()) + "[" + std::to_string(array_count) + "]", nullptr);
-                    auto item_type_meta_item =
-                        Reflection::TypeMeta::newMetaFromName(array_accessor.getElementTypeName());
+                    m_editor_ui_creator["TreeNodePush"](std::string(field.getFieldName()) + "[" + std::to_string(array_count) + "]", nullptr);
+                    auto item_type_meta_item      = Reflection::TypeMeta::newMetaFromName(array_accessor.getElementTypeName());
                     auto item_ui_creator_iterator = m_editor_ui_creator.find(item_type_meta_item.getTypeName());
                     for (int index = 0; index < array_count; index++)
                     {
                         if (item_ui_creator_iterator == m_editor_ui_creator.end())
                         {
                             m_editor_ui_creator["TreeNodePush"]("[" + std::to_string(index) + "]", nullptr);
-                            auto object_instance =
-                                Reflection::ReflectionInstance(Piccolo::Reflection::TypeMeta::newMetaFromName(
-                                                                   item_type_meta_item.getTypeName().c_str()),
-                                                               array_accessor.get(index, field_instance));
+                            auto object_instance = Reflection::ReflectionInstance(
+                                Piccolo::Reflection::TypeMeta::newMetaFromName(item_type_meta_item.getTypeName().c_str()),
+                                array_accessor.get(index, field_instance)
+                            );
                             createClassUI(object_instance);
                             m_editor_ui_creator["TreeNodePop"]("[" + std::to_string(index) + "]", nullptr);
                         }
@@ -503,7 +477,8 @@ namespace Piccolo
                                 continue;
                             }
                             m_editor_ui_creator[item_type_meta_item.getTypeName()](
-                                "[" + std::to_string(index) + "]", array_accessor.get(index, field_instance));
+                                "[" + std::to_string(index) + "]", array_accessor.get(index, field_instance)
+                            );
                         }
                     }
                     m_editor_ui_creator["TreeNodePop"](field.getFieldName(), nullptr);
@@ -592,9 +567,8 @@ namespace Piccolo
         for (auto component_ptr : selected_object_components)
         {
             m_editor_ui_creator["TreeNodePush"](("<" + component_ptr.getTypeName() + ">").c_str(), nullptr);
-            auto object_instance = Reflection::ReflectionInstance(
-                Piccolo::Reflection::TypeMeta::newMetaFromName(component_ptr.getTypeName().c_str()),
-                component_ptr.operator->());
+            auto object_instance =
+                Reflection::ReflectionInstance(Piccolo::Reflection::TypeMeta::newMetaFromName(component_ptr.getTypeName().c_str()), component_ptr.operator->());
             createClassUI(object_instance);
             m_editor_ui_creator["TreeNodePop"](("<" + component_ptr.getTypeName() + ">").c_str(), nullptr);
         }
@@ -616,9 +590,8 @@ namespace Piccolo
             return;
         }
 
-        static ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH |
-                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg |
-                                       ImGuiTableFlags_NoBordersInBody;
+        static ImGuiTableFlags flags =
+            ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody;
 
         if (ImGui::BeginTable("File Content", 2, flags))
         {
@@ -733,7 +706,8 @@ namespace Piccolo
                     g_editor_global_context.m_scene_manager->drawSelectedEntityAxis();
                     g_runtime_global_context.m_input_system->resetGameCommand();
                     g_editor_global_context.m_render_system->getRenderCamera()->setMainViewMatrix(
-                        g_editor_global_context.m_scene_manager->getEditorCamera()->getViewMatrix());
+                        g_editor_global_context.m_scene_manager->getEditorCamera()->getViewMatrix()
+                    );
                 }
             }
 
@@ -747,9 +721,9 @@ namespace Piccolo
         }
         else
         {
-            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f),
-                               "Current editor camera move speed: [%f]",
-                               g_editor_global_context.m_input_manager->getCameraSpeed());
+            ImGui::TextColored(
+                ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Current editor camera move speed: [%f]", g_editor_global_context.m_input_manager->getCameraSpeed()
+            );
         }
 
         // GetWindowPos() ----->  X--------------------------------------------O
@@ -772,10 +746,8 @@ namespace Piccolo
         render_target_window_pos.x  = ImGui::GetWindowPos().x;
         render_target_window_pos.y  = menu_bar_rect.Max.y;
         render_target_window_size.x = ImGui::GetWindowSize().x;
-        render_target_window_size.y =
-            (ImGui::GetWindowSize().y + ImGui::GetWindowPos().y) -
-            menu_bar_rect.Max
-                .y; // coord of right bottom point of full window minus coord of right bottom point of menu bar window.
+        render_target_window_size.y = (ImGui::GetWindowSize().y + ImGui::GetWindowPos().y) -
+                                      menu_bar_rect.Max.y; // coord of right bottom point of full window minus coord of right bottom point of menu bar window.
 
         // if (new_window_pos != m_engine_window_pos || new_window_size != m_engine_window_size)
         {
@@ -788,12 +760,12 @@ namespace Piccolo
                 render_target_window_pos.x * dpi_scale,
                 render_target_window_pos.y * dpi_scale,
                 render_target_window_size.x * dpi_scale,
-                render_target_window_size.y * dpi_scale);
+                render_target_window_size.y * dpi_scale
+            );
 #else
-            g_runtime_global_context.m_render_system->updateEngineContentViewport(render_target_window_pos.x,
-                                                                                  render_target_window_pos.y,
-                                                                                  render_target_window_size.x,
-                                                                                  render_target_window_size.y);
+            g_runtime_global_context.m_render_system->updateEngineContentViewport(
+                render_target_window_pos.x, render_target_window_pos.y, render_target_window_size.x, render_target_window_size.y
+            );
 #endif
             g_editor_global_context.m_input_manager->setEngineWindowPos(render_target_window_pos);
             g_editor_global_context.m_input_manager->setEngineWindowSize(render_target_window_size);
@@ -808,8 +780,7 @@ namespace Piccolo
         {
             ImGui::PushID(string_id);
             ImVec4 check_button_color = ImVec4(93.0f / 255.0f, 10.0f / 255.0f, 66.0f / 255.0f, 1.00f);
-            ImGui::PushStyleColor(ImGuiCol_Button,
-                                  ImVec4(check_button_color.x, check_button_color.y, check_button_color.z, 0.40f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(check_button_color.x, check_button_color.y, check_button_color.z, 0.40f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, check_button_color);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, check_button_color);
             ImGui::Button(string_id);
@@ -847,9 +818,7 @@ namespace Piccolo
         }
         else
         {
-            ImGui::TreeNodeEx(node->m_file_name.c_str(),
-                              ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen |
-                                  ImGuiTreeNodeFlags_SpanFullWidth);
+            ImGui::TreeNodeEx(node->m_file_name.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanFullWidth);
             if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
             {
                 onFileContentItemClicked(node);
@@ -872,10 +841,8 @@ namespace Piccolo
         const unsigned int new_object_index = ++m_new_object_index_map[node->m_file_name];
 
         ObjectInstanceRes new_object_instance_res;
-        new_object_instance_res.m_name =
-            "New_" + Path::getFilePureName(node->m_file_name) + "_" + std::to_string(new_object_index);
-        new_object_instance_res.m_definition =
-            g_runtime_global_context.m_asset_manager->getFullPath(node->m_file_path).generic_string();
+        new_object_instance_res.m_name       = "New_" + Path::getFilePureName(node->m_file_name) + "_" + std::to_string(new_object_index);
+        new_object_instance_res.m_definition = g_runtime_global_context.m_asset_manager->getFullPath(node->m_file_path).generic_string();
 
         size_t new_gobject_id = level->createObject(new_object_instance_res);
         if (new_gobject_id != k_invalid_gobject_id)
@@ -893,10 +860,7 @@ namespace Piccolo
         // TOOD: Reload fonts if DPI scale is larger than previous font loading DPI scale
     }
 
-    inline void windowContentScaleCallback(GLFWwindow* window, float x_scale, float y_scale)
-    {
-        windowContentScaleUpdate(fmaxf(x_scale, y_scale));
-    }
+    inline void windowContentScaleCallback(GLFWwindow* window, float x_scale, float y_scale) { windowContentScaleUpdate(fmaxf(x_scale, y_scale)); }
 
     void EditorUI::initialize(WindowUIInitInfo init_info)
     {
@@ -916,11 +880,13 @@ namespace Piccolo
 
         // load font for imgui
         ImGuiIO& io = ImGui::GetIO();
+        // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+        // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
         io.ConfigDockingAlwaysTabBar         = true;
         io.ConfigWindowsMoveFromTitleBarOnly = true;
-        io.Fonts->AddFontFromFileTTF(
-            config_manager->getEditorFontPath().generic_string().data(), content_scale * 16, nullptr, nullptr);
+        io.Fonts->AddFontFromFileTTF(config_manager->getEditorFontPath().generic_string().data(), content_scale * 16, nullptr, nullptr);
         io.Fonts->Build();
 
         ImGuiStyle& style     = ImGui::GetStyle();
@@ -930,17 +896,23 @@ namespace Piccolo
         style.FrameRounding   = 5.0f;
         style.FrameBorderSize = 1.5f;
 
-        // set imgui color style
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            style.WindowRounding = 0.0f;
+            style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+        }
+
+        // Setup Dear ImGui style
+        // ImGui::StyleColorsDark();
+        //ImGui::StyleColorsLight();
         setUIColorStyle();
 
         // setup window icon
         GLFWimage   window_icon[2];
         std::string big_icon_path_string   = config_manager->getEditorBigIconPath().generic_string();
         std::string small_icon_path_string = config_manager->getEditorSmallIconPath().generic_string();
-        window_icon[0].pixels =
-            stbi_load(big_icon_path_string.data(), &window_icon[0].width, &window_icon[0].height, 0, 4);
-        window_icon[1].pixels =
-            stbi_load(small_icon_path_string.data(), &window_icon[1].width, &window_icon[1].height, 0, 4);
+        window_icon[0].pixels              = stbi_load(big_icon_path_string.data(), &window_icon[0].width, &window_icon[0].height, 0, 4);
+        window_icon[1].pixels              = stbi_load(small_icon_path_string.data(), &window_icon[1].width, &window_icon[1].height, 0, 4);
         glfwSetWindowIcon(init_info.window_system->getWindow(), 2, window_icon);
         stbi_image_free(window_icon[0].pixels);
         stbi_image_free(window_icon[1].pixels);
