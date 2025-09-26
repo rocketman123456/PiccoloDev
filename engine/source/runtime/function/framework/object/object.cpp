@@ -13,9 +13,8 @@
 #include <cassert>
 #include <unordered_set>
 
-#include "editor/include/editor_global_context.h"
-#include "function/render/render_system.h"
 #include "_generated/serializer/all_serializer.h"
+#include "function/render/render_system.h"
 
 namespace Piccolo
 {
@@ -116,7 +115,7 @@ namespace Piccolo
         out_object_instance_res.m_definition = m_definition_url;
 
         out_object_instance_res.m_instanced_components = m_components;
-        out_object_instance_res.m_active = m_active;
+        out_object_instance_res.m_active               = m_active;
     }
 
     void GObject::setActive(bool active)
@@ -148,7 +147,7 @@ namespace Piccolo
 
     void GObject::onInactive() const
     {
-        RenderSwapContext& swap_context = g_editor_global_context.m_render_system->getSwapContext();
+        RenderSwapContext& swap_context = g_runtime_global_context.m_render_system->getSwapContext();
         swap_context.getLogicSwapData().addDeleteGameObject(GameObjectDesc {getID(), {}});
     }
 } // namespace Piccolo

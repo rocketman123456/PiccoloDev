@@ -18,7 +18,9 @@ namespace Piccolo
         using TypeNameSet = std::unordered_set<std::string>;
 
     public:
-        GObject(GObjectID id) : m_id {id} {}
+        GObject(GObjectID id)
+            : m_id {id}
+        {}
         virtual ~GObject();
 
         virtual void tick(float delta_time);
@@ -73,9 +75,9 @@ namespace Piccolo
         GObjectID   m_id {k_invalid_gobject_id};
         std::string m_name;
         std::string m_definition_url;
-        bool m_active {true};
+        bool        m_active {true};
 
-        // we have to use the ReflectionPtr due to that the components need to be reflected 
+        // we have to use the ReflectionPtr due to that the components need to be reflected
         // in editor, and it's polymorphism
         std::vector<Reflection::ReflectionPtr<Component>> m_components;
 
