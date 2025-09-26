@@ -54,7 +54,7 @@ add_subdirectory(3rdparty)
 
 add_subdirectory(source/runtime)
 add_subdirectory(source/editor)
-add_subdirectory(source/game)
+# add_subdirectory(source/game)
 add_subdirectory(source/meta_parser)
 #add_subdirectory(source/test)
 

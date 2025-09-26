@@ -102,6 +102,10 @@ if(NOT TARGET soloud)
     include(soloud.cmake)
 endif()
 
+if(NOT TARGET tinygltf)
+    add_subdirectory(tinygltf)
+endif()
+
 if(NOT TARGET ImGuiFileDialog)
     add_subdirectory(ImGuiFileDialog)
     target_include_directories(ImGuiFileDialog PUBLIC imgui)
