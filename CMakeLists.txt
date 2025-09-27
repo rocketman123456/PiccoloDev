@@ -21,6 +21,13 @@ find_package(tinyobjloader CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
+# find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
+# target_include_directories(main PRIVATE ${MINIAUDIO_INCLUDE_DIRS})
+find_package(portaudio CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE portaudio_static)
+find_package(SndFile CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE SndFile::sndfile)
+
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(FATAL_ERROR

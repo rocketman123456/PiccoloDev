@@ -108,12 +108,22 @@
             "$typeName": "NPCMotorComponent"
         },
         {
-        "$context": {
-            "lua_script_res": {
-            "script_url": "scripts/player/hello_world.lua"
-            }
+            "$context": {
+                "lua_script_res": {
+                    "script_url": "scripts/player/hello_world.lua"
+                }
+            },
+            "$typeName": "LuaComponent"
         },
-        "$typeName": "LuaComponent"
+        {
+            "$context": {
+                "sound_name": "powerup",
+                "sound_res": {
+                    "sound_url": "sound/powerup.wav"
+                },
+                "trigger_dt": 15.0
+            },
+            "$typeName": "SoundComponent"
         }
     ]
 }

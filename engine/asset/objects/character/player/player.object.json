@@ -125,10 +125,20 @@
         {
             "$context": {
                 "lua_script_res": {
-                "script_url": "scripts/player/set_jump_height.lua"
+                    "script_url": "scripts/player/set_jump_height.lua"
                 }
             },
             "$typeName": "LuaComponent"
+        },
+        {
+            "$context": {
+                "sound_name": "bleep",
+                "sound_res": {
+                    "sound_url": "sound/bleep.wav"
+                },
+                "trigger_dt": 10.0
+            },
+            "$typeName": "SoundComponent"
         }
     ]
 }

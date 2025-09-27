@@ -11,10 +11,12 @@
 #include "runtime/function/render/debugdraw/debug_draw_manager.h"
 #include "runtime/function/render/render_system.h"
 #include "runtime/function/render/window_system.h"
+#include "runtime/function/sound/sound_manager.h"
 
 namespace Piccolo
 {
     bool                            g_is_editor_mode {false};
+    bool                            g_is_game_mode {false};
     std::unordered_set<std::string> g_editor_tick_component_types {};
 
     const float PiccoloEngine::s_fps_alpha = 1.f / 100.f;
@@ -72,6 +74,8 @@ namespace Piccolo
     {
         logicalTick(delta_time);
         calculateFPS(delta_time);
+
+        g_runtime_global_context.m_sound_manager->tick(delta_time);
 
         // single thread
         // exchange data between logic and render contexts

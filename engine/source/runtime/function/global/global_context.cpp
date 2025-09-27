@@ -18,6 +18,7 @@
 #include "runtime/function/render/render_debug_config.h"
 #include "runtime/function/render/render_system.h"
 #include "runtime/function/render/window_system.h"
+#include "runtime/function/sound/sound_manager.h"
 
 namespace Piccolo
 {
@@ -39,6 +40,9 @@ namespace Piccolo
 
         m_world_manager = std::make_shared<WorldManager>();
         m_world_manager->initialize();
+
+        m_sound_manager = std::make_shared<SoundManager>();
+        m_sound_manager->initialize();
 
         m_window_system = std::make_shared<WindowSystem>();
         WindowCreateInfo window_create_info;
@@ -71,6 +75,9 @@ namespace Piccolo
         m_render_system.reset();
 
         m_window_system.reset();
+
+        m_sound_manager->clear();
+        m_sound_manager.reset();
 
         m_world_manager->clear();
         m_world_manager.reset();

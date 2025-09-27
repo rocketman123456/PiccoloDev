@@ -44,19 +44,20 @@ target_include_directories(${TARGET_NAME} PRIVATE ${SOL2_INCLUDE_DIRS})
 
 # Link dependencies    
 target_link_libraries(${TARGET_NAME} PUBLIC spdlog::spdlog)
-target_link_libraries(${TARGET_NAME} PRIVATE tinyobjloader::tinyobjloader)
+target_link_libraries(${TARGET_NAME} PUBLIC tinyobjloader::tinyobjloader)
 target_link_libraries(${TARGET_NAME} PUBLIC glfw)
 target_link_libraries(${TARGET_NAME} PUBLIC imgui)
 target_link_libraries(${TARGET_NAME} PUBLIC Jolt::Jolt)
 target_link_libraries(${TARGET_NAME} PUBLIC ${LUA_LIBRARIES})
-target_link_libraries(${TARGET_NAME} PRIVATE json11)
-target_link_libraries(${TARGET_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
-
-target_link_libraries(${TARGET_NAME} PRIVATE Vulkan::Vulkan)
+target_link_libraries(${TARGET_NAME} PUBLIC json11)
+target_link_libraries(${TARGET_NAME} PUBLIC GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan)
+target_link_libraries(${TARGET_NAME} PUBLIC portaudio_static)
+target_link_libraries(${TARGET_NAME} PUBLIC SndFile::sndfile)
 
 target_include_directories(${TARGET_NAME} PUBLIC ${LUA_INCLUDE_DIR})
-target_include_directories(${TARGET_NAME} PRIVATE ${Stb_INCLUDE_DIR})
-target_include_directories(${TARGET_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+target_include_directories(${TARGET_NAME} PUBLIC ${Stb_INCLUDE_DIR})
+target_include_directories(${TARGET_NAME} PUBLIC ${TINYGLTF_INCLUDE_DIRS})
 
 if(ENABLE_PHYSICS_DEBUG_RENDERER)
   add_compile_definitions(ENABLE_PHYSICS_DEBUG_RENDERER)
