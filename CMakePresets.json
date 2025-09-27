@@ -1,0 +1,18 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": { "major": 3, "minor": 19 },
+    "configurePresets": [
+        {
+            "name": "default",
+            "generator": "Xcode",
+            "binaryDir": "${workspaceFolder}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc",
+                "CMAKE_CXX_COMPILER": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        }
+    ]
+}

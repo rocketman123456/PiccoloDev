@@ -4,7 +4,8 @@ project(Piccolo VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(BUILD_SHARED_LIBS OFF)
+# set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF) # Optional: Disable compiler-specific extensions
 
 include(CMakeDependentOption)
 
@@ -20,13 +21,8 @@ find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 find_package(tinyobjloader CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
-
-# find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
-# target_include_directories(main PRIVATE ${MINIAUDIO_INCLUDE_DIRS})
 find_package(portaudio CONFIG REQUIRED)
-# target_link_libraries(main PRIVATE portaudio_static)
 find_package(SndFile CONFIG REQUIRED)
-# target_link_libraries(main PRIVATE SndFile::sndfile)
 
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)

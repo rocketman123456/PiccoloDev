@@ -1,0 +1,167 @@
+{
+  "pipeline": {
+    "name": "DefaultRenderPipeline",
+    "description": "Default render pipeline with all standard passes",
+    "enable_debug_markers": false,
+    "enable_timing": true,
+    "passes": [
+      {
+        "name": "DirectionalLightShadow",
+        "type_name": "DirectionalLightPass",
+        "execution_order": 0,
+        "enabled": true,
+        "dependencies": [],
+        "parameters": {
+          "shadow_map_size": "2048",
+          "cascade_count": "4"
+        },
+        "requires_depth": true,
+        "requires_stencil": false,
+        "description": "Directional light shadow mapping pass"
+      },
+      {
+        "name": "PointLightShadow",
+        "type_name": "PointLightShadowPass",
+        "execution_order": 1,
+        "enabled": true,
+        "dependencies": [],
+        "parameters": {
+          "shadow_map_size": "1024",
+          "cube_map_face_count": "6"
+        },
+        "requires_depth": true,
+        "requires_stencil": false,
+        "description": "Point light shadow mapping pass"
+      },
+      {
+        "name": "MainCamera",
+        "type_name": "MainCameraPass",
+        "execution_order": 200,
+        "enabled": true,
+        "dependencies": ["DirectionalLightShadow", "PointLightShadow"],
+        "parameters": {
+          "enable_gbuffer": "true",
+          "enable_deferred_lighting": "true",
+          "enable_forward_lighting": "false"
+        },
+        "requires_depth": true,
+        "requires_stencil": false,
+        "description": "Main camera rendering pass with GBuffer and lighting"
+      },
+      {
+        "name": "Particle",
+        "type_name": "ParticlePass",
+        "execution_order": 300,
+        "enabled": true,
+        "dependencies": ["MainCamera"],
+        "parameters": {
+          "max_particles": "10000",
+          "enable_collision": "true"
+        },
+        "requires_depth": true,
+        "requires_stencil": false,
+        "description": "Particle system rendering pass"
+      },
+      {
+        "name": "ColorGrading",
+        "type_name": "ColorGradingPass",
+        "execution_order": 500,
+        "enabled": true,
+        "dependencies": ["MainCamera"],
+        "parameters": {
+          "lut_texture": "asset/texture/lut/color_grading_lut_origin.png",
+          "intensity": "1.0"
+        },
+        "requires_depth": false,
+        "requires_stencil": false,
+        "description": "Color grading post-processing pass"
+      },
+      {
+        "name": "Vignette",
+        "type_name": "VignettePass",
+        "execution_order": 501,
+        "enabled": true,
+        "dependencies": ["ColorGrading"],
+        "parameters": {
+          "intensity": "0.3",
+          "radius": "0.8"
+        },
+        "requires_depth": false,
+        "requires_stencil": false,
+        "description": "Vignette effect post-processing pass"
+      },
+      {
+        "name": "FXAA",
+        "type_name": "FXAAPass",
+        "execution_order": 502,
+        "enabled": true,
+        "dependencies": ["Vignette"],
+        "parameters": {
+          "quality": "high",
+          "edge_threshold": "0.125"
+        },
+        "requires_depth": false,
+        "requires_stencil": false,
+        "description": "Fast Approximate Anti-Aliasing pass"
+      },
+      {
+        "name": "ToneMapping",
+        "type_name": "ToneMappingPass",
+        "execution_order": 503,
+        "enabled": true,
+        "dependencies": ["FXAA"],
+        "parameters": {
+          "exposure": "1.0",
+          "gamma": "2.2"
+        },
+        "requires_depth": false,
+        "requires_stencil": false,
+        "description": "HDR tone mapping pass"
+      },
+      {
+        "name": "UI",
+        "type_name": "UIPass",
+        "execution_order": 600,
+        "enabled": true,
+        "dependencies": ["ToneMapping"],
+        "parameters": {
+          "enable_blending": "true"
+        },
+        "requires_depth": false,
+        "requires_stencil": false,
+        "description": "UI rendering pass"
+      },
+      {
+        "name": "CombineUI",
+        "type_name": "CombineUIPass",
+        "execution_order": 601,
+        "enabled": true,
+        "dependencies": ["UI"],
+        "parameters": {},
+        "requires_depth": false,
+        "requires_stencil": false,
+        "description": "UI composition pass"
+      },
+      {
+        "name": "Pick",
+        "type_name": "PickPass",
+        "execution_order": 700,
+        "enabled": false,
+        "dependencies": [],
+        "parameters": {
+          "enable_picking": "true"
+        },
+        "requires_depth": true,
+        "requires_stencil": false,
+        "description": "Object picking pass for editor"
+      }
+    ],
+    "global_parameters": {
+      "enable_wireframe": "false",
+      "enable_debug_normals": "false",
+      "enable_debug_tangents": "false",
+      "shadow_quality": "high",
+      "anti_aliasing": "fxaa"
+    }
+  }
+}

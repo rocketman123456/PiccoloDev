@@ -114,16 +114,6 @@
                 }
             },
             "$typeName": "LuaComponent"
-        },
-        {
-            "$context": {
-                "sound_name": "powerup",
-                "sound_res": {
-                    "sound_url": "sound/powerup.wav"
-                },
-                "trigger_dt": 15.0
-            },
-            "$typeName": "SoundComponent"
         }
     ]
 }

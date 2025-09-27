@@ -132,11 +132,11 @@
         },
         {
             "$context": {
-                "sound_name": "bleep",
+                "sound_name": "breakout",
                 "sound_res": {
-                    "sound_url": "sound/bleep.wav"
+                    "sound_url": "sound/breakout.mp3"
                 },
-                "trigger_dt": 10.0
+                "trigger_dt": 200.0
             },
             "$typeName": "SoundComponent"
         }
