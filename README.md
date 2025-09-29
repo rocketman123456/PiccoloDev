@@ -64,6 +64,8 @@ vcpkg packages:
   - tinygltf
   - tinyobjloader
   - vulkan-memory-allocator
+  - libsndfile
+  - portaudio
 
 system packages:
   - vulkan

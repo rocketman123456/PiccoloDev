@@ -38,9 +38,15 @@ namespace Piccolo
         Reflection::TypeMetaRegister::metaUnregister();
     }
 
-    void PiccoloEngine::initialize() {}
+    void PiccoloEngine::initialize()
+    {
+        //
+    }
 
-    void PiccoloEngine::clear() {}
+    void PiccoloEngine::clear()
+    {
+        //
+    }
 
     void PiccoloEngine::run()
     {

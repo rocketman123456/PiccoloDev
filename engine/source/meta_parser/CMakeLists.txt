@@ -58,8 +58,6 @@ add_definitions(-DTIXML_USE_STL)
 # copy resources on post build
 add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
 	# mustache templates directory
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${LLVM_SHARED_LIBRARY_DIR}"
-		$<TARGET_FILE_DIR:${TARGET_NAME}>
+	COMMAND ${CMAKE_COMMAND} -E copy_directory "${LLVM_SHARED_LIBRARY_DIR}" $<TARGET_FILE_DIR:${TARGET_NAME}>
 )
 
