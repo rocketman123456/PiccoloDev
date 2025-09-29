@@ -10,7 +10,6 @@ namespace Piccolo
 {
     namespace vfs
     {
-
         enum class Status
         {
             OK             = 0,
@@ -30,6 +29,8 @@ namespace Piccolo
 
             static bool isEmpty(const IBlob& blob) { return blob.data() != nullptr && blob.size() != 0; }
         };
+
+        using IBlobPtr = std::shared_ptr<IBlob>;
 
         // Specific Blob implementation that owns the data and frees it when deleted
         class Blob : public IBlob
@@ -69,7 +70,7 @@ namespace Piccolo
 
             // Read the entire file.
             // Returns nullptr if the file cannot be read
-            virtual std::shared_ptr<IBlob> readFile(const std::filesystem::path& name) = 0;
+            virtual IBlobPtr readFile(const std::filesystem::path& name) = 0;
 
             // Write the entire file
             // Returns false if the file cannot be written
@@ -98,16 +99,17 @@ namespace Piccolo
         public:
             std::filesystem::path getFullPath(const std::filesystem::path& name) const override { return name; }
 
-            bool                   isFolderExists(const std::filesystem::path& name) override;
-            bool                   isFileExists(const std::filesystem::path& name) override;
-            std::shared_ptr<IBlob> readFile(const std::filesystem::path& name) override;
-            bool                   writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
-            int                    enumerateFiles(
-                                   const std::filesystem::path&    path,
-                                   const std::vector<std::string>& extensions,
-                                   enumerate_callback_t            callback,
-                                   bool                            allowDuplicates /* = false */
-                               ) override;
+            bool     isFolderExists(const std::filesystem::path& name) override;
+            bool     isFileExists(const std::filesystem::path& name) override;
+            IBlobPtr readFile(const std::filesystem::path& name) override;
+            bool     writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
+
+            int enumerateFiles(
+                const std::filesystem::path&    path,
+                const std::vector<std::string>& extensions,
+                enumerate_callback_t            callback,
+                bool                            allowDuplicates /* = false */
+            ) override;
             int enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates /* = false */) override;
         };
 
@@ -123,16 +125,17 @@ namespace Piccolo
 
             std::filesystem::path getFullPath(const std::filesystem::path& name) const override { return basePath_ / name.relative_path(); }
 
-            bool                   isFolderExists(const std::filesystem::path& name) override;
-            bool                   isFileExists(const std::filesystem::path& name) override;
-            std::shared_ptr<IBlob> readFile(const std::filesystem::path& name) override;
-            bool                   writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
-            int                    enumerateFiles(
-                                   const std::filesystem::path&    path,
-                                   const std::vector<std::string>& extensions,
-                                   enumerate_callback_t            callback,
-                                   bool                            allowDuplicates /* = false */
-                               ) override;
+            bool     isFolderExists(const std::filesystem::path& name) override;
+            bool     isFileExists(const std::filesystem::path& name) override;
+            IBlobPtr readFile(const std::filesystem::path& name) override;
+            bool     writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
+
+            int enumerateFiles(
+                const std::filesystem::path&    path,
+                const std::vector<std::string>& extensions,
+                enumerate_callback_t            callback,
+                bool                            allowDuplicates /* = false */
+            ) override;
             int enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates /* = false */) override;
 
         private:
@@ -151,16 +154,17 @@ namespace Piccolo
             void mount(const std::filesystem::path& path, const std::filesystem::path& nativePath);
             bool unmount(const std::filesystem::path& path);
 
-            bool                   isFolderExists(const std::filesystem::path& name) override;
-            bool                   isFileExists(const std::filesystem::path& name) override;
-            std::shared_ptr<IBlob> readFile(const std::filesystem::path& name) override;
-            bool                   writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
-            int                    enumerateFiles(
-                                   const std::filesystem::path&    path,
-                                   const std::vector<std::string>& extensions,
-                                   enumerate_callback_t            callback,
-                                   bool                            allowDuplicates /* = false */
-                               ) override;
+            bool     isFolderExists(const std::filesystem::path& name) override;
+            bool     isFileExists(const std::filesystem::path& name) override;
+            IBlobPtr readFile(const std::filesystem::path& name) override;
+            bool     writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
+
+            int enumerateFiles(
+                const std::filesystem::path&    path,
+                const std::vector<std::string>& extensions,
+                enumerate_callback_t            callback,
+                bool                            allowDuplicates /* = false */
+            ) override;
             int enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates /* = false */) override;
 
         private:

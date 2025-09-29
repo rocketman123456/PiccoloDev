@@ -1,0 +1,138 @@
+[
+    {
+        "name": "lightweightvk",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/corporateshark/lightweightvk.git",
+            "revision": "1.3.4"
+        }
+    },
+    {
+        "name": "glTF-Sample-Assets",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/KhronosGroup/glTF-Sample-Assets.git",
+            "revision": "517a5db6aa558f5c57faed8301ba40cd246a9d76"
+        }
+    },
+    {
+        "name": "json11",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/dropbox/json11.git",
+            "revision": "master"
+        }
+    },
+    {
+        "name": "glfw",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/glfw/glfw.git",
+            "revision": "3.4"
+        }
+    },
+    {
+        "name": "spdlog",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/gabime/spdlog.git",
+            "revision": "v1.15.3"
+        }
+    },
+    {
+        "name": "stb",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/nothings/stb.git",
+            "revision": "master"
+        }
+    },
+    {
+        "name": "sol2",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/ThePhD/sol2.git",
+            "revision": "v2.20.6"
+        }
+    },
+    {
+        "name": "lua",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/lua/lua.git",
+            "revision": "v5.4.8"
+        }
+    },
+    {
+        "name": "tinygltf",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/syoyo/tinygltf.git",
+            "revision": "v2.9.6"
+        }
+    },
+    {
+        "name": "tinyobjloader",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/tinyobjloader/tinyobjloader.git",
+            "revision": "v1.0.6"
+        }
+    },
+    {
+        "name": "portaudio",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/PortAudio/portaudio.git",
+            "revision": "master"
+        }
+    },
+    {
+        "name": "libsndfile",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/libsndfile/libsndfile.git",
+            "revision": "1.2.2"
+        }
+    },
+    {
+        "name": "taskflow",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/taskflow/taskflow.git",
+            "revision": "v3.8.0"
+        }
+    },
+    {
+        "name": "JoltPhysics",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/jrouwe/JoltPhysics.git",
+            "revision": "5.4.0"
+        }
+    },
+    {
+        "name": "imgui",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/ocornut/imgui.git",
+            "revision": "v1.89.9"
+        }
+    },
+    {
+        "name": "implot",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/epezent/implot.git",
+            "revision": "master"
+        }
+    },
+    {
+        "name": "ImGuizmo",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/CedricGuillemet/ImGuizmo",
+            "revision": "6d588209f99b1324a608783d1f52faa518886c29"
+        }
+    }
+]

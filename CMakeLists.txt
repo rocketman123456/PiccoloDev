@@ -24,6 +24,9 @@ find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(portaudio CONFIG REQUIRED)
 find_package(SndFile CONFIG REQUIRED)
 
+find_package(Taskflow CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE Taskflow::Taskflow)
+
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(FATAL_ERROR

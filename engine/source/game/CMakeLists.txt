@@ -10,10 +10,7 @@ add_executable(${TARGET_NAME} ${GAME_HEADERS} ${GAME_SOURCES} ${GAME_RESOURCE})
 
 add_compile_definitions("PICCOLO_ROOT_DIR=${BINARY_ROOT_DIR}")
 
-target_include_directories(
-  ${TARGET_NAME} 
-  PUBLIC $<BUILD_INTERFACE:${THIRD_PARTY_DIR}/stb>
-)
+target_include_directories(${TARGET_NAME} PUBLIC $<BUILD_INTERFACE:${THIRD_PARTY_DIR}/stb>)
 
 set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 17 OUTPUT_NAME "PiccoloGame")
 set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "Engine")
