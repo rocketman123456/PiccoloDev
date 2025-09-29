@@ -10,6 +10,8 @@ namespace Piccolo
     class AssetManager;
     class ConfigManager;
 
+    class EventSystem;
+
     class WindowSystem;
 
     struct EngineInitParams;
@@ -28,6 +30,8 @@ namespace Piccolo
         std::shared_ptr<FileSystem>    m_file_system;
         std::shared_ptr<LogSystem>     m_logger_system;
         std::shared_ptr<AssetManager>  m_asset_manager;
+
+        std::shared_ptr<EventSystem> m_event_system;
 
         std::shared_ptr<WindowSystem> m_window_system;
     };

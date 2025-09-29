@@ -108,7 +108,7 @@
         "source": {
             "type": "git",
             "url": "https://github.com/jrouwe/JoltPhysics.git",
-            "revision": "5.4.0"
+            "revision": "v5.4.0"
         }
     },
     {

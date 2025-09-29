@@ -5,9 +5,10 @@
 
 #include "runtime/core/log/log_system.h"
 #include "runtime/platform/file_service/file_service.h"
-
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
+
+#include "runtime/function/event/event_system.h"
 
 #include "runtime/function/render/window_system.h"
 
@@ -89,7 +90,8 @@ namespace Piccolo
 
     void PiccoloEngine::logicalTick(float delta_time)
     {
-        //
+        // Update event handle
+        g_runtime_global_context.m_event_system->tick(delta_time);
     }
 
     bool PiccoloEngine::rendererTick(float delta_time)

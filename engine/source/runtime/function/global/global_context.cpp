@@ -4,9 +4,10 @@
 
 #include "runtime/core/log/log_system.h"
 #include "runtime/platform/file_service/file_service.h"
-
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
+
+#include "runtime/function/event/event_system.h"
 
 #include "runtime/function/render/window_system.h"
 
@@ -19,9 +20,12 @@ namespace Piccolo
         m_config_manager = std::make_shared<ConfigManager>();
         m_config_manager->initialize(config_file_path);
 
-        m_file_system = std::make_shared<FileSystem>();
+        m_file_system   = std::make_shared<FileSystem>();
         m_logger_system = std::make_shared<LogSystem>();
         m_asset_manager = std::make_shared<AssetManager>();
+
+        m_event_system = std::make_shared<EventSystem>();
+        m_event_system->initialize();
 
         m_window_system = std::make_shared<WindowSystem>();
         WindowCreateInfo window_create_info;
@@ -31,6 +35,9 @@ namespace Piccolo
     void RuntimeGlobalContext::shutdownSystems()
     {
         m_window_system.reset();
+
+        m_event_system->clear();
+        m_event_system.reset();
 
         m_asset_manager.reset();
         m_logger_system.reset();

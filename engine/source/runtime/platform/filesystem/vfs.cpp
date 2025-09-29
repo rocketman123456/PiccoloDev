@@ -8,6 +8,13 @@
 #include <limits>
 #include <sstream>
 #include <utility>
+#include <filesystem>
+
+#ifdef __APPLE__
+#include <limits.h>
+#include <mach-o/dyld.h>
+#include <unistd.h>
+#endif
 
 #ifdef WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -145,6 +152,38 @@ namespace Piccolo
             FindClose(hFind);
 
             return numEntries;
+#elif __APPLE__
+            glob_t glob_matches;
+            int    glob_result = glob(pattern, 0, nullptr, &glob_matches);
+
+            if (glob_result == 0)
+            {
+                int num_entries = 0;
+
+                for (int i = 0; i < glob_matches.gl_pathc; ++i)
+                {
+                    const char*                      globentry = (glob_matches.gl_pathv)[i];
+                    std::error_code                  ec, ec2;
+                    std::filesystem::directory_entry entry(globentry, ec);
+                    if (!ec)
+                    {
+                        if (directories == entry.is_directory(ec2) && !ec2)
+                        {
+                            callback(entry.path().filename().native());
+                            ++num_entries;
+                        }
+                    }
+                }
+
+                globfree(&glob_matches);
+
+                return num_entries;
+            }
+
+            if (glob_result == GLOB_NOMATCH)
+                return 0;
+
+            return static_cast<int>(Status::Failed);
 #else
             glob64_t globMatches;
             int      globResult = glob64(pattern, 0, nullptr, &globMatches);
@@ -470,6 +509,24 @@ namespace Piccolo
             wchar_t buf[MAX_PATH];
             GetModuleFileNameW(nullptr, buf, MAX_PATH);
             return std::filesystem::path(buf).parent_path();
+#elif __APPLE__
+            char     buf[PATH_MAX];
+            uint32_t size = sizeof(buf);
+            if (_NSGetExecutablePath(buf, &size) == 0)
+            {
+                char resolved[PATH_MAX];
+                if (realpath(buf, resolved))
+                {
+                    return std::filesystem::path(resolved).parent_path();
+                }
+                return std::filesystem::path(buf).parent_path();
+            }
+            else
+            {
+                // Buffer too small (shouldn’t happen with PATH_MAX)
+                std::string fallback(buf, size);
+                return std::filesystem::path(fallback).parent_path();
+            }
 #else
             char    buf[PATH_MAX];
             ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
