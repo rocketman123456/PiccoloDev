@@ -33,9 +33,9 @@ namespace Piccolo
         // Use the bus:
         EventBus bus;
 
-        auto c1 = bus.subscribe<PlayerDamaged>([](const PlayerDamaged& e) {
-            // update health UI, play hurt sound
-        });
+        // auto c1 = bus.subscribe<PlayerDamaged>([](const PlayerDamaged& e) {
+        //     // update health UI, play hurt sound
+        // });
 
         // auto c2 = bus.subscribe<KeyPressed>(
         //     [](const KeyPressed& e) {
@@ -47,9 +47,9 @@ namespace Piccolo
         // );
 
         // Immediate:
-        bus.publish(PlayerDamaged {42, 15});
+        // bus.publish(PlayerDamaged {42, 15});
 
         // Deferred (from input thread or physics thread):
-        bus.enqueue(KeyPressed {0, false});
+        // bus.enqueue(KeyPressed {0, false});
     }
 } // namespace Piccolo

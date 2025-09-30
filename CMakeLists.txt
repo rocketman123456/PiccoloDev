@@ -15,8 +15,6 @@ find_path(SOL2_INCLUDE_DIRS "sol/abort.hpp")
 find_package(Stb REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
 find_package(Lua REQUIRED)
-find_package(glslang CONFIG REQUIRED)
-find_package(volk CONFIG REQUIRED)
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 find_package(tinyobjloader CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
@@ -24,8 +22,10 @@ find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(portaudio CONFIG REQUIRED)
 find_package(SndFile CONFIG REQUIRED)
 
+find_package(glslang CONFIG REQUIRED)
+find_package(volk CONFIG REQUIRED)
+
 find_package(Taskflow CONFIG REQUIRED)
-# target_link_libraries(main PRIVATE Taskflow::Taskflow)
 
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)

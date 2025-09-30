@@ -3,10 +3,14 @@
 namespace Piccolo
 {
     // Define events as plain structs:
-    struct PlayerDamaged
+    struct MouseMove
     {
-        int player_id;
-        int amount;
+        double x;
+        double y;
+        double dx;
+        double dy;
+        int    key;
+        bool   repeat;
     };
 
     struct KeyPressed

@@ -1,5 +1,7 @@
 #include "runtime/function/render/window_system.h"
 
+#include "runtime/core/base/macro.h"
+
 namespace Piccolo
 {
     WindowSystem::~WindowSystem()
@@ -16,6 +18,11 @@ namespace Piccolo
         // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         m_window = glfwCreateWindow(create_info.width, create_info.height, create_info.title, nullptr, nullptr);
+
+        if (!m_window)
+        {
+            LOG_ERROR("Failed to create GLFW window");
+        }
     }
 
     void WindowSystem::pollEvents() const { glfwPollEvents(); }

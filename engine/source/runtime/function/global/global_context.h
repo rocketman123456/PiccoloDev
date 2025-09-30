@@ -13,6 +13,7 @@ namespace Piccolo
     class EventSystem;
 
     class WindowSystem;
+    class RenderSystem;
 
     struct EngineInitParams;
 
@@ -33,7 +34,8 @@ namespace Piccolo
 
         std::shared_ptr<EventSystem> m_event_system;
 
-        std::shared_ptr<WindowSystem> m_window_system;
+        std::shared_ptr<WindowSystem> m_window_system; 
+        std::shared_ptr<RenderSystem> m_render_system;
     };
 
     extern RuntimeGlobalContext g_runtime_global_context;
