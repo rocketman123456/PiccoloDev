@@ -1,6 +1,15 @@
 #include "runtime/function/render/gpu_device.h"
+#include "runtime/function/render/utils/render_utils.h"
 
 #include "runtime/core/base/macro.h"
+
+#include "runtime/function/global/global_context.h"
+#include "runtime/function/render/window_system.h"
+
+// #define VK_NO_PROTOTYPES
+#define GLFW_INCLUDE_VULKAN
+// #include <volk.h>
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <set>
@@ -9,16 +18,33 @@ namespace Piccolo
 {
     GPUDevice::GPUDevice(VkInstance instance)
     {
-        pickPhysicalDevice(instance);
+        m_instance = instance;
+
+        createSurface();
+        pickPhysicalDevice();
         createLogicalDevice();
-        queryBindlessSupport();
     }
 
     GPUDevice::~GPUDevice()
     {
-        if (device != VK_NULL_HANDLE)
+        if (m_device != VK_NULL_HANDLE)
         {
-            vkDestroyDevice(device, nullptr);
+            vkDestroyDevice(m_device, nullptr);
+        }
+
+        if (m_surface != VK_NULL_HANDLE)
+        {
+            vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+        }
+    }
+
+    void GPUDevice::createSurface()
+    {
+        auto* window = g_runtime_global_context.m_window_system->getWindow();
+
+        if (glfwCreateWindowSurface(m_instance, window, nullptr, &m_surface) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create window surface!");
         }
     }
 
@@ -30,11 +56,11 @@ namespace Piccolo
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(dev, nullptr, &extensionCount, availableExtensions.data());
 
-        LOG_DEBUG("support extensions:")
-        for (const auto& ext : availableExtensions)
-        {
-            LOG_DEBUG("  {}", ext.extensionName);
-        }
+        // LOG_DEBUG("support extensions:")
+        // for (const auto& ext : availableExtensions)
+        // {
+        //     LOG_DEBUG("  {}", ext.extensionName);
+        // }
 
         std::set<std::string> required(deviceExtensions.begin(), deviceExtensions.end());
 
@@ -46,98 +72,162 @@ namespace Piccolo
         return required.empty();
     }
 
-    void GPUDevice::pickPhysicalDevice(VkInstance instance)
+    QueueFamilyIndices GPUDevice::findQueueFamilies(VkPhysicalDevice device)
     {
-        uint32_t deviceCount = 0;
-        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-        if (deviceCount == 0)
+        QueueFamilyIndices indices;
+
+        uint32_t queue_family_count = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
+
+        std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families.data());
+
+        int i = 0;
+        for (const auto& queue_family : queue_families)
+        {
+            if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            {
+                indices.graphics_family = i;
+            }
+
+            if (queue_family.queueFlags & VK_QUEUE_COMPUTE_BIT)
+            {
+                indices.compute_family = i;
+            }
+
+            VkBool32 present_support = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &present_support);
+
+            if (present_support)
+            {
+                indices.present_family = i;
+            }
+
+            if (indices.isComplete())
+            {
+                break;
+            }
+
+            i++;
+        }
+
+        return indices;
+    }
+
+    bool GPUDevice::isDeviceSuitable(VkPhysicalDevice physical_device)
+    {
+        auto indices = findQueueFamilies(physical_device);
+        auto support = checkDeviceExtensionSupport(physical_device);
+
+        return indices.isComplete() && support;
+    }
+
+    void GPUDevice::pickPhysicalDevice()
+    {
+        uint32_t device_count = 0;
+        vkEnumeratePhysicalDevices(m_instance, &device_count, nullptr);
+        if (device_count == 0)
         {
             LOG_ERROR("Failed: no Vulkan-capable GPU found");
         }
 
-        std::vector<VkPhysicalDevice> devices(deviceCount);
-        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+        std::vector<VkPhysicalDevice> devices(device_count);
+        vkEnumeratePhysicalDevices(m_instance, &device_count, devices.data());
 
-        for (const auto& dev : devices)
+        for (const auto& device : devices)
         {
-            uint32_t queueFamilyCount = 0;
-            vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, nullptr);
-            std::vector<VkQueueFamilyProperties> families(queueFamilyCount);
-            vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, families.data());
-
-            for (uint32_t i = 0; i < queueFamilyCount; i++)
+            if (isDeviceSuitable(device))
             {
-                if (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-                {
-                    if (checkDeviceExtensionSupport(dev))
-                    {
-                        physicalDevice      = dev;
-                        graphicsQueueFamily = i;
-                        LOG_INFO("Selected GPU with graphics + swapchain support.")
-                        return;
-                    }
-                }
+                m_physical_device = device;
+                LOG_INFO("Selected GPU with support.")
+                break;
             }
         }
 
-        LOG_ERROR("Failed: no suitable GPU with required extensions found");
+        if (m_physical_device == VK_NULL_HANDLE)
+        {
+            LOG_ERROR("Failed: no suitable GPU with required extensions found");
+        }
     }
 
     void GPUDevice::createLogicalDevice()
     {
-        float                   queuePriority = 1.0f;
-        VkDeviceQueueCreateInfo queueInfo {};
-        queueInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueInfo.queueFamilyIndex = graphicsQueueFamily;
-        queueInfo.queueCount       = 1;
-        queueInfo.pQueuePriorities = &queuePriority;
+        auto indices = findQueueFamilies(m_physical_device);
 
-        VkPhysicalDeviceFeatures2 features2 {};
-        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t>                   uniqueQueueFamilies = {
+            indices.graphics_family.value(),
+            indices.present_family.value(),
+        };
 
-        VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures {};
-        indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-        features2.pNext        = &indexingFeatures;
+        float queuePriority = 1.0f;
+        for (uint32_t queueFamily : uniqueQueueFamilies)
+        {
+            VkDeviceQueueCreateInfo queueCreateInfo {};
+            queueCreateInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamily;
+            queueCreateInfo.queueCount       = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
 
-        vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+        // float                   queuePriority = 1.0f;
+        // VkDeviceQueueCreateInfo queueInfo {};
+        // queueInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        // queueInfo.queueFamilyIndex = m_graphics_queue_family;
+        // queueInfo.queueCount       = 1;
+        // queueInfo.pQueuePriorities = &queuePriority;
 
         VkDeviceCreateInfo createInfo {};
         createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.queueCreateInfoCount    = 1;
-        createInfo.pQueueCreateInfos       = &queueInfo;
         createInfo.enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-        createInfo.pNext                   = &indexingFeatures; // enable descriptor indexing if available
+        createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
+        createInfo.pQueueCreateInfos       = queueCreateInfos.data();
 
-        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
+        if (m_enable_descriptor_indexing)
+        {
+            VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures {};
+            indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+            indexingFeatures.pNext = nullptr;
+
+            VkPhysicalDeviceFeatures2 features2 {};
+            features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+            features2.pNext = &indexingFeatures;
+
+            vkGetPhysicalDeviceFeatures2(m_physical_device, &features2);
+
+            createInfo.pNext = &indexingFeatures; // enable descriptor indexing if available
+
+            m_bindless_supported = indexingFeatures.descriptorBindingPartiallyBound && indexingFeatures.runtimeDescriptorArray;
+            if (m_bindless_supported)
+            {
+                LOG_DEBUG("Bindless (descriptor indexing) is supported.");
+            }
+            else
+            {
+                LOG_WARN("Bindless not supported on this GPU.");
+            }
+        }
+        else
+        {
+            createInfo.pNext = nullptr;
+
+            m_bindless_supported = false;
+            LOG_WARN("Bindless not supported on this GPU.");
+        }
+
+        if (vkCreateDevice(m_physical_device, &createInfo, nullptr, &m_device) != VK_SUCCESS)
         {
             LOG_ERROR("Failed to create logical device");
         }
 
-        vkGetDeviceQueue(device, graphicsQueueFamily, 0, &graphicsQueue);
-    }
+        m_graphics_queue_family = indices.graphics_family.value();
+        m_compute_queue_family  = indices.compute_family.value();
+        m_present_queue_family  = indices.present_family.value();
 
-    void GPUDevice::queryBindlessSupport()
-    {
-        VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures {};
-        indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-
-        VkPhysicalDeviceFeatures2 features2 {};
-        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        features2.pNext = &indexingFeatures;
-
-        vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
-
-        bindlessSupported = indexingFeatures.runtimeDescriptorArray && indexingFeatures.shaderSampledImageArrayNonUniformIndexing &&
-                            indexingFeatures.descriptorBindingPartiallyBound;
-
-        if (bindlessSupported)
-        {
-            LOG_DEBUG("Bindless (descriptor indexing) is supported.");
-        }
-        else
-        {
-            LOG_WARN("Bindless not supported on this GPU.");
-        }
+        vkGetDeviceQueue(m_device, indices.graphics_family.value(), 0, &m_graphics_queue);
+        vkGetDeviceQueue(m_device, indices.present_family.value(), 0, &m_present_queue);
+        vkGetDeviceQueue(m_device, indices.compute_family.value(), 0, &m_compute_queue);
     }
 } // namespace Piccolo

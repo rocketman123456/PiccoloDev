@@ -1,5 +1,6 @@
 // EventBus.h
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <functional>
