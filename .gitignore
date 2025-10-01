@@ -1,10 +1,11 @@
 .cache
-
 .vscode
 
 bin/
 build/
 
 _generated/
+
+imgui.ini
 
 *.DS_Store
