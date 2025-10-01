@@ -14,11 +14,11 @@ namespace Piccolo
     {
         m_context    = std::make_shared<GPUContext>();
         m_device     = std::make_shared<GPUDevice>(m_context->getInstance());
-        // m_swap_chain = std::make_shared<GPUSwapChain>(m_device->getPhysicalDevice(), m_device->getDevice(), m_device->getSurface());
+        m_swap_chain = std::make_shared<GPUSwapChain>(m_device->getPhysicalDevice(), m_device->getDevice(), m_device->getSurface());
     }
     void RenderSystem::clear()
     {
-        // m_swap_chain.reset();
+        m_swap_chain.reset();
         m_device.reset();
         m_context.reset();
     }

@@ -37,34 +37,34 @@ namespace Piccolo
             "VK_LAYER_KHRONOS_validation",
         };
 
-        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-            VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
-            VkDebugUtilsMessageTypeFlagsEXT             messageType,
-            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-            void*                                       pUserData
-        )
-        {
-            if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
-            {
-                LOG_DEBUG("validation layer: {}", pCallbackData->pMessage);
-            }
-            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
-            {
-                LOG_INFO("validation layer: {}", pCallbackData->pMessage);
-            }
-            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-            {
-                LOG_WARN("validation layer: {}", pCallbackData->pMessage);
-            }
-            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-            {
-                LOG_ERROR("validation layer: {}", pCallbackData->pMessage);
-            }
-            else
-            {
-                LOG_WARN("validation layer: {}", pCallbackData->pMessage);
-            }
-            return VK_FALSE;
-        }
+        // static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        //     VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+        //     VkDebugUtilsMessageTypeFlagsEXT             messageType,
+        //     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        //     void*                                       pUserData
+        // )
+        // {
+        //     if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+        //     {
+        //         LOG_DEBUG("validation layer: {}", pCallbackData->pMessage);
+        //     }
+        //     else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+        //     {
+        //         LOG_INFO("validation layer: {}", pCallbackData->pMessage);
+        //     }
+        //     else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+        //     {
+        //         LOG_WARN("validation layer: {}", pCallbackData->pMessage);
+        //     }
+        //     else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        //     {
+        //         LOG_ERROR("validation layer: {}", pCallbackData->pMessage);
+        //     }
+        //     else
+        //     {
+        //         LOG_WARN("validation layer: {}", pCallbackData->pMessage);
+        //     }
+        //     return VK_FALSE;
+        // }
     };
 } // namespace Piccolo

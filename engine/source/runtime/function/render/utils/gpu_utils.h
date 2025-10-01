@@ -8,15 +8,6 @@
 
 namespace Piccolo
 {
-    VkResult CreateDebugUtilsMessengerEXT(
-        VkInstance                                instance,
-        const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-        const VkAllocationCallbacks*              pAllocator,
-        VkDebugUtilsMessengerEXT*                 pDebugMessenger
-    );
-
-    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
-
     struct QueueFamilyIndices
     {
         std::optional<uint32_t> graphics_family;
@@ -32,4 +23,24 @@ namespace Piccolo
         std::vector<VkSurfaceFormatKHR> formats;
         std::vector<VkPresentModeKHR>   present_modes;
     };
+
+    VkResult CreateDebugUtilsMessengerEXT(
+        VkInstance                                instance,
+        const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+        const VkAllocationCallbacks*              pAllocator,
+        VkDebugUtilsMessengerEXT*                 pDebugMessenger
+    );
+
+    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
+
+    VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT             messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void*                                       pUserData
+    );
+
+    QueueFamilyIndices      findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
+
 } // namespace Piccolo

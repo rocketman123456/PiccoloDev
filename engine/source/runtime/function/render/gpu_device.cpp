@@ -72,85 +72,16 @@ namespace Piccolo
         return required.empty();
     }
 
-    QueueFamilyIndices GPUDevice::findQueueFamilies(VkPhysicalDevice device)
-    {
-        QueueFamilyIndices indices;
-
-        uint32_t queue_family_count = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
-
-        std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families.data());
-
-        int i = 0;
-        for (const auto& queue_family : queue_families)
-        {
-            if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            {
-                indices.graphics_family = i;
-            }
-
-            if (queue_family.queueFlags & VK_QUEUE_COMPUTE_BIT)
-            {
-                indices.compute_family = i;
-            }
-
-            VkBool32 present_support = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &present_support);
-
-            if (present_support)
-            {
-                indices.present_family = i;
-            }
-
-            if (indices.isComplete())
-            {
-                break;
-            }
-
-            i++;
-        }
-
-        return indices;
-    }
-
-    SwapChainSupportDetails GPUDevice::querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
-    {
-        SwapChainSupportDetails details;
-
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-        if (formatCount != 0)
-        {
-            details.formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-        }
-
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-
-        if (presentModeCount != 0)
-        {
-            details.present_modes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.present_modes.data());
-        }
-
-        return details;
-    }
-
     bool GPUDevice::isDeviceSuitable(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
     {
-        auto indices = findQueueFamilies(physical_device);
+        auto indices = findQueueFamilies(physical_device, surface);
         auto support = checkDeviceExtensionSupport(physical_device);
 
         bool swap_chain_adequate = false;
         if (support)
         {
             SwapChainSupportDetails swap_chain_support = querySwapChainSupport(physical_device, surface);
-            swap_chain_adequate = !swap_chain_support.formats.empty() && !swap_chain_support.present_modes.empty();
+            swap_chain_adequate                        = !swap_chain_support.formats.empty() && !swap_chain_support.present_modes.empty();
         }
 
         return indices.isComplete() && support && swap_chain_adequate;
@@ -186,7 +117,7 @@ namespace Piccolo
 
     void GPUDevice::createLogicalDevice()
     {
-        auto indices = findQueueFamilies(m_physical_device);
+        auto indices = findQueueFamilies(m_physical_device, m_surface);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t>                   uniqueQueueFamilies = {

@@ -1,4 +1,5 @@
 #include "runtime/function/render/gpu_swap_chain.h"
+#include "runtime/function/render/utils/gpu_utils.h"
 
 #include "runtime/core/base/macro.h"
 
@@ -35,33 +36,6 @@ namespace Piccolo
         {
             vkDestroySwapchainKHR(m_logical_device, m_swapchain, nullptr);
         }
-    }
-
-    SwapChainSupportDetails GPUSwapChain::querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
-    {
-        SwapChainSupportDetails details;
-
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-        if (formatCount != 0)
-        {
-            details.formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-        }
-
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-
-        if (presentModeCount != 0)
-        {
-            details.present_modes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.present_modes.data());
-        }
-
-        return details;
     }
 
     VkSurfaceFormatKHR GPUSwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats)
@@ -135,21 +109,20 @@ namespace Piccolo
         createInfo.imageArrayLayers = 1;
         createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-        // QueueFamilyIndices indices              = findQueueFamilies(m_physical_device);
-        // uint32_t           queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+        QueueFamilyIndices indices = findQueueFamilies(m_physical_device, m_surface);
 
-        // if (indices.graphicsFamily != indices.presentFamily)
-        // {
-        //     createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
-        //     createInfo.queueFamilyIndexCount = 2;
-        //     createInfo.pQueueFamilyIndices   = queueFamilyIndices;
-        // }
-        // else
-        // {
-        //     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        // }
+        uint32_t queueFamilyIndices[] = {indices.graphics_family.value(), indices.present_family.value()};
 
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        if (indices.graphics_family != indices.present_family)
+        {
+            createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices   = queueFamilyIndices;
+        }
+        else
+        {
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
 
         createInfo.preTransform   = swap_chain_support.capabilities.currentTransform;
         createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -160,12 +133,14 @@ namespace Piccolo
 
         if (vkCreateSwapchainKHR(m_logical_device, &createInfo, nullptr, &m_swapchain) != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to create swap chain!");
+            LOG_ERROR("failed to create swap chain!")
         }
 
         vkGetSwapchainImagesKHR(m_logical_device, m_swapchain, &image_count, nullptr);
         m_images.resize(image_count);
         vkGetSwapchainImagesKHR(m_logical_device, m_swapchain, &image_count, m_images.data());
+
+        LOG_INFO("swap chain image count: {}", image_count);
 
         m_image_format = surfaceFormat.format;
         m_extent       = extent;
@@ -177,11 +152,14 @@ namespace Piccolo
         for (size_t i = 0; i < m_images.size(); i++)
         {
             VkImageViewCreateInfo viewInfo {};
-            viewInfo.sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            viewInfo.image      = m_images[i];
-            viewInfo.viewType   = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format     = m_image_format;
-            viewInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+            viewInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image                           = m_images[i];
+            viewInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format                          = m_image_format;
+            viewInfo.components.r                    = VK_COMPONENT_SWIZZLE_IDENTITY;
+            viewInfo.components.g                    = VK_COMPONENT_SWIZZLE_IDENTITY;
+            viewInfo.components.b                    = VK_COMPONENT_SWIZZLE_IDENTITY;
+            viewInfo.components.a                    = VK_COMPONENT_SWIZZLE_IDENTITY;
             viewInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
             viewInfo.subresourceRange.baseMipLevel   = 0;
             viewInfo.subresourceRange.levelCount     = 1;
@@ -190,7 +168,7 @@ namespace Piccolo
 
             if (vkCreateImageView(m_logical_device, &viewInfo, nullptr, &m_image_views[i]) != VK_SUCCESS)
             {
-                throw std::runtime_error("Failed to create image view for swapchain image");
+                LOG_ERROR("Failed to create image view for swapchain image view");
             }
         }
     }

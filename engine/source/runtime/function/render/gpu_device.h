@@ -42,9 +42,6 @@ namespace Piccolo
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
         bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-        QueueFamilyIndices      findQueueFamilies(VkPhysicalDevice device);
-        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
-
         VkInstance m_instance; // from outside
 
         VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;
