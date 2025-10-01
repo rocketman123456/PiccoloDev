@@ -1,18 +1,18 @@
 [
     {
-        "name": "lightweightvk",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/corporateshark/lightweightvk.git",
-            "revision": "1.3.4"
-        }
-    },
-    {
         "name": "glTF-Sample-Assets",
         "source": {
             "type": "git",
             "url": "https://github.com/KhronosGroup/glTF-Sample-Assets.git",
             "revision": "517a5db6aa558f5c57faed8301ba40cd246a9d76"
+        }
+    },
+    {
+        "name": "entt",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/skypjack/entt.git",
+            "revision": "v3.15.0"
         }
     },
     {
@@ -109,6 +109,22 @@
             "type": "git",
             "url": "https://github.com/jrouwe/JoltPhysics.git",
             "revision": "v5.4.0"
+        }
+    },
+    {
+        "name": "lightweightvk",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/corporateshark/lightweightvk.git",
+            "revision": "1.3.4"
+        }
+    },
+    {
+        "name": "vk-bootstrap",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/charles-lunarg/vk-bootstrap.git",
+            "revision": "main"
         }
     },
     {

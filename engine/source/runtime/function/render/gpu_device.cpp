@@ -1,12 +1,12 @@
 #include "runtime/function/render/gpu_device.h"
-#include "runtime/function/render/utils/render_utils.h"
+#include "runtime/function/render/utils/gpu_utils.h"
 
 #include "runtime/core/base/macro.h"
 
 #include "runtime/function/global/global_context.h"
 #include "runtime/function/render/window_system.h"
 
-// #define VK_NO_PROTOTYPES
+#define VK_NO_PROTOTYPES
 #define GLFW_INCLUDE_VULKAN
 // #include <volk.h>
 #include <GLFW/glfw3.h>
@@ -44,7 +44,7 @@ namespace Piccolo
 
         if (glfwCreateWindowSurface(m_instance, window, nullptr, &m_surface) != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to create window surface!");
+            LOG_ERROR("failed to create window surface!");
         }
     }
 
@@ -62,7 +62,7 @@ namespace Piccolo
         //     LOG_DEBUG("  {}", ext.extensionName);
         // }
 
-        std::set<std::string> required(deviceExtensions.begin(), deviceExtensions.end());
+        std::set<std::string> required(m_device_extensions.begin(), m_device_extensions.end());
 
         for (const auto& ext : availableExtensions)
         {
@@ -114,12 +114,46 @@ namespace Piccolo
         return indices;
     }
 
-    bool GPUDevice::isDeviceSuitable(VkPhysicalDevice physical_device)
+    SwapChainSupportDetails GPUDevice::querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
+    {
+        SwapChainSupportDetails details;
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+        if (formatCount != 0)
+        {
+            details.formats.resize(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        }
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+        if (presentModeCount != 0)
+        {
+            details.present_modes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.present_modes.data());
+        }
+
+        return details;
+    }
+
+    bool GPUDevice::isDeviceSuitable(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
     {
         auto indices = findQueueFamilies(physical_device);
         auto support = checkDeviceExtensionSupport(physical_device);
 
-        return indices.isComplete() && support;
+        bool swap_chain_adequate = false;
+        if (support)
+        {
+            SwapChainSupportDetails swap_chain_support = querySwapChainSupport(physical_device, surface);
+            swap_chain_adequate = !swap_chain_support.formats.empty() && !swap_chain_support.present_modes.empty();
+        }
+
+        return indices.isComplete() && support && swap_chain_adequate;
     }
 
     void GPUDevice::pickPhysicalDevice()
@@ -136,7 +170,7 @@ namespace Piccolo
 
         for (const auto& device : devices)
         {
-            if (isDeviceSuitable(device))
+            if (isDeviceSuitable(device, m_surface))
             {
                 m_physical_device = device;
                 LOG_INFO("Selected GPU with support.")
@@ -180,8 +214,8 @@ namespace Piccolo
 
         VkDeviceCreateInfo createInfo {};
         createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size());
-        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+        createInfo.enabledExtensionCount   = static_cast<uint32_t>(m_device_extensions.size());
+        createInfo.ppEnabledExtensionNames = m_device_extensions.data();
         createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos       = queueCreateInfos.data();
 
@@ -221,6 +255,8 @@ namespace Piccolo
         {
             LOG_ERROR("Failed to create logical device");
         }
+
+        volkLoadDevice(m_device);
 
         m_graphics_queue_family = indices.graphics_family.value();
         m_compute_queue_family  = indices.compute_family.value();

@@ -2,7 +2,8 @@
 
 #include "runtime/core/base/macro.h"
 
-#include <vulkan/vulkan.h>
+#include <volk.h>
+// #include <vulkan/vulkan.h>
 
 namespace Piccolo
 {
@@ -18,7 +19,7 @@ namespace Piccolo
         void createInstance();
         void setupDebugMessenger();
 
-        void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+        void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& create_info);
         bool checkValidationLayerSupport();
 
         std::vector<const char*> getRequiredExtensions();
@@ -43,19 +44,19 @@ namespace Piccolo
             void*                                       pUserData
         )
         {
-            if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT )
+            if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
             {
                 LOG_DEBUG("validation layer: {}", pCallbackData->pMessage);
             }
-            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT )
+            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
             {
                 LOG_INFO("validation layer: {}", pCallbackData->pMessage);
             }
-            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT  )
+            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
             {
                 LOG_WARN("validation layer: {}", pCallbackData->pMessage);
             }
-            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT   )
+            else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
             {
                 LOG_ERROR("validation layer: {}", pCallbackData->pMessage);
             }

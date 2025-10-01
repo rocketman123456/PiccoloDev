@@ -29,3 +29,6 @@
 #else
 #define ASSERT(statement) assert(statement)
 #endif
+
+#define PICCOLO_XSTR(s) PICCOLO_STR(s)
+#define PICCOLO_STR(s) #s

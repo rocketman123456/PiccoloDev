@@ -32,12 +32,12 @@ set(POST_EDITOR_BUILD_COMMANDS
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${ENGINE_ROOT_DIR}/${ENGINE_ASSET_DIR}" "${BINARY_ROOT_DIR}/${ENGINE_ASSET_DIR}"
 )
 
-if(APPLE)
-  set(POST_EDITOR_BUILD_COMMANDS ${POST_EDITOR_BUILD_COMMANDS}
-    COMMAND ${CMAKE_COMMAND} -E copy "${ENGINE_ROOT_DIR}/3rdParty/VulkanSDK/bin/MacOS/libMoltenVK.dylib" "${BINARY_ROOT_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy "${ENGINE_ROOT_DIR}/3rdParty/VulkanSDK/bin/MacOS/libVkLayer_khronos_validation.dylib" "${BINARY_ROOT_DIR}"
-  )
-endif()
+# if(APPLE)
+#   set(POST_EDITOR_BUILD_COMMANDS ${POST_EDITOR_BUILD_COMMANDS}
+#     COMMAND ${CMAKE_COMMAND} -E copy "${ENGINE_ROOT_DIR}/3rdParty/VulkanSDK/bin/MacOS/libMoltenVK.dylib" "${BINARY_ROOT_DIR}"
+#     COMMAND ${CMAKE_COMMAND} -E copy "${ENGINE_ROOT_DIR}/3rdParty/VulkanSDK/bin/MacOS/libVkLayer_khronos_validation.dylib" "${BINARY_ROOT_DIR}"
+#   )
+# endif()
 
 # if(ENABLE_PHYSICS_DEBUG_RENDERER)
 #   set(POST_EDITOR_BUILD_COMMANDS ${POST_EDITOR_BUILD_COMMANDS}

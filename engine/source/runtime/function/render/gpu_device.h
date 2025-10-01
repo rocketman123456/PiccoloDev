@@ -1,6 +1,9 @@
 #pragma once
 
+#include "runtime/function/render/utils/gpu_utils.h"
+
 #include <vulkan/vulkan.h>
+
 
 #include <cstdint>
 #include <cstring>
@@ -11,15 +14,6 @@
 
 namespace Piccolo
 {
-    struct QueueFamilyIndices
-    {
-        std::optional<uint32_t> graphics_family;
-        std::optional<uint32_t> present_family;
-        std::optional<uint32_t> compute_family;
-
-        bool isComplete() { return graphics_family.has_value() && present_family.has_value() && compute_family.has_value(); }
-    };
-
     class GPUDevice
     {
     public:
@@ -46,9 +40,10 @@ namespace Piccolo
 
         // Utility
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-        bool isDeviceSuitable(VkPhysicalDevice device);
+        bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+        QueueFamilyIndices      findQueueFamilies(VkPhysicalDevice device);
+        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
         VkInstance m_instance; // from outside
 
@@ -75,10 +70,10 @@ namespace Piccolo
 #endif
 
         // Required device extensions
-        const std::vector<const char*> deviceExtensions = {
+        const std::vector<const char*> m_device_extensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 #ifdef __APPLE__
-        // "VK_KHR_portability_subset",
+            "VK_KHR_portability_subset",
 #else
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 #endif

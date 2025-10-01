@@ -1,9 +1,12 @@
 #include "runtime/function/render/gpu_context.h"
-#include "runtime/function/render/utils/render_utils.h"
+#include "runtime/function/render/utils/gpu_utils.h"
 
 #include "runtime/core/base/macro.h"
 
-// #define VK_NO_PROTOTYPES
+#define VOLK_IMPLEMENTATION
+#include "volk.h"
+
+#define VK_NO_PROTOTYPES
 #define GLFW_INCLUDE_VULKAN
 // #include <volk.h>
 #include <GLFW/glfw3.h>
@@ -12,6 +15,31 @@ namespace Piccolo
 {
     GPUContext::GPUContext()
     {
+        auto result = volkInitialize();
+
+#if defined(__GNUC__)
+        // https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+#if defined(__linux__)
+        char const* vk_layer_path = PICCOLO_XSTR(PICCOLO_VK_LAYER_PATH);
+        setenv("VK_LAYER_PATH", vk_layer_path, 1);
+#elif defined(__MACH__)
+        // https://developer.apple.com/library/archive/documentation/Porting/Conceptual/PortingUnix/compiling/compiling.html
+        char const* vk_layer_path    = PICCOLO_XSTR(PICCOLO_VK_LAYER_PATH);
+        char const* vk_icd_filenames = PICCOLO_XSTR(PICCOLO_VK_ICD_FILENAMES);
+        setenv("VK_LAYER_PATH", vk_layer_path, 1);
+        setenv("VK_ICD_FILENAMES", vk_icd_filenames, 1);
+#else
+#error Unknown Platform
+#endif
+#elif defined(_MSC_VER)
+        // https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros
+        char const* vk_layer_path = PICCOLO_XSTR(PICCOLO_VK_LAYER_PATH);
+        SetEnvironmentVariableA("VK_LAYER_PATH", vk_layer_path);
+        SetEnvironmentVariableA("DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1", "1");
+#else
+#error Unknown Compiler
+#endif
+
         createInstance();
         setupDebugMessenger();
     }
@@ -64,17 +92,23 @@ namespace Piccolo
         {
             LOG_ERROR("Failed to create Vulkan instance");
         }
+        else
+        {
+            LOG_INFO("create Vulkan instance");
+        }
+
+        volkLoadInstance(m_instance);
     }
 
-    void GPUContext::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+    void GPUContext::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& create_info)
     {
-        createInfo       = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity =
+        create_info       = {};
+        create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        create_info.messageSeverity =
             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        createInfo.messageType =
+        create_info.messageType =
             VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        createInfo.pfnUserCallback = debugCallback;
+        create_info.pfnUserCallback = debugCallback;
     }
 
     std::vector<const char*> GPUContext::getRequiredExtensions()
@@ -134,6 +168,10 @@ namespace Piccolo
         if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debug_messenger) != VK_SUCCESS)
         {
             LOG_ERROR("failed to set up debug messenger!");
+        }
+        else
+        {
+            LOG_INFO("set up debug messenger");
         }
     }
 } // namespace Piccolo

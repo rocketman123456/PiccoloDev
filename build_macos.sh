@@ -34,3 +34,4 @@ cmake -S . -B build -G "Xcode" \
     -D CMAKE_POLICY_VERSION_MINIMUM=3.5 -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 cmake --build build --config "${CONFIG}"
+# open build/Piccolo.xcodeproj

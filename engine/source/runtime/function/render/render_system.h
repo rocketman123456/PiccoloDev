@@ -6,6 +6,7 @@ namespace Piccolo
 {
     class GPUContext;
     class GPUDevice;
+    class GPUSwapChain;
 
     class RenderSystem
     {
@@ -18,7 +19,8 @@ namespace Piccolo
         void tick(float dt);
 
     private:
-        std::shared_ptr<GPUContext> m_context;
-        std::shared_ptr<GPUDevice> m_device;
+        std::shared_ptr<GPUContext>   m_context;
+        std::shared_ptr<GPUDevice>    m_device;
+        // std::shared_ptr<GPUSwapChain> m_swap_chain;
     };
 } // namespace Piccolo
