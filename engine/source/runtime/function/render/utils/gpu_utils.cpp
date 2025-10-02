@@ -8,7 +8,7 @@
 namespace Piccolo
 {
 
-    VkResult CreateDebugUtilsMessengerEXT(
+    VkResult create_debug_utils_messenger_ext(
         VkInstance                                instance,
         const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
         const VkAllocationCallbacks*              pAllocator,
@@ -26,7 +26,7 @@ namespace Piccolo
         }
     }
 
-    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
+    void destroy_debug_utils_messenger_ext(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
     {
         auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
         if (func != nullptr)
@@ -35,7 +35,7 @@ namespace Piccolo
         }
     }
 
-    VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
         VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT             messageType,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,

@@ -24,16 +24,16 @@ namespace Piccolo
         std::vector<VkPresentModeKHR>   present_modes;
     };
 
-    VkResult CreateDebugUtilsMessengerEXT(
+    VkResult create_debug_utils_messenger_ext(
         VkInstance                                instance,
         const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
         const VkAllocationCallbacks*              pAllocator,
         VkDebugUtilsMessengerEXT*                 pDebugMessenger
     );
 
-    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
+    void destroy_debug_utils_messenger_ext(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
 
-    VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
         VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT             messageType,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,

@@ -1,20 +1,16 @@
 #pragma once
 #include <glslang/Public/ShaderLang.h>
 
+#include <volk.h>
+// #include <vulkan/vulkan.h>
+
 #include <string>
 #include <vector>
 
 namespace Piccolo
 {
-    class ShaderCompiler
+    namespace shader
     {
-    public:
-        ShaderCompiler();
-        ~ShaderCompiler();
-
-        bool compileGLSL(const std::string& sourcePath, EShLanguage stage, std::vector<uint32_t>& spirvOut, std::string& errorLog);
-
-    private:
         class Includer : public glslang::TShader::Includer
         {
         public:
@@ -22,5 +18,11 @@ namespace Piccolo
             IncludeResult* includeLocal(const char* headerName, const char* includerName, size_t) override;
             void           releaseInclude(IncludeResult* result) override;
         };
-    };
+
+        void start_compiler();
+        void stop_compiler();
+        bool compile_glsl(const std::string& sourcePath, EShLanguage stage, std::vector<uint32_t>& spirvOut, std::string& errorLog);
+
+        VkShaderModule create_shader_module(VkDevice device, const std::vector<uint32_t>& code);
+    } // namespace shader
 } // namespace Piccolo

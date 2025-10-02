@@ -48,7 +48,7 @@ namespace Piccolo
     {
         if (m_enable_validation_layers)
         {
-            DestroyDebugUtilsMessengerEXT(m_instance, m_debug_messenger, nullptr);
+            destroy_debug_utils_messenger_ext(m_instance, m_debug_messenger, nullptr);
         }
         vkDestroyInstance(m_instance, nullptr);
     }
@@ -108,7 +108,7 @@ namespace Piccolo
             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         create_info.messageType =
             VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        create_info.pfnUserCallback = debugCallback;
+        create_info.pfnUserCallback = debug_callback;
     }
 
     std::vector<const char*> GPUContext::getRequiredExtensions()
@@ -165,7 +165,7 @@ namespace Piccolo
         VkDebugUtilsMessengerCreateInfoEXT createInfo;
         populateDebugMessengerCreateInfo(createInfo);
 
-        if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debug_messenger) != VK_SUCCESS)
+        if (create_debug_utils_messenger_ext(m_instance, &createInfo, nullptr, &m_debug_messenger) != VK_SUCCESS)
         {
             LOG_ERROR("failed to set up debug messenger!");
         }
