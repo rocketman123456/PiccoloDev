@@ -1,4 +1,4 @@
-#include "runtime/function/render/gpu_profiler.h"
+#include "runtime/function/render/profiler/gpu_profiler.h"
 
 namespace Piccolo
 {

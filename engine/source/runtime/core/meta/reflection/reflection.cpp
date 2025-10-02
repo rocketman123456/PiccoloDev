@@ -329,6 +329,14 @@ namespace Piccolo
         {
             // todo: should check validation
             size_t count = getSize(instance);
+            if (count > 0)
+            {
+                // TODO
+            }
+            else
+            {
+                // TODO
+            }
             // todo: should check validation(index < count)
             std::get<0> (*m_func)(index, instance, element_value);
         }

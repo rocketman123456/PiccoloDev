@@ -21,9 +21,8 @@ find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(portaudio CONFIG REQUIRED)
 find_package(SndFile CONFIG REQUIRED)
-
-find_package(glslang CONFIG REQUIRED)
 find_package(volk CONFIG REQUIRED)
+find_package(glslang CONFIG REQUIRED)
 
 find_package(Taskflow CONFIG REQUIRED)
 

@@ -1,4 +1,4 @@
-#include "runtime/function/render/gpu_timestamp.h"
+#include "runtime/function/render/profiler/gpu_timestamp.h"
 
 #include "runtime/core/base/macro.h"
 
