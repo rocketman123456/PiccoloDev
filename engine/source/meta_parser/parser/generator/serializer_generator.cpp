@@ -16,7 +16,6 @@ namespace Generator
         TemplateManager::getInstance()->loadTemplates(m_root_path, "allSerializer.h");
         TemplateManager::getInstance()->loadTemplates(m_root_path, "allSerializer.ipp");
         TemplateManager::getInstance()->loadTemplates(m_root_path, "commonSerializerGenFile");
-        return;
     }
 
     std::string SerializerGenerator::processFileName(std::string path)
@@ -34,7 +33,7 @@ namespace Generator
         Mustache::data class_defines(Mustache::data::type::list);
 
         include_headfiles.push_back(Mustache::data("headfile_name", Utils::makeRelativePath(m_root_path, path).string()));
-        for (auto class_temp : schema.classes)
+        for (auto& class_temp : schema.classes)
         {
             if (!class_temp->shouldCompileFields())
                 continue;
@@ -43,7 +42,7 @@ namespace Generator
             genClassRenderData(class_temp, class_def);
 
             // deal base class
-            for (const auto & m_base_classe : class_temp->m_base_classes)
+            for (const auto& m_base_classe : class_temp->m_base_classes)
             {
                 auto include_file = m_get_include_func(m_base_classe->name);
                 if (!include_file.empty())
@@ -55,10 +54,11 @@ namespace Generator
                     }
                 }
             }
-            for (auto field : class_temp->m_fields)
+            for (auto& field : class_temp->m_fields)
             {
                 if (!field->shouldCompile())
                     continue;
+
                 // deal vector
                 if (field->m_type.find("std::vector") == 0)
                 {
@@ -72,6 +72,21 @@ namespace Generator
                         }
                     }
                 }
+
+                // deal map containers
+                if (field->m_type.find("std::map") == 0 || field->m_type.find("std::unordered"))
+                {
+                    auto include_file = m_get_include_func(field->m_name);
+                    if (!include_file.empty())
+                    {
+                        auto include_file_base = processFileName(include_file);
+                        if (file_path != include_file_base)
+                        {
+                            include_headfiles.push_back(Mustache::data("headfile_name", Utils::makeRelativePath(m_root_path, include_file_base).string()));
+                        }
+                    }
+                }
+
                 // deal normal
             }
             class_defines.push_back(class_def);

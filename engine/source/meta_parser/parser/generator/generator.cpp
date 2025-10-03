@@ -36,14 +36,15 @@ namespace Generator
         genClassFieldRenderData(class_temp, class_field_defines);
         class_def.set("class_field_defines", class_field_defines);
 
-        
         Mustache::data class_method_defines = Mustache::data::type::list;
         genClassMethodRenderData(class_temp, class_method_defines);
         class_def.set("class_method_defines", class_method_defines);
     }
     void GeneratorInterface::genClassFieldRenderData(std::shared_ptr<Class> class_temp, Mustache::data& feild_defs)
     {
-        static const std::string vector_prefix = "std::vector<";
+        static const std::string vector_prefix        = "std::vector<";
+        static const std::string map_prefix           = "std::map<";
+        static const std::string unordered_map_prefix = "std::unordered<";
 
         for (auto& field : class_temp->m_fields)
         {
@@ -54,21 +55,38 @@ namespace Generator
             filed_define.set("class_field_name", field->m_name);
             filed_define.set("class_field_type", field->m_type);
             filed_define.set("class_field_display_name", field->m_display_name);
+
             bool is_vector = field->m_type.find(vector_prefix) == 0;
+            // bool is_vector = Utils::isVectorContainer(field->m_type);
+            // bool is_map = Utils::isMapContainer(field->m_type) || Utils::isUnorderedMapContainer(field->m_type);
+            bool is_map           = field->m_type.find(map_prefix) == 0;
+            bool is_unordered_map = field->m_type.find(unordered_map_prefix) == 0;
+
             filed_define.set("class_field_is_vector", is_vector);
+            filed_define.set("class_field_is_map", is_map && is_unordered_map);
+
+            // For map containers, add key and value type information
+            if (is_map)
+            {
+                std::string key_type   = Utils::getMapKeyType(field->m_type);
+                std::string value_type = Utils::getMapValueType(field->m_type);
+                filed_define.set("class_field_map_key_type", key_type);
+                filed_define.set("class_field_map_value_type", value_type);
+            }
+
             feild_defs.push_back(filed_define);
         }
     }
 
     void GeneratorInterface::genClassMethodRenderData(std::shared_ptr<Class> class_temp, Mustache::data& method_defs)
     {
-       for (auto& method : class_temp->m_methods)
+        for (auto& method : class_temp->m_methods)
         {
             if (!method->shouldCompile())
                 continue;
             Mustache::data method_define;
 
-            method_define.set("class_method_name", method->m_name);   
+            method_define.set("class_method_name", method->m_name);
             method_defs.push_back(method_define);
         }
     }

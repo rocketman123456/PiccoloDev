@@ -2,6 +2,10 @@
 
 #include "runtime/core/meta/reflection/reflection.h"
 
+#include <map>
+#include <unordered_map>
+#include <vector>
+
 namespace Piccolo
 {
     REFLECTION_TYPE(BaseTest)
@@ -32,4 +36,17 @@ namespace Piccolo
     public:
         std::vector<Reflection::ReflectionPtr<BaseTest>> m_test_base_array;
     };
+
+    REFLECTION_TYPE(Test3)
+    CLASS(Test3, Fields)
+    {
+        REFLECTION_BODY(BaseTest);
+
+    public:
+        int                          m_int;
+        std::map<int, int>           m_int_map;
+        std::unordered_map<int, int> m_int_unordered_map;
+    };
+
+    void metaExample();
 } // namespace Piccolo

@@ -13,6 +13,7 @@ namespace Piccolo
         static std::multimap<std::string, FieldFunctionTuple*>  m_field_map;
         static std::multimap<std::string, MethodFunctionTuple*> m_method_map;
         static std::map<std::string, ArrayFunctionTuple*>       m_array_map;
+        static std::map<std::string, MapFunctionTuple*>         m_map_map;
 
         void TypeMetaRegisterinterface::registerToFieldMap(const char* name, FieldFunctionTuple* value)
         {
@@ -27,6 +28,18 @@ namespace Piccolo
             if (m_array_map.find(name) == m_array_map.end())
             {
                 m_array_map.insert(std::make_pair(name, value));
+            }
+            else
+            {
+                delete value;
+            }
+        }
+
+        void TypeMetaRegisterinterface::registerToMapMap(const char* name, MapFunctionTuple* value)
+        {
+            if (m_map_map.find(name) == m_map_map.end())
+            {
+                m_map_map.insert(std::make_pair(name, value));
             }
             else
             {
@@ -63,6 +76,11 @@ namespace Piccolo
                 delete itr.second;
             }
             m_array_map.clear();
+            for (const auto& itr : m_map_map)
+            {
+                delete itr.second;
+            }
+            m_map_map.clear();
         }
 
         TypeMeta::TypeMeta(std::string type_name) : m_type_name(type_name)
@@ -107,6 +125,20 @@ namespace Piccolo
             if (iter != m_array_map.end())
             {
                 ArrayAccessor new_accessor(iter->second);
+                accessor = new_accessor;
+                return true;
+            }
+
+            return false;
+        }
+
+        bool TypeMeta::newMapAccessorFromName(std::string map_type_name, MapAccessor& accessor)
+        {
+            auto iter = m_map_map.find(map_type_name);
+
+            if (iter != m_map_map.end())
+            {
+                MapAccessor new_accessor(iter->second);
                 accessor = new_accessor;
                 return true;
             }
@@ -364,6 +396,73 @@ namespace Piccolo
             m_func              = dest.m_func;
             m_array_type_name   = dest.m_array_type_name;
             m_element_type_name = dest.m_element_type_name;
+            return *this;
+        }
+
+        // MapAccessor implementation
+        MapAccessor::MapAccessor() :
+            m_func(nullptr), m_map_type_name("UnKnownType"), m_key_type_name("UnKnownType"), m_value_type_name("UnKnownType")
+        {}
+
+        MapAccessor::MapAccessor(MapFunctionTuple* map_func) : m_func(map_func)
+        {
+            m_map_type_name   = k_unknown_type;
+            m_key_type_name   = k_unknown_type;
+            m_value_type_name = k_unknown_type;
+            if (m_func == nullptr)
+            {
+                return;
+            }
+
+            m_map_type_name   = std::get<5>(*m_func)();
+            m_key_type_name   = std::get<6>(*m_func)();
+            m_value_type_name = std::get<7>(*m_func)();
+        }
+
+        const char* MapAccessor::getMapTypeName() { return m_map_type_name; }
+        const char* MapAccessor::getKeyTypeName() { return m_key_type_name; }
+        const char* MapAccessor::getValueTypeName() { return m_value_type_name; }
+
+        bool MapAccessor::hasKey(void* key, void* instance)
+        {
+            if (m_func == nullptr) return false;
+            return std::get<0>(*m_func)(key, instance);
+        }
+
+        void* MapAccessor::getValue(void* key, void* instance)
+        {
+            if (m_func == nullptr) return nullptr;
+            return std::get<1>(*m_func)(key, instance);
+        }
+
+        void MapAccessor::setValue(void* key, void* value, void* instance)
+        {
+            if (m_func == nullptr) return;
+            std::get<2>(*m_func)(key, value, instance);
+        }
+
+        void MapAccessor::removeKey(void* key, void* instance)
+        {
+            if (m_func == nullptr) return;
+            std::get<3>(*m_func)(key, instance);
+        }
+
+        int MapAccessor::getSize(void* instance)
+        {
+            if (m_func == nullptr) return 0;
+            return std::get<4>(*m_func)(instance);
+        }
+
+        MapAccessor& MapAccessor::operator=(MapAccessor& dest)
+        {
+            if (this == &dest)
+            {
+                return *this;
+            }
+            m_func            = dest.m_func;
+            m_map_type_name   = dest.m_map_type_name;
+            m_key_type_name   = dest.m_key_type_name;
+            m_value_type_name = dest.m_value_type_name;
             return *this;
         }
 

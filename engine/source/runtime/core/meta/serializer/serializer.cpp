@@ -87,6 +87,54 @@ namespace Piccolo
         return instance = json_context.string_value();
     }
 
+    template<>
+    Json Serializer::write(const long long& instance)
+    {
+        return Json(static_cast<double>(instance));
+    }
+    template<>
+    long long& Serializer::read(const Json& json_context, long long& instance)
+    {
+        assert(json_context.is_number());
+        return instance = static_cast<long long>(json_context.number_value());
+    }
+
+    template<>
+    Json Serializer::write(const unsigned long long& instance)
+    {
+        return Json(static_cast<double>(instance));
+    }
+    template<>
+    unsigned long long& Serializer::read(const Json& json_context, unsigned long long& instance)
+    {
+        assert(json_context.is_number());
+        return instance = static_cast<unsigned long long>(json_context.number_value());
+    }
+
+    template<>
+    Json Serializer::write(const long& instance)
+    {
+        return Json(static_cast<double>(instance));
+    }
+    template<>
+    long& Serializer::read(const Json& json_context, long& instance)
+    {
+        assert(json_context.is_number());
+        return instance = static_cast<long>(json_context.number_value());
+    }
+
+    template<>
+    Json Serializer::write(const unsigned long& instance)
+    {
+        return Json(static_cast<double>(instance));
+    }
+    template<>
+    unsigned long& Serializer::read(const Json& json_context, unsigned long& instance)
+    {
+        assert(json_context.is_number());
+        return instance = static_cast<unsigned long>(json_context.number_value());
+    }
+
     // template<>
     // Json Serializer::write(const Reflection::object& instance)
     //{

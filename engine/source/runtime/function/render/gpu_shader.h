@@ -1,5 +1,4 @@
 #pragma once
-#include "runtime/function/render/utils/gpu_shader_utils.h"
 
 #include <volk.h>
 // #include <vulkan/vulkan.h>
@@ -14,13 +13,20 @@ namespace Piccolo
     {
         VertexShader,
         FragmanetShader,
+        GeometryShader,
+        ComputeShader,
+        MeshShader,
+        TessellaionControlShader,
+        TessellaionEvaluationShader,
     };
 
     class GPUShader
     {
     public:
-        GPUShader(const std::string& shader_path, ShaderType type);
+        GPUShader(VkDevice device, const std::string& shader_path, ShaderType type);
         ~GPUShader();
+
+        VkPipelineShaderStageCreateInfo getCreateInfo();
 
     private:
         std::string m_path;
@@ -28,6 +34,7 @@ namespace Piccolo
 
         std::vector<uint32_t> m_spirv;
 
+        VkDevice       m_device;
         VkShaderModule m_shader;
     };
 } // namespace Piccolo

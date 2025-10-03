@@ -1,5 +1,7 @@
 #include "runtime/function/render/utils/gpu_shader_utils.h"
 
+#include "runtime/core/base/macro.h"
+
 #include "runtime/function/global/global_context.h"
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
@@ -57,23 +59,33 @@ namespace Piccolo
         void start_compiler() { glslang::InitializeProcess(); }
         void stop_compiler() { glslang::FinalizeProcess(); }
 
-        bool compile_glsl(const std::string& sourcePath, EShLanguage stage, std::vector<uint32_t>& spirvOut, std::string& errorLog)
+        bool compile_glsl(const std::string& source_path, EShLanguage stage, std::vector<uint32_t>& spirvOut, std::string& error_log)
         {
-            std::ifstream file(sourcePath);
+            std::string path;
+            if (g_runtime_global_context.m_asset_manager)
+            {
+                path = g_runtime_global_context.m_asset_manager->getFullPath(source_path).string();
+            }
+            else
+            {
+                path = std::filesystem::path(source_path);
+            }
+
+            std::ifstream file(path);
             if (!file.is_open())
             {
-                errorLog = "Failed to open shader file: " + sourcePath;
+                error_log = "Failed to open shader file: " + path;
                 return false;
             }
 
             std::stringstream buffer;
             buffer << file.rdbuf();
-            std::string shaderCode = buffer.str();
+            std::string shader_code = buffer.str();
 
-            const char* shaderStrings[1] = {shaderCode.c_str()};
+            const char* shader_strings[1] = {shader_code.c_str()};
 
             glslang::TShader shader(stage);
-            shader.setStrings(shaderStrings, 1);
+            shader.setStrings(shader_strings, 1);
             shader.setEnvInput(glslang::EShSourceGlsl, stage, glslang::EShClientVulkan, 100);
             shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_2);
             shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_5);
@@ -85,7 +97,7 @@ namespace Piccolo
 
             if (!shader.parse(resources, 100, false, messages, includer))
             {
-                errorLog = shader.getInfoLog();
+                error_log = shader.getInfoLog();
                 return false;
             }
 
@@ -93,12 +105,14 @@ namespace Piccolo
             program.addShader(&shader);
             if (!program.link(messages))
             {
-                errorLog = program.getInfoLog();
+                error_log = program.getInfoLog();
                 return false;
             }
 
-            glslang::SpvOptions spvOptions;
-            glslang::GlslangToSpv(*program.getIntermediate(stage), spirvOut, &spvOptions);
+            glslang::SpvOptions spv_options;
+            spv_options.generateDebugInfo = true;
+
+            glslang::GlslangToSpv(*program.getIntermediate(stage), spirvOut, &spv_options);
             return true;
         }
 

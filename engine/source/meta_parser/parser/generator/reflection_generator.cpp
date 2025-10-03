@@ -15,12 +15,12 @@ namespace Generator
     {
         prepareStatus(m_out_path);
     }
+
     void ReflectionGenerator::prepareStatus(std::string path)
     {
         GeneratorInterface::prepareStatus(path);
         TemplateManager::getInstance()->loadTemplates(m_root_path, "commonReflectionFile");
         TemplateManager::getInstance()->loadTemplates(m_root_path, "allReflectionFile");
-        return;
     }
 
     std::string ReflectionGenerator::processFileName(std::string path)
@@ -32,6 +32,8 @@ namespace Generator
     int ReflectionGenerator::generate(std::string path, SchemaMoudle schema)
     {
         static const std::string vector_prefix = "std::vector<";
+        static const std::string map_prefix = "std::map<";
+        static const std::string unordered_map_prefix = "std::unordered_map<";
 
         std::string file_path = processFileName(path);
 
@@ -53,9 +55,11 @@ namespace Generator
 
             std::vector<std::string>                                   field_names;
             std::map<std::string, std::pair<std::string, std::string>> vector_map;
+            std::map<std::string, std::tuple<std::string, std::string, std::string>> map_container_map;
 
             Mustache::data class_def;
             Mustache::data vector_defines(Mustache::data::type::list);
+            Mustache::data map_defines(Mustache::data::type::list);
 
             genClassRenderData(class_temp, class_def);
             for (auto field : class_temp->m_fields)
@@ -63,6 +67,8 @@ namespace Generator
                 if (!field->shouldCompile())
                     continue;
                 field_names.emplace_back(field->m_name);
+                
+                // Handle vector containers
                 bool is_array = field->m_type.find(vector_prefix) == 0;
                 if (is_array)
                 {
@@ -75,6 +81,19 @@ namespace Generator
                     item_type = Utils::getNameWithoutContainer(item_type);
 
                     vector_map[field->m_type] = std::make_pair(array_useful_name, item_type);
+                }
+                
+                // Handle map containers
+                bool is_map = Utils::isMapContainer(field->m_type) || Utils::isUnorderedMapContainer(field->m_type);
+                if (is_map)
+                {
+                    std::string map_useful_name = field->m_type;
+                    Utils::formatQualifiedName(map_useful_name);
+                    
+                    std::string key_type = Utils::getMapKeyType(field->m_type);
+                    std::string value_type = Utils::getMapValueType(field->m_type);
+                    
+                    map_container_map[field->m_type] = std::make_tuple(map_useful_name, key_type, value_type);
                 }
             }
 
@@ -98,6 +117,30 @@ namespace Generator
                 }
             }
             class_def.set("vector_defines", vector_defines);
+            
+            // Handle map containers
+            if (map_container_map.size() > 0)
+            {
+                if (nullptr == class_def.get("map_exist"))
+                {
+                    class_def.set("map_exist", true);
+                }
+                for (auto map_item : map_container_map)
+                {
+                    std::string map_useful_name = std::get<0>(map_item.second);
+                    std::string key_type = std::get<1>(map_item.second);
+                    std::string value_type = std::get<2>(map_item.second);
+                    
+                    Mustache::data map_define;
+                    map_define.set("map_useful_name", map_useful_name);
+                    map_define.set("map_type_name", map_item.first);
+                    map_define.set("map_key_type_name", key_type);
+                    map_define.set("map_value_type_name", value_type);
+                    map_defines.push_back(map_define);
+                }
+            }
+            class_def.set("map_defines", map_defines);
+            
             class_defines.push_back(class_def);
         }
 

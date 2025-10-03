@@ -33,6 +33,14 @@ namespace Utils
 
     std::string getNameWithoutContainer(std::string name);
 
+    // Map container support functions
+    std::string getMapKeyType(std::string map_type);
+    std::string getMapValueType(std::string map_type);
+
+    bool isVectorContainer(std::string type_name);
+    bool isMapContainer(std::string type_name);
+    bool isUnorderedMapContainer(std::string type_name);
+
     std::string getStringWithoutQuot(std::string input);
 
     std::string replace(std::string& source_string, std::string sub_string, const std::string new_string);
@@ -43,7 +51,7 @@ namespace Utils
 
     std::string join(std::vector<std::string> context_list, std::string separator);
 
-    std::string trim(std::string& source_string, const std::string trim_chars);
+    std::string trim(std::string& source_string, const std::string& trim_chars);
 
     std::string loadFile(std::string path);
 

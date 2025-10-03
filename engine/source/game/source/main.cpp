@@ -6,6 +6,8 @@
 
 #include "runtime/engine.h"
 
+#include "runtime/core/meta/meta_example.h"
+
 // #include "game/include/game.h"
 
 // https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
@@ -21,6 +23,8 @@ int main(int argc, char** argv)
 
     engine->startEngine(config_file_path.generic_string());
     engine->initialize();
+
+    Piccolo::metaExample();
 
     engine->run();
 

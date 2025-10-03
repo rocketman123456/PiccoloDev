@@ -25,7 +25,7 @@ namespace Reflection{
             {{#class_has_base}}out_list = new ReflectionInstance[count];
             for (int i=0;i<count;++i){
             {{#class_base_class_defines}}
-               out_list[i] = TypeMetaDef({{class_base_class_name}},static_cast<{{class_name}}*>(instance));
+                out_list[i] = TypeMetaDef({{class_base_class_name}},static_cast<{{class_name}}*>(instance));
             {{/class_base_class_defines}}
             }{{/class_has_base}}
             return count;
@@ -36,6 +36,7 @@ namespace Reflection{
         static void set_{{class_field_name}}(void* instance, void* field_value){ static_cast<{{class_name}}*>(instance)->{{class_field_name}} = *static_cast<{{{class_field_type}}}*>(field_value);}
         static void* get_{{class_field_name}}(void* instance){ return static_cast<void*>(&(static_cast<{{class_name}}*>(instance)->{{class_field_name}}));}
         static bool isArray_{{class_field_name}}(){ {{#class_field_is_vector}}return true;{{/class_field_is_vector}}{{^class_field_is_vector}}return false;{{/class_field_is_vector}} }
+        static bool isMap_{{class_field_name}}(){ {{#class_field_is_map}}return true;{{/class_field_is_map}}{{^class_field_is_map}}return false;{{/class_field_is_map}} }
         {{/class_field_defines}}
 
         // methods
@@ -45,6 +46,7 @@ namespace Reflection{
         {{/class_method_defines}}
     };
 }//namespace TypeFieldReflectionOparator
+
 {{#vector_exist}}namespace ArrayReflectionOperator{
 {{#vector_defines}}#ifndef Array{{vector_useful_name}}OperatorMACRO
 #define Array{{vector_useful_name}}OperatorMACRO
@@ -68,6 +70,43 @@ namespace Reflection{
 #endif //Array{{vector_useful_name}}Operator
 {{/vector_defines}}
 }//namespace ArrayReflectionOperator{{/vector_exist}}
+
+{{#map_exist}}namespace MapReflectionOperator{
+{{#map_defines}}#ifndef Map{{map_useful_name}}OperatorMACRO
+#define Map{{map_useful_name}}OperatorMACRO
+    class Map{{map_useful_name}}Operator{
+        public:
+            static const char* getMapTypeName(){ return "{{{map_type_name}}}";}
+            static const char* getKeyTypeName(){ return "{{{map_key_type_name}}}";}
+            static const char* getValueTypeName(){ return "{{{map_value_type_name}}}";}
+            static int getSize(void* instance){
+                //todo: should check validation
+                return static_cast<int>(static_cast<{{{map_type_name}}}*>(instance)->size());
+            }
+            static bool hasKey(void* key, void* instance){
+                //todo: should check validation
+                return static_cast<{{{map_type_name}}}*>(instance)->find(*static_cast<{{{map_key_type_name}}}*>(key)) != static_cast<{{{map_type_name}}}*>(instance)->end();
+            }
+            static void* getValue(void* key, void* instance){
+                //todo: should check validation
+                auto it = static_cast<{{{map_type_name}}}*>(instance)->find(*static_cast<{{{map_key_type_name}}}*>(key));
+                if (it != static_cast<{{{map_type_name}}}*>(instance)->end()) {
+                    return static_cast<void*>(&(it->second));
+                }
+                return nullptr;
+            }
+            static void setValue(void* key, void* value, void* instance){
+                //todo: should check validation
+                (*static_cast<{{{map_type_name}}}*>(instance))[*static_cast<{{{map_key_type_name}}}*>(key)] = *static_cast<{{{map_value_type_name}}}*>(value);
+            }
+            static void removeKey(void* key, void* instance){
+                //todo: should check validation
+                static_cast<{{{map_type_name}}}*>(instance)->erase(*static_cast<{{{map_key_type_name}}}*>(key));
+            }
+    };
+#endif //Map{{map_useful_name}}Operator
+{{/map_defines}}
+}//namespace MapReflectionOperator{{/map_exist}}
 
     void TypeWrapperRegister_{{class_name}}(){
         {{#class_field_defines}}FieldFunctionTuple* field_function_tuple_{{class_field_name}}=new FieldFunctionTuple(
@@ -95,6 +134,18 @@ namespace Reflection{
             &ArrayReflectionOperator::Array{{vector_useful_name}}Operator::getElementTypeName);
         REGISTER_ARRAY_TO_MAP("{{{vector_type_name}}}", array_tuple_{{vector_useful_name}});
         {{/vector_defines}}{{/vector_exist}}
+        
+        {{#map_exist}}{{#map_defines}}MapFunctionTuple* map_tuple_{{map_useful_name}} = new MapFunctionTuple(
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::hasKey,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::getValue,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::setValue,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::removeKey,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::getSize,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::getMapTypeName,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::getKeyTypeName,
+            &MapReflectionOperator::Map{{map_useful_name}}Operator::getValueTypeName);
+        REGISTER_MAP_TO_MAP("{{{map_type_name}}}", map_tuple_{{map_useful_name}});
+        {{/map_defines}}{{/map_exist}}
         {{#class_need_register}}ClassFunctionTuple* class_function_tuple_{{class_name}}=new ClassFunctionTuple(
             &TypeFieldReflectionOparator::Type{{class_name}}Operator::get{{class_name}}BaseClassReflectionInstanceList,
             &TypeFieldReflectionOparator::Type{{class_name}}Operator::constructorWithJson,

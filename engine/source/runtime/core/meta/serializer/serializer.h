@@ -3,6 +3,9 @@
 #include "runtime/core/meta/reflection/reflection.h"
 
 #include <cassert>
+#include <vector>
+#include <map>
+#include <unordered_map>
 
 namespace Piccolo
 {
@@ -51,6 +54,8 @@ namespace Piccolo
         {
             std::string type_name = json_context["$typeName"].string_value();
             instance.setTypeName(type_name);
+            // Clear the pointer before reading to satisfy readPointer's assertion
+            instance.getPtrReference() = nullptr;
             return readPointer(json_context, instance.getPtrReference());
         }
 
@@ -60,7 +65,7 @@ namespace Piccolo
 
             if constexpr (std::is_pointer<T>::value)
             {
-                return writePointer((T)instance);
+                return writePointer(static_cast<T>(instance));
             }
             else
             {
@@ -81,6 +86,89 @@ namespace Piccolo
                 static_assert(always_false<T>, "Serializer::read<T> has not been implemented yet!");
                 return instance;
             }
+        }
+
+        // std::vector specialization
+        template<typename T>
+        static Json write(const std::vector<T>& instance)
+        {
+            Json::array array_json;
+            for (const auto& item : instance)
+            {
+                array_json.emplace_back(Serializer::write(item));
+            }
+            return Json(array_json);
+        }
+
+        template<typename T>
+        static std::vector<T>& read(const Json& json_context, std::vector<T>& instance)
+        {
+            assert(json_context.is_array());
+            Json::array array_items = json_context.array_items();
+            instance.resize(array_items.size());
+            for (size_t index = 0; index < array_items.size(); ++index)
+            {
+                Serializer::read(array_items[index], instance[index]);
+            }
+            return instance;
+        }
+
+        // std::map specialization
+        template<typename K, typename V>
+        static Json write(const std::map<K, V>& instance)
+        {
+            Json::object map_json;
+            for (const auto& pair : instance)
+            {
+                std::string key_str = std::to_string(pair.first);
+                map_json[key_str] = Serializer::write(pair.second);
+            }
+            return Json(map_json);
+        }
+
+        template<typename K, typename V>
+        static std::map<K, V>& read(const Json& json_context, std::map<K, V>& instance)
+        {
+            assert(json_context.is_object());
+            instance.clear();
+            Json::object map_items = json_context.object_items();
+            for (const auto& pair : map_items)
+            {
+                K key = static_cast<K>(std::stoi(pair.first));
+                V value;
+                Serializer::read(pair.second, value);
+                instance[key] = value;
+            }
+            return instance;
+        }
+
+        // std::unordered_map specialization
+        template<typename K, typename V>
+        static Json write(const std::unordered_map<K, V>& instance)
+        {
+            Json::object map_json;
+            for (const auto& pair : instance)
+            {
+                std::string key_str = std::to_string(pair.first);
+                map_json[key_str] = Serializer::write(pair.second);
+            }
+            return Json(map_json);
+        }
+
+        template<typename K, typename V>
+        static std::unordered_map<K, V>& read(const Json& json_context, std::unordered_map<K, V>& instance)
+        {
+            assert(json_context.is_object());
+            instance.clear();
+            Json::object map_items = json_context.object_items();
+            for (const auto& pair : map_items)
+            {
+                K key = static_cast<K>(std::stoi(pair.first));
+                V value;
+                Serializer::read(pair.second, value);
+                instance[key] = value;
+            }
+            return instance;
         }
     };
 
@@ -119,6 +207,26 @@ namespace Piccolo
     Json Serializer::write(const std::string& instance);
     template<>
     std::string& Serializer::read(const Json& json_context, std::string& instance);
+
+    template<>
+    Json Serializer::write(const long long& instance);
+    template<>
+    long long& Serializer::read(const Json& json_context, long long& instance);
+
+    template<>
+    Json Serializer::write(const unsigned long long& instance);
+    template<>
+    unsigned long long& Serializer::read(const Json& json_context, unsigned long long& instance);
+
+    template<>
+    Json Serializer::write(const long& instance);
+    template<>
+    long& Serializer::read(const Json& json_context, long& instance);
+
+    template<>
+    Json Serializer::write(const unsigned long& instance);
+    template<>
+    unsigned long& Serializer::read(const Json& json_context, unsigned long& instance);
 
     // template<>
     // Json Serializer::write(const Reflection::object& instance);

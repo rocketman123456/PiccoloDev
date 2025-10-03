@@ -40,6 +40,7 @@ namespace Piccolo
 #define REGISTER_Method_TO_MAP(name, value) TypeMetaRegisterinterface::registerToMethodMap(name, value);
 #define REGISTER_BASE_CLASS_TO_MAP(name, value) TypeMetaRegisterinterface::registerToClassMap(name, value);
 #define REGISTER_ARRAY_TO_MAP(name, value) TypeMetaRegisterinterface::registerToArrayMap(name, value);
+#define REGISTER_MAP_TO_MAP(name, value) TypeMetaRegisterinterface::registerToMapMap(name, value);
 #define UNREGISTER_ALL TypeMetaRegisterinterface::unregisterAll();
 
 #define PICCOLO_REFLECTION_NEW(name, ...) Reflection::ReflectionPtr(#name, new name(__VA_ARGS__));
@@ -74,6 +75,7 @@ namespace Piccolo
         class FieldAccessor;
         class MethodAccessor;
         class ArrayAccessor;
+        class MapAccessor;
         class ReflectionInstance;
     } // namespace Reflection
     typedef std::function<void(void*, void*)>      SetFuncion;
@@ -84,6 +86,12 @@ namespace Piccolo
     typedef std::function<int(void*)>              GetSizeFunc;
     typedef std::function<bool()>                  GetBoolFunc;
     typedef std::function<void(void*)>             InvokeFunction;
+    
+    // Map container function types
+    typedef std::function<bool(void*, void*)>      HasKeyFunc;
+    typedef std::function<void*(void*, void*)>     GetValueFunc;
+    typedef std::function<void(void*, void*, void*)> SetValueFunc;
+    typedef std::function<void(void*, void*)>      RemoveKeyFunc;
 
     typedef std::function<void*(const Json&)>                           ConstructorWithJson;
     typedef std::function<Json(void*)>                                  WriteJsonByName;
@@ -94,6 +102,7 @@ namespace Piccolo
     typedef std::tuple<GetNameFuncion, InvokeFunction> MethodFunctionTuple;
     typedef std::tuple<GetBaseClassReflectionInstanceListFunc, ConstructorWithJson, WriteJsonByName> ClassFunctionTuple;
     typedef std::tuple<SetArrayFunc, GetArrayFunc, GetSizeFunc, GetNameFuncion, GetNameFuncion>      ArrayFunctionTuple;
+    typedef std::tuple<HasKeyFunc, GetValueFunc, SetValueFunc, RemoveKeyFunc, GetSizeFunc, GetNameFuncion, GetNameFuncion, GetNameFuncion> MapFunctionTuple;
 
     namespace Reflection
     {
@@ -105,6 +114,7 @@ namespace Piccolo
 
             static void registerToMethodMap(const char* name, MethodFunctionTuple* value);
             static void registerToArrayMap(const char* name, ArrayFunctionTuple* value);
+            static void registerToMapMap(const char* name, MapFunctionTuple* value);
 
             static void unregisterAll();
         };
@@ -112,6 +122,7 @@ namespace Piccolo
         {
             friend class FieldAccessor;
             friend class ArrayAccessor;
+            friend class MapAccessor;
             friend class TypeMetaRegisterinterface;
 
         public:
@@ -122,6 +133,7 @@ namespace Piccolo
             static TypeMeta newMetaFromName(std::string type_name);
 
             static bool               newArrayAccessorFromName(std::string array_type_name, ArrayAccessor& accessor);
+            static bool               newMapAccessorFromName(std::string map_type_name, MapAccessor& accessor);
             static ReflectionInstance newFromNameAndJson(std::string type_name, const Json& json_context);
             static Json               writeByName(std::string type_name, void* instance);
 
@@ -230,6 +242,37 @@ namespace Piccolo
             ArrayFunctionTuple* m_func;
             const char*         m_array_type_name;
             const char*         m_element_type_name;
+        };
+
+        /**
+         *  Map container accessor for std::map and std::unordered_map
+         */
+        class MapAccessor
+        {
+            friend class TypeMeta;
+
+        public:
+            MapAccessor();
+            const char* getMapTypeName();
+            const char* getKeyTypeName();
+            const char* getValueTypeName();
+            
+            bool hasKey(void* key, void* instance);
+            void* getValue(void* key, void* instance);
+            void setValue(void* key, void* value, void* instance);
+            void removeKey(void* key, void* instance);
+            int getSize(void* instance);
+
+            MapAccessor& operator=(MapAccessor& dest);
+
+        private:
+            MapAccessor(MapFunctionTuple* map_func);
+
+        private:
+            MapFunctionTuple* m_func;
+            const char* m_map_type_name;
+            const char* m_key_type_name;
+            const char* m_value_type_name;
         };
 
         class ReflectionInstance

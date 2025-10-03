@@ -1,5 +1,9 @@
 #pragma once
 
+#include "clang-c/Index.h"
+
+#include <string>
+
 class Cursor;
 
 class CursorType

@@ -2,12 +2,16 @@
 
 #include "cursor_type.h"
 
+#include <vector>
+
 class Cursor
 {
 public:
-    typedef std::vector<Cursor> List;
-    
-    typedef CXCursorVisitor Visitor;
+    // typedef std::vector<Cursor> List;
+    // typedef CXCursorVisitor Visitor;
+
+    using Visitor = CXCursorVisitor;
+    using List    = std::vector<Cursor>;
 
     Cursor(const CXCursor& handle);
 
