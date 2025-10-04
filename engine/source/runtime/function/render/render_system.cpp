@@ -4,6 +4,7 @@
 #include "runtime/function/render/gpu_device.h"
 #include "runtime/function/render/gpu_pipeline.h"
 #include "runtime/function/render/gpu_pipeline_manager.h"
+#include "runtime/function/render/gpu_render_pass.h"
 #include "runtime/function/render/gpu_swap_chain.h"
 
 #include "runtime/core/base/macro.h"
@@ -28,6 +29,8 @@ namespace Piccolo
         //     ShaderType::FragmanetShader,
         // };
 
+        m_render_pass = std::make_shared<GPURenderPass>(m_device->getDevice());
+
         GPUPipelineConfig pipeline_config;
         pipeline_config.name          = "DefaultRenderPipeline";
         pipeline_config.description   = "Default render pipeline with all standard passes";
@@ -42,6 +45,7 @@ namespace Piccolo
     void RenderSystem::clear()
     {
         m_pipeline.reset();
+        m_render_pass.reset();
         m_swap_chain.reset();
         m_device.reset();
         m_context.reset();
