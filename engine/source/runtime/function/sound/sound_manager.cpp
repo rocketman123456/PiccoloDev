@@ -92,10 +92,10 @@ namespace Piccolo
         file_dir      = file_dir / res.sound_url;
 
         SF_INFO  info {};
-        SNDFILE* snd = sf_open(file_dir.c_str(), SFM_READ, &info);
+        SNDFILE* snd = sf_open(file_dir.string().c_str(), SFM_READ, &info);
         if (!snd)
         {
-            LOG_WARN("Failed to open sound: {}", file_dir.c_str());
+            LOG_WARN("Failed to open sound: {}", file_dir.string().c_str());
             return -1;
         }
 
