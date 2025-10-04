@@ -7,6 +7,13 @@
 #include <map>
 #include <unordered_map>
 
+// Forward declarations for enums
+namespace Piccolo
+{
+    enum class TestEnum : int;
+    enum class StatusEnum;
+}
+
 namespace Piccolo
 {
     template<typename...>
@@ -227,6 +234,17 @@ namespace Piccolo
     Json Serializer::write(const unsigned long& instance);
     template<>
     unsigned long& Serializer::read(const Json& json_context, unsigned long& instance);
+
+    // Enum specializations
+    template<>
+    Json Serializer::write(const TestEnum& instance);
+    template<>
+    TestEnum& Serializer::read(const Json& json_context, TestEnum& instance);
+
+    template<>
+    Json Serializer::write(const StatusEnum& instance);
+    template<>
+    StatusEnum& Serializer::read(const Json& json_context, StatusEnum& instance);
 
     // template<>
     // Json Serializer::write(const Reflection::object& instance);

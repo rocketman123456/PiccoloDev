@@ -9,4 +9,9 @@ namespace Piccolo{
     template<>
     {{class_name}}& Serializer::read(const Json& json_context, {{class_name}}& instance);
     {{/class_defines}}
+    {{#enum_defines}}template<>
+    Json Serializer::write(const {{enum_name}}& instance);
+    template<>
+    {{enum_name}}& Serializer::read(const Json& json_context, {{enum_name}}& instance);
+    {{/enum_defines}}
 }//namespace

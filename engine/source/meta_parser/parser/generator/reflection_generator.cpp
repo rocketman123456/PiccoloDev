@@ -3,6 +3,7 @@
 #include "generator/reflection_generator.h"
 
 #include "language_types/class.h"
+#include "language_types/enum.h"
 #include "template_manager/template_manager.h"
 
 #include <map>
@@ -144,7 +145,33 @@ namespace Generator
             class_defines.push_back(class_def);
         }
 
+        // enum defs
+        Mustache::data enum_defines(Mustache::data::type::list);
+        for (auto enum_temp : schema.enums)
+        {
+            if (!enum_temp->shouldCompile())
+                continue;
+
+            Mustache::data enum_def;
+            enum_def.set("enum_name", enum_temp->getName());
+            enum_def.set("enum_qualified_name", enum_temp->getQualifiedName());
+            enum_def.set("enum_display_name", enum_temp->getDisplayName());
+            
+            Mustache::data enum_values(Mustache::data::type::list);
+            for (const auto& value : enum_temp->getValues())
+            {
+                Mustache::data enum_value;
+                enum_value.set("enum_value_name", value.name);
+                enum_value.set("enum_value_value", value.value);
+                enum_values.push_back(enum_value);
+            }
+            enum_def.set("enum_values", enum_values);
+            
+            enum_defines.push_back(enum_def);
+        }
+
         mustache_data.set("class_defines", class_defines);
+        mustache_data.set("enum_defines", enum_defines);
         mustache_data.set("include_headfiles", include_headfiles);
 
         std::string tmp = Utils::convertNameToUpperCamelCase(fs::path(path).stem().string(), "_");

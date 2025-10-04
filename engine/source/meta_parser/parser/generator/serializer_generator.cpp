@@ -1,6 +1,7 @@
 #include "generator/serializer_generator.h"
 #include "common/precompiled.h"
 #include "language_types/class.h"
+#include "language_types/enum.h"
 
 namespace Generator
 {
@@ -93,7 +94,23 @@ namespace Generator
             m_class_defines.push_back(class_def);
         }
 
+        // enum defs
+        Mustache::data enum_defines(Mustache::data::type::list);
+        for (auto& enum_temp : schema.enums)
+        {
+            if (!enum_temp->shouldCompile())
+                continue;
+
+            Mustache::data enum_def;
+            enum_def.set("enum_name", enum_temp->getName());
+            enum_def.set("enum_qualified_name", enum_temp->getQualifiedName());
+            enum_def.set("enum_display_name", enum_temp->getDisplayName());
+            
+            enum_defines.push_back(enum_def);
+        }
+
         mustache_data.set("class_defines", class_defines);
+        mustache_data.set("enum_defines", enum_defines);
         mustache_data.set("include_headfiles", include_headfiles);
         std::string render_string = TemplateManager::getInstance()->renderByTemplate("commonSerializerGenFile", mustache_data);
         Utils::saveFile(render_string, file_path);

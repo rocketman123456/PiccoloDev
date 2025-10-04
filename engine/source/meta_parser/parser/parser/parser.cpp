@@ -1,6 +1,7 @@
 #include "common/precompiled.h"
 
 #include "language_types/class.h"
+#include "language_types/enum.h"
 
 #include "generator/reflection_generator.h"
 #include "generator/serializer_generator.h"
@@ -211,6 +212,13 @@ void MetaParser::buildClassAST(const Cursor& cursor, Namespace& current_namespac
             auto class_ptr = std::make_shared<Class>(child, current_namespace);
 
             TRY_ADD_LANGUAGE_TYPE(class_ptr, classes);
+        }
+        // actual definition and an enum
+        else if (child.isDefinition() && kind == CXCursor_EnumDecl)
+        {
+            auto enum_ptr = std::make_shared<Enum>(child, current_namespace);
+
+            TRY_ADD_LANGUAGE_TYPE(enum_ptr, enums);
         }
         else
         {

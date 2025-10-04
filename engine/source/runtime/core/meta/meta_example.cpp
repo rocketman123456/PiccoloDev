@@ -94,6 +94,29 @@ namespace Piccolo
             LOG_INFO("UnorderedMap[{}] = {}", pair.first, pair.second);
         }
 
+        // Test enum serialization and deserialization
+        TestWithEnum test_enum_in;
+        test_enum_in.m_test_enum = TestEnum::Value2;
+        test_enum_in.m_status_enum = StatusEnum::Running;
+        test_enum_in.m_regular_int = 123;
+
+        // Serialize TestWithEnum
+        auto test_enum_json_in = Serializer::write(test_enum_in);
+        std::string test_enum_context = test_enum_json_in.dump();
+        
+        LOG_INFO("TestWithEnum serialized:");
+        LOG_INFO(test_enum_context.c_str());
+
+        // Deserialize TestWithEnum
+        TestWithEnum test_enum_out;
+        auto&& test_enum_json = Json::parse(test_enum_context, err);
+        Serializer::read(test_enum_json, test_enum_out);
+        
+        LOG_INFO("TestWithEnum deserialized:");
+        LOG_INFO("m_test_enum: {}", static_cast<int>(test_enum_out.m_test_enum));
+        LOG_INFO("m_status_enum: {}", static_cast<int>(test_enum_out.m_status_enum));
+        LOG_INFO("m_regular_int: {}", test_enum_out.m_regular_int);
+
         // reflection
         auto                       meta = TypeMetaDef(Test2, &test2_out);
         Reflection::FieldAccessor* fields;

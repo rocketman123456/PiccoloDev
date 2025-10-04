@@ -197,4 +197,34 @@ namespace Piccolo
     }*/
 
     ////////////////////////////////////
+
+    // Enum implementations
+    template<>
+    Json Serializer::write(const TestEnum& instance)
+    {
+        return Json(static_cast<int>(instance));
+    }
+
+    template<>
+    TestEnum& Serializer::read(const Json& json_context, TestEnum& instance)
+    {
+        assert(json_context.is_number());
+        instance = static_cast<TestEnum>(static_cast<int>(json_context.number_value()));
+        return instance;
+    }
+
+    template<>
+    Json Serializer::write(const StatusEnum& instance)
+    {
+        return Json(static_cast<int>(instance));
+    }
+
+    template<>
+    StatusEnum& Serializer::read(const Json& json_context, StatusEnum& instance)
+    {
+        assert(json_context.is_number());
+        instance = static_cast<StatusEnum>(static_cast<int>(json_context.number_value()));
+        return instance;
+    }
+
 } // namespace Piccolo

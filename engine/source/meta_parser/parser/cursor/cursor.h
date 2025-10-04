@@ -28,6 +28,8 @@ public:
 
     List getChildren(void) const;
     void visitChildren(Visitor visitor, void* data = nullptr);
+    
+    CXCursor getHandle(void) const { return m_handle; }
 
 private:
     CXCursor m_handle;

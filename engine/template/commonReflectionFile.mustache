@@ -6,6 +6,8 @@
 namespace Piccolo{
     {{#class_defines}}class {{class_name}};
     {{/class_defines}}
+    {{#enum_defines}}enum {{enum_name}};
+    {{/enum_defines}}
 namespace Reflection{
 {{#class_defines}}namespace TypeFieldReflectionOparator{
     class Type{{class_name}}Operator{
@@ -153,11 +155,51 @@ namespace Reflection{
         REGISTER_BASE_CLASS_TO_MAP("{{class_name}}", class_function_tuple_{{class_name}});
         {{/class_need_register}}
     }{{/class_defines}}
+
+{{#enum_defines}}namespace EnumReflectionOperator{
+    class Enum{{enum_name}}Operator{
+    public:
+        static const char* getEnumName(){ return "{{enum_name}}";}
+        static const char* getEnumQualifiedName(){ return "{{enum_qualified_name}}";}
+        static const char* getEnumDisplayName(){ return "{{enum_display_name}}";}
+        
+        {{#enum_values}}static const char* getValueName_{{enum_value_name}}(){ return "{{enum_value_name}}";}
+        static int getValue_{{enum_value_name}}(){ return {{enum_value_value}};}{{/enum_values}}
+        
+        static int getValueCount(){ return {{enum_values.size}}; }
+        static const char* getValueName(int index){
+            switch(index){
+                {{#enum_values}}case {{enum_value_value}}: return "{{enum_value_name}}";{{/enum_values}}
+                default: return nullptr;
+            }
+        }
+        static int getValue(int index){
+            switch(index){
+                {{#enum_values}}case {{enum_value_value}}: return {{enum_value_value}};{{/enum_values}}
+                default: return -1;
+            }
+        }
+    };
+}//namespace EnumReflectionOperator
+
+void EnumWrapperRegister_{{enum_name}}(){
+    EnumFunctionTuple* enum_function_tuple_{{enum_name}} = new EnumFunctionTuple(
+        &EnumReflectionOperator::Enum{{enum_name}}Operator::getEnumName,
+        &EnumReflectionOperator::Enum{{enum_name}}Operator::getEnumQualifiedName,
+        &EnumReflectionOperator::Enum{{enum_name}}Operator::getEnumDisplayName,
+        &EnumReflectionOperator::Enum{{enum_name}}Operator::getValueCount,
+        &EnumReflectionOperator::Enum{{enum_name}}Operator::getValueName,
+        &EnumReflectionOperator::Enum{{enum_name}}Operator::getValue);
+    REGISTER_ENUM_TO_MAP("{{enum_name}}", enum_function_tuple_{{enum_name}});
+}{{/enum_defines}}
+
 namespace TypeWrappersRegister{
     void {{sourefile_name_upper_camel_case}}()
     {
         {{#class_defines}}TypeWrapperRegister_{{class_name}}();
     {{/class_defines}}
+        {{#enum_defines}}EnumWrapperRegister_{{enum_name}}();
+    {{/enum_defines}}
     }
 }//namespace TypeWrappersRegister
 
