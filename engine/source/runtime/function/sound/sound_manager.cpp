@@ -96,7 +96,7 @@ namespace Piccolo
         if (!snd)
         {
             LOG_WARN("Failed to open sound: {}", file_dir.c_str());
-            return;
+            return -1;
         }
 
         std::vector<float> buffer(info.frames * info.channels);
