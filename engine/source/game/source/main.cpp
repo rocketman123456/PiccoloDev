@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     engine->startEngine(config_file_path.generic_string());
     engine->initialize();
 
-    Piccolo::metaExample();
+    // Piccolo::metaExample();
 
     engine->run();
 

@@ -9,11 +9,14 @@
 
 namespace Piccolo
 {
-    GPUShader::GPUShader(VkDevice device, const std::string& shader_path, ShaderType type)
+    GPUShader::GPUShader(VkDevice device, const std::string& shader_path, ShaderType type, std::string entry_point)
     {
-        m_device = device;
-        m_path   = shader_path;
-        m_type   = type;
+        m_device      = device;
+        m_path        = shader_path;
+        m_type        = type;
+        m_entry_point = entry_point;
+
+        LOG_DEBUG("shader path: {}", shader_path);
 
         std::string error;
 
@@ -45,17 +48,21 @@ namespace Piccolo
 
         shader::compile_glsl(shader_path, stage, m_spirv, error);
 
-        LOG_INFO("compile glsl log: {}", error);
+        LOG_DEBUG("compile glsl log: {}", error);
 
         m_shader = shader::create_shader_module(m_device, m_spirv);
     }
 
     GPUShader::~GPUShader()
     {
+        LOG_DEBUG("clear shader {} resource", m_path);
+
         m_spirv.clear();
 
         vkDestroyShaderModule(m_device, m_shader, nullptr);
     }
+
+    VkShaderModule GPUShader::getShaderModule() const { return m_shader; }
 
     VkPipelineShaderStageCreateInfo GPUShader::getCreateInfo()
     {
@@ -87,9 +94,9 @@ namespace Piccolo
 
         VkPipelineShaderStageCreateInfo shader_stage_info {};
         shader_stage_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shader_stage_info.stage  = VK_SHADER_STAGE_VERTEX_BIT; // VK_SHADER_STAGE_FRAGMENT_BIT
+        shader_stage_info.stage  = stage;
         shader_stage_info.module = m_shader;
-        shader_stage_info.pName  = "main";
+        shader_stage_info.pName  = m_entry_point.c_str();
 
         return shader_stage_info;
     }

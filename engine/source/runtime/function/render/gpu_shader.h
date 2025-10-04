@@ -23,14 +23,16 @@ namespace Piccolo
     class GPUShader
     {
     public:
-        GPUShader(VkDevice device, const std::string& shader_path, ShaderType type);
+        GPUShader(VkDevice device, const std::string& shader_path, ShaderType type, std::string entry_point);
         ~GPUShader();
 
+        VkShaderModule                  getShaderModule() const;
         VkPipelineShaderStageCreateInfo getCreateInfo();
 
     private:
         std::string m_path;
         ShaderType  m_type;
+        std::string m_entry_point;
 
         std::vector<uint32_t> m_spirv;
 

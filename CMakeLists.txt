@@ -25,6 +25,14 @@ find_package(volk CONFIG REQUIRED)
 find_package(glslang CONFIG REQUIRED)
 
 find_package(Taskflow CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE nlohmann_json::nlohmann_json)
+find_package(EnTT CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE EnTT::EnTT)
+find_path(REFL_CPP_INCLUDE_DIRS "refl.hpp")
+# target_include_directories(main PRIVATE ${REFL_CPP_INCLUDE_DIRS})
+find_package(reflectcpp CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE reflectcpp::reflectcpp)
 
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)

@@ -7,9 +7,9 @@ if(NOT TARGET imgui)
     set_target_properties(imgui PROPERTIES FOLDER ${third_party_folder}/imgui)
 endif()
 
-if(NOT TARGET soloud)
-    include(soloud.cmake)
-endif()
+# if(NOT TARGET soloud)
+#     include(soloud.cmake)
+# endif()
 
 if(NOT TARGET ImGuiFileDialog)
     add_subdirectory(ImGuiFileDialog)
