@@ -93,7 +93,10 @@ namespace Piccolo
         std::array<int, 2> window_size = init_info.window_system->getWindowSize();
 
         m_viewport = {0.0f, 0.0f, (float)window_size[0], (float)window_size[1], 0.0f, 1.0f};
-        m_scissor  = {{0, 0}, {(uint32_t)window_size[0], (uint32_t)window_size[1]}};
+        m_scissor  = {
+            {                       0,                        0},
+            {(uint32_t)window_size[0], (uint32_t)window_size[1]}
+        };
 
 #ifndef NDEBUG
         m_enable_validation_Layers = true; // true;
@@ -374,12 +377,9 @@ namespace Piccolo
 
     bool VulkanRHI::prepareBeforePass(std::function<void()> passUpdateAfterRecreateSwapchain)
     {
-        VkResult acquire_image_result = vkAcquireNextImageKHR(m_device,
-                                                              m_swapchain,
-                                                              UINT64_MAX,
-                                                              m_image_available_for_render_semaphores[m_current_frame_index],
-                                                              VK_NULL_HANDLE,
-                                                              &m_current_swapchain_image_index);
+        VkResult acquire_image_result = vkAcquireNextImageKHR(
+            m_device, m_swapchain, UINT64_MAX, m_image_available_for_render_semaphores[m_current_frame_index], VK_NULL_HANDLE, &m_current_swapchain_image_index
+        );
 
         if (VK_ERROR_OUT_OF_DATE_KHR == acquire_image_result)
         {
@@ -456,8 +456,10 @@ namespace Piccolo
             return;
         }
 
-        VkSemaphore semaphores[2] = {((VulkanSemaphore*)m_image_available_for_texturescopy_semaphores[m_current_frame_index])->getResource(),
-                                     m_image_finished_for_presentation_semaphores[m_current_frame_index]};
+        VkSemaphore semaphores[2] = {
+            ((VulkanSemaphore*)m_image_available_for_texturescopy_semaphores[m_current_frame_index])->getResource(),
+            m_image_finished_for_presentation_semaphores[m_current_frame_index]
+        };
 
         // submit command buffer
         VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -605,10 +607,8 @@ namespace Piccolo
     }
 
     // debug callback
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT,
-                                                        VkDebugUtilsMessageTypeFlagsEXT,
-                                                        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                                                        void*)
+    static VKAPI_ATTR VkBool32 VKAPI_CALL
+    debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void*)
     {
         std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
         return VK_FALSE;
@@ -631,7 +631,7 @@ namespace Piccolo
             LOG_ERROR("validation layers requested, but not available!");
         }
 
-        m_vulkan_api_version = VK_API_VERSION_1_0;
+        m_vulkan_api_version = VK_API_VERSION_1_3;
 
         // app info
         VkApplicationInfo appInfo {};
@@ -736,9 +736,11 @@ namespace Piccolo
                 ranked_physical_devices.push_back({score, device});
             }
 
-            std::sort(ranked_physical_devices.begin(),
-                      ranked_physical_devices.end(),
-                      [](const std::pair<int, VkPhysicalDevice>& p1, const std::pair<int, VkPhysicalDevice>& p2) { return p1 > p2; });
+            std::sort(
+                ranked_physical_devices.begin(),
+                ranked_physical_devices.end(),
+                [](const std::pair<int, VkPhysicalDevice>& p1, const std::pair<int, VkPhysicalDevice>& p2) { return p1 > p2; }
+            );
 
             for (const auto& device : ranked_physical_devices)
             {
@@ -764,7 +766,8 @@ namespace Piccolo
 
         std::vector<VkDeviceQueueCreateInfo> queue_create_infos; // all queues that need to be created
         std::set<uint32_t>                   queue_families = {
-            m_queue_indices.graphics_family.value(), m_queue_indices.present_family.value(), m_queue_indices.m_compute_family.value()};
+            m_queue_indices.graphics_family.value(), m_queue_indices.present_family.value(), m_queue_indices.m_compute_family.value()
+        };
 
         float queue_priority = 1.0f;
         for (uint32_t queue_family : queue_families) // for every queue family
@@ -1081,10 +1084,12 @@ namespace Piccolo
         }
     }
 
-    bool VulkanRHI::createGraphicsPipelines(RHIPipelineCache*                    pipelineCache,
-                                            uint32_t                             createInfoCount,
-                                            const RHIGraphicsPipelineCreateInfo* pCreateInfo,
-                                            RHIPipeline*&                        pPipelines)
+    bool VulkanRHI::createGraphicsPipelines(
+        RHIPipelineCache*                    pipelineCache,
+        uint32_t                             createInfoCount,
+        const RHIGraphicsPipelineCreateInfo* pCreateInfo,
+        RHIPipeline*&                        pPipelines
+    )
     {
         // pipeline_shader_stage_create_info
         int                                          pipeline_shader_stage_create_info_size = pCreateInfo->stageCount;
@@ -1415,10 +1420,12 @@ namespace Piccolo
         }
     }
 
-    bool VulkanRHI::createComputePipelines(RHIPipelineCache*                   pipelineCache,
-                                           uint32_t                            createInfoCount,
-                                           const RHIComputePipelineCreateInfo* pCreateInfos,
-                                           RHIPipeline*&                       pPipelines)
+    bool VulkanRHI::createComputePipelines(
+        RHIPipelineCache*                   pipelineCache,
+        uint32_t                            createInfoCount,
+        const RHIComputePipelineCreateInfo* pCreateInfos,
+        RHIPipeline*&                       pPipelines
+    )
     {
         VkPipelineShaderStageCreateInfo shader_stage_create_info {};
         if (pCreateInfos->pStages->pSpecializationInfo != nullptr)
@@ -1909,7 +1916,8 @@ namespace Piccolo
     void VulkanRHI::cmdBindPipelinePFN(RHICommandBuffer* commandBuffer, RHIPipelineBindPoint pipelineBindPoint, RHIPipeline* pipeline)
     {
         return _vkCmdBindPipeline(
-            ((VulkanCommandBuffer*)commandBuffer)->getResource(), (VkPipelineBindPoint)pipelineBindPoint, ((VulkanPipeline*)pipeline)->getResource());
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(), (VkPipelineBindPoint)pipelineBindPoint, ((VulkanPipeline*)pipeline)->getResource()
+        );
     }
 
     void VulkanRHI::cmdSetViewportPFN(RHICommandBuffer* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const RHIViewport* pViewports)
@@ -1958,11 +1966,13 @@ namespace Piccolo
         return _vkCmdSetScissor(((VulkanCommandBuffer*)commandBuffer)->getResource(), firstScissor, scissorCount, vk_rect_2d_list.data());
     }
 
-    void VulkanRHI::cmdBindVertexBuffersPFN(RHICommandBuffer*    commandBuffer,
-                                            uint32_t             firstBinding,
-                                            uint32_t             bindingCount,
-                                            RHIBuffer* const*    pBuffers,
-                                            const RHIDeviceSize* pOffsets)
+    void VulkanRHI::cmdBindVertexBuffersPFN(
+        RHICommandBuffer*    commandBuffer,
+        uint32_t             firstBinding,
+        uint32_t             bindingCount,
+        RHIBuffer* const*    pBuffers,
+        const RHIDeviceSize* pOffsets
+    )
     {
         // buffer
         int                   buffer_size = bindingCount;
@@ -1987,23 +1997,27 @@ namespace Piccolo
         };
 
         return _vkCmdBindVertexBuffers(
-            ((VulkanCommandBuffer*)commandBuffer)->getResource(), firstBinding, bindingCount, vk_buffer_list.data(), vk_device_size_list.data());
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(), firstBinding, bindingCount, vk_buffer_list.data(), vk_device_size_list.data()
+        );
     }
 
     void VulkanRHI::cmdBindIndexBufferPFN(RHICommandBuffer* commandBuffer, RHIBuffer* buffer, RHIDeviceSize offset, RHIIndexType indexType)
     {
         return _vkCmdBindIndexBuffer(
-            ((VulkanCommandBuffer*)commandBuffer)->getResource(), ((VulkanBuffer*)buffer)->getResource(), (VkDeviceSize)offset, (VkIndexType)indexType);
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(), ((VulkanBuffer*)buffer)->getResource(), (VkDeviceSize)offset, (VkIndexType)indexType
+        );
     }
 
-    void VulkanRHI::cmdBindDescriptorSetsPFN(RHICommandBuffer*              commandBuffer,
-                                             RHIPipelineBindPoint           pipelineBindPoint,
-                                             RHIPipelineLayout*             layout,
-                                             uint32_t                       firstSet,
-                                             uint32_t                       descriptorSetCount,
-                                             const RHIDescriptorSet* const* pDescriptorSets,
-                                             uint32_t                       dynamicOffsetCount,
-                                             const uint32_t*                pDynamicOffsets)
+    void VulkanRHI::cmdBindDescriptorSetsPFN(
+        RHICommandBuffer*              commandBuffer,
+        RHIPipelineBindPoint           pipelineBindPoint,
+        RHIPipelineLayout*             layout,
+        uint32_t                       firstSet,
+        uint32_t                       descriptorSetCount,
+        const RHIDescriptorSet* const* pDescriptorSets,
+        uint32_t                       dynamicOffsetCount,
+        const uint32_t*                pDynamicOffsets
+    )
     {
         // descriptor_set
         int                          descriptor_set_size = descriptorSetCount;
@@ -2027,31 +2041,37 @@ namespace Piccolo
             vk_offset_element = rhi_offset_element;
         };
 
-        return _vkCmdBindDescriptorSets(((VulkanCommandBuffer*)commandBuffer)->getResource(),
-                                        (VkPipelineBindPoint)pipelineBindPoint,
-                                        ((VulkanPipelineLayout*)layout)->getResource(),
-                                        firstSet,
-                                        descriptorSetCount,
-                                        vk_descriptor_set_list.data(),
-                                        dynamicOffsetCount,
-                                        vk_offset_list.data());
+        return _vkCmdBindDescriptorSets(
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(),
+            (VkPipelineBindPoint)pipelineBindPoint,
+            ((VulkanPipelineLayout*)layout)->getResource(),
+            firstSet,
+            descriptorSetCount,
+            vk_descriptor_set_list.data(),
+            dynamicOffsetCount,
+            vk_offset_list.data()
+        );
     }
 
-    void VulkanRHI::cmdDrawIndexedPFN(RHICommandBuffer* commandBuffer,
-                                      uint32_t          indexCount,
-                                      uint32_t          instanceCount,
-                                      uint32_t          firstIndex,
-                                      int32_t           vertexOffset,
-                                      uint32_t          firstInstance)
+    void VulkanRHI::cmdDrawIndexedPFN(
+        RHICommandBuffer* commandBuffer,
+        uint32_t          indexCount,
+        uint32_t          instanceCount,
+        uint32_t          firstIndex,
+        int32_t           vertexOffset,
+        uint32_t          firstInstance
+    )
     {
         return _vkCmdDrawIndexed(((VulkanCommandBuffer*)commandBuffer)->getResource(), indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
     }
 
-    void VulkanRHI::cmdClearAttachmentsPFN(RHICommandBuffer*         commandBuffer,
-                                           uint32_t                  attachmentCount,
-                                           const RHIClearAttachment* pAttachments,
-                                           uint32_t                  rectCount,
-                                           const RHIClearRect*       pRects)
+    void VulkanRHI::cmdClearAttachmentsPFN(
+        RHICommandBuffer*         commandBuffer,
+        uint32_t                  attachmentCount,
+        const RHIClearAttachment* pAttachments,
+        uint32_t                  rectCount,
+        const RHIClearRect*       pRects
+    )
     {
         // clear_attachment
         int                            clear_attachment_size = attachmentCount;
@@ -2108,7 +2128,8 @@ namespace Piccolo
         };
 
         return _vkCmdClearAttachments(
-            ((VulkanCommandBuffer*)commandBuffer)->getResource(), attachmentCount, vk_clear_attachment_list.data(), rectCount, vk_clear_rect_list.data());
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(), attachmentCount, vk_clear_attachment_list.data(), rectCount, vk_clear_rect_list.data()
+        );
     }
 
     bool VulkanRHI::beginCommandBuffer(RHICommandBuffer* commandBuffer, const RHICommandBufferBeginInfo* pBeginInfo)
@@ -2163,10 +2184,12 @@ namespace Piccolo
         }
     }
 
-    void VulkanRHI::updateDescriptorSets(uint32_t                     descriptorWriteCount,
-                                         const RHIWriteDescriptorSet* pDescriptorWrites,
-                                         uint32_t                     descriptorCopyCount,
-                                         const RHICopyDescriptorSet*  pDescriptorCopies)
+    void VulkanRHI::updateDescriptorSets(
+        uint32_t                     descriptorWriteCount,
+        const RHIWriteDescriptorSet* pDescriptorWrites,
+        uint32_t                     descriptorCopyCount,
+        const RHICopyDescriptorSet*  pDescriptorCopies
+    )
     {
         // write_descriptor_set
         int                               write_descriptor_set_size = descriptorWriteCount;
@@ -2411,16 +2434,18 @@ namespace Piccolo
         }
     }
 
-    void VulkanRHI::cmdPipelineBarrier(RHICommandBuffer*             commandBuffer,
-                                       RHIPipelineStageFlags         srcStageMask,
-                                       RHIPipelineStageFlags         dstStageMask,
-                                       RHIDependencyFlags            dependencyFlags,
-                                       uint32_t                      memoryBarrierCount,
-                                       const RHIMemoryBarrier*       pMemoryBarriers,
-                                       uint32_t                      bufferMemoryBarrierCount,
-                                       const RHIBufferMemoryBarrier* pBufferMemoryBarriers,
-                                       uint32_t                      imageMemoryBarrierCount,
-                                       const RHIImageMemoryBarrier*  pImageMemoryBarriers)
+    void VulkanRHI::cmdPipelineBarrier(
+        RHICommandBuffer*             commandBuffer,
+        RHIPipelineStageFlags         srcStageMask,
+        RHIPipelineStageFlags         dstStageMask,
+        RHIDependencyFlags            dependencyFlags,
+        uint32_t                      memoryBarrierCount,
+        const RHIMemoryBarrier*       pMemoryBarriers,
+        uint32_t                      bufferMemoryBarrierCount,
+        const RHIBufferMemoryBarrier* pBufferMemoryBarriers,
+        uint32_t                      imageMemoryBarrierCount,
+        const RHIImageMemoryBarrier*  pImageMemoryBarriers
+    )
     {
 
         // memory_barrier
@@ -2483,16 +2508,18 @@ namespace Piccolo
             vk_image_memory_barrier_element.subresourceRange    = image_subresource_range;
         };
 
-        vkCmdPipelineBarrier(((VulkanCommandBuffer*)commandBuffer)->getResource(),
-                             (RHIPipelineStageFlags)srcStageMask,
-                             (RHIPipelineStageFlags)dstStageMask,
-                             (RHIDependencyFlags)dependencyFlags,
-                             memoryBarrierCount,
-                             vk_memory_barrier_list.data(),
-                             bufferMemoryBarrierCount,
-                             vk_buffer_memory_barrier_list.data(),
-                             imageMemoryBarrierCount,
-                             vk_image_memory_barrier_list.data());
+        vkCmdPipelineBarrier(
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(),
+            (RHIPipelineStageFlags)srcStageMask,
+            (RHIPipelineStageFlags)dstStageMask,
+            (RHIDependencyFlags)dependencyFlags,
+            memoryBarrierCount,
+            vk_memory_barrier_list.data(),
+            bufferMemoryBarrierCount,
+            vk_buffer_memory_barrier_list.data(),
+            imageMemoryBarrierCount,
+            vk_image_memory_barrier_list.data()
+        );
     }
 
     void VulkanRHI::cmdDraw(RHICommandBuffer* commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
@@ -2510,12 +2537,14 @@ namespace Piccolo
         vkCmdDispatchIndirect(((VulkanCommandBuffer*)commandBuffer)->getResource(), ((VulkanBuffer*)buffer)->getResource(), offset);
     }
 
-    void VulkanRHI::cmdCopyImageToBuffer(RHICommandBuffer*         commandBuffer,
-                                         RHIImage*                 srcImage,
-                                         RHIImageLayout            srcImageLayout,
-                                         RHIBuffer*                dstBuffer,
-                                         uint32_t                  regionCount,
-                                         const RHIBufferImageCopy* pRegions)
+    void VulkanRHI::cmdCopyImageToBuffer(
+        RHICommandBuffer*         commandBuffer,
+        RHIImage*                 srcImage,
+        RHIImageLayout            srcImageLayout,
+        RHIBuffer*                dstBuffer,
+        uint32_t                  regionCount,
+        const RHIBufferImageCopy* pRegions
+    )
     {
         // buffer_image_copy
         int                            buffer_image_copy_size = regionCount;
@@ -2557,21 +2586,25 @@ namespace Piccolo
             vk_buffer_image_copy_element.imageExtent       = extent_3d;
         };
 
-        vkCmdCopyImageToBuffer(((VulkanCommandBuffer*)commandBuffer)->getResource(),
-                               ((VulkanImage*)srcImage)->getResource(),
-                               (VkImageLayout)srcImageLayout,
-                               ((VulkanBuffer*)dstBuffer)->getResource(),
-                               regionCount,
-                               vk_buffer_image_copy_list.data());
+        vkCmdCopyImageToBuffer(
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(),
+            ((VulkanImage*)srcImage)->getResource(),
+            (VkImageLayout)srcImageLayout,
+            ((VulkanBuffer*)dstBuffer)->getResource(),
+            regionCount,
+            vk_buffer_image_copy_list.data()
+        );
     }
 
-    void VulkanRHI::cmdCopyImageToImage(RHICommandBuffer*      commandBuffer,
-                                        RHIImage*              srcImage,
-                                        RHIImageAspectFlagBits srcFlag,
-                                        RHIImage*              dstImage,
-                                        RHIImageAspectFlagBits dstFlag,
-                                        uint32_t               width,
-                                        uint32_t               height)
+    void VulkanRHI::cmdCopyImageToImage(
+        RHICommandBuffer*      commandBuffer,
+        RHIImage*              srcImage,
+        RHIImageAspectFlagBits srcFlag,
+        RHIImage*              dstImage,
+        RHIImageAspectFlagBits dstFlag,
+        uint32_t               width,
+        uint32_t               height
+    )
     {
         VkImageCopy imagecopyRegion    = {};
         imagecopyRegion.srcSubresource = {(VkImageAspectFlags)srcFlag, 0, 0, 1};
@@ -2580,13 +2613,15 @@ namespace Piccolo
         imagecopyRegion.dstOffset      = {0, 0, 0};
         imagecopyRegion.extent         = {width, height, 1};
 
-        vkCmdCopyImage(((VulkanCommandBuffer*)commandBuffer)->getResource(),
-                       ((VulkanImage*)srcImage)->getResource(),
-                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                       ((VulkanImage*)dstImage)->getResource(),
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                       1,
-                       &imagecopyRegion);
+        vkCmdCopyImage(
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(),
+            ((VulkanImage*)srcImage)->getResource(),
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            ((VulkanImage*)dstImage)->getResource(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &imagecopyRegion
+        );
     }
 
     void VulkanRHI::cmdCopyBuffer(RHICommandBuffer* commandBuffer, RHIBuffer* srcBuffer, RHIBuffer* dstBuffer, uint32_t regionCount, RHIBufferCopy* pRegions)
@@ -2596,11 +2631,13 @@ namespace Piccolo
         copyRegion.dstOffset = pRegions->dstOffset;
         copyRegion.size      = pRegions->size;
 
-        vkCmdCopyBuffer(((VulkanCommandBuffer*)commandBuffer)->getResource(),
-                        ((VulkanBuffer*)srcBuffer)->getResource(),
-                        ((VulkanBuffer*)dstBuffer)->getResource(),
-                        regionCount,
-                        &copyRegion);
+        vkCmdCopyBuffer(
+            ((VulkanCommandBuffer*)commandBuffer)->getResource(),
+            ((VulkanBuffer*)srcBuffer)->getResource(),
+            ((VulkanBuffer*)dstBuffer)->getResource(),
+            regionCount,
+            &copyRegion
+        );
     }
 
     void VulkanRHI::createCommandBuffers()
@@ -2679,8 +2716,8 @@ namespace Piccolo
             if (vkCreateSemaphore(m_device, &semaphore_create_info, nullptr, &m_image_available_for_render_semaphores[i]) != VK_SUCCESS ||
                 vkCreateSemaphore(m_device, &semaphore_create_info, nullptr, &m_image_finished_for_presentation_semaphores[i]) != VK_SUCCESS ||
                 vkCreateSemaphore(
-                    m_device, &semaphore_create_info, nullptr, &(((VulkanSemaphore*)m_image_available_for_texturescopy_semaphores[i])->getResource())) !=
-                    VK_SUCCESS ||
+                    m_device, &semaphore_create_info, nullptr, &(((VulkanSemaphore*)m_image_available_for_texturescopy_semaphores[i])->getResource())
+                ) != VK_SUCCESS ||
                 vkCreateFence(m_device, &fence_create_info, nullptr, &m_is_frame_in_flight_fences[i]) != VK_SUCCESS)
             {
                 LOG_ERROR("vk create semaphore & fence");
@@ -2693,28 +2730,26 @@ namespace Piccolo
 
     void VulkanRHI::createFramebufferImageAndView()
     {
-        VulkanUtil::createImage(m_physical_device,
-                                m_device,
-                                m_swapchain_extent.width,
-                                m_swapchain_extent.height,
-                                (VkFormat)m_depth_image_format,
-                                VK_IMAGE_TILING_OPTIMAL,
-                                VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                ((VulkanImage*)m_depth_image)->getResource(),
-                                m_depth_image_memory,
-                                0,
-                                1,
-                                1);
+        VulkanUtil::createImage(
+            m_physical_device,
+            m_device,
+            m_swapchain_extent.width,
+            m_swapchain_extent.height,
+            (VkFormat)m_depth_image_format,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            ((VulkanImage*)m_depth_image)->getResource(),
+            m_depth_image_memory,
+            0,
+            1,
+            1
+        );
 
         ((VulkanImageView*)m_depth_image_view)
-            ->setResource(VulkanUtil::createImageView(m_device,
-                                                      ((VulkanImage*)m_depth_image)->getResource(),
-                                                      (VkFormat)m_depth_image_format,
-                                                      VK_IMAGE_ASPECT_DEPTH_BIT,
-                                                      VK_IMAGE_VIEW_TYPE_2D,
-                                                      1,
-                                                      1));
+            ->setResource(VulkanUtil::createImageView(
+                m_device, ((VulkanImage*)m_depth_image)->getResource(), (VkFormat)m_depth_image_format, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D, 1, 1
+            ));
     }
 
     RHISampler* VulkanRHI::getOrCreateDefaultSampler(RHIDefaultSamplerType type)
@@ -2784,11 +2819,13 @@ namespace Piccolo
         return shahder;
     }
 
-    void VulkanRHI::createBuffer(RHIDeviceSize          size,
-                                 RHIBufferUsageFlags    usage,
-                                 RHIMemoryPropertyFlags properties,
-                                 RHIBuffer*&            buffer,
-                                 RHIDeviceMemory*&      buffer_memory)
+    void VulkanRHI::createBuffer(
+        RHIDeviceSize          size,
+        RHIBufferUsageFlags    usage,
+        RHIMemoryPropertyFlags properties,
+        RHIBuffer*&            buffer,
+        RHIDeviceMemory*&      buffer_memory
+    )
     {
         VkBuffer       vk_buffer;
         VkDeviceMemory vk_device_memory;
@@ -2801,13 +2838,15 @@ namespace Piccolo
         ((VulkanDeviceMemory*)buffer_memory)->setResource(vk_device_memory);
     }
 
-    void VulkanRHI::createBufferAndInitialize(RHIBufferUsageFlags    usage,
-                                              RHIMemoryPropertyFlags properties,
-                                              RHIBuffer*&            buffer,
-                                              RHIDeviceMemory*&      buffer_memory,
-                                              RHIDeviceSize          size,
-                                              void*                  data,
-                                              int                    datasize)
+    void VulkanRHI::createBufferAndInitialize(
+        RHIBufferUsageFlags    usage,
+        RHIMemoryPropertyFlags properties,
+        RHIBuffer*&            buffer,
+        RHIDeviceMemory*&      buffer_memory,
+        RHIDeviceSize          size,
+        void*                  data,
+        int                    datasize
+    )
     {
         VkBuffer       vk_buffer;
         VkDeviceMemory vk_device_memory;
@@ -2820,12 +2859,14 @@ namespace Piccolo
         ((VulkanDeviceMemory*)buffer_memory)->setResource(vk_device_memory);
     }
 
-    bool VulkanRHI::createBufferVMA(VmaAllocator                   allocator,
-                                    const RHIBufferCreateInfo*     pBufferCreateInfo,
-                                    const VmaAllocationCreateInfo* pAllocationCreateInfo,
-                                    RHIBuffer*&                    pBuffer,
-                                    VmaAllocation*                 pAllocation,
-                                    VmaAllocationInfo*             pAllocationInfo)
+    bool VulkanRHI::createBufferVMA(
+        VmaAllocator                   allocator,
+        const RHIBufferCreateInfo*     pBufferCreateInfo,
+        const VmaAllocationCreateInfo* pAllocationCreateInfo,
+        RHIBuffer*&                    pBuffer,
+        VmaAllocation*                 pAllocation,
+        VmaAllocationInfo*             pAllocationInfo
+    )
     {
         VkBuffer           vk_buffer;
         VkBufferCreateInfo buffer_create_info {};
@@ -2853,13 +2894,15 @@ namespace Piccolo
         }
     }
 
-    bool VulkanRHI::createBufferWithAlignmentVMA(VmaAllocator                   allocator,
-                                                 const RHIBufferCreateInfo*     pBufferCreateInfo,
-                                                 const VmaAllocationCreateInfo* pAllocationCreateInfo,
-                                                 RHIDeviceSize                  minAlignment,
-                                                 RHIBuffer*&                    pBuffer,
-                                                 VmaAllocation*                 pAllocation,
-                                                 VmaAllocationInfo*             pAllocationInfo)
+    bool VulkanRHI::createBufferWithAlignmentVMA(
+        VmaAllocator                   allocator,
+        const RHIBufferCreateInfo*     pBufferCreateInfo,
+        const VmaAllocationCreateInfo* pAllocationCreateInfo,
+        RHIDeviceSize                  minAlignment,
+        RHIBuffer*&                    pBuffer,
+        VmaAllocation*                 pAllocation,
+        VmaAllocationInfo*             pAllocationInfo
+    )
     {
         VkBuffer           vk_buffer;
         VkBufferCreateInfo buffer_create_info {};
@@ -2896,33 +2939,37 @@ namespace Piccolo
         VulkanUtil::copyBuffer(this, vk_src_buffer, vk_dst_buffer, srcOffset, dstOffset, size);
     }
 
-    void VulkanRHI::createImage(uint32_t               image_width,
-                                uint32_t               image_height,
-                                RHIFormat              format,
-                                RHIImageTiling         image_tiling,
-                                RHIImageUsageFlags     image_usage_flags,
-                                RHIMemoryPropertyFlags memory_property_flags,
-                                RHIImage*&             image,
-                                RHIDeviceMemory*&      memory,
-                                RHIImageCreateFlags    image_create_flags,
-                                uint32_t               array_layers,
-                                uint32_t               miplevels)
+    void VulkanRHI::createImage(
+        uint32_t               image_width,
+        uint32_t               image_height,
+        RHIFormat              format,
+        RHIImageTiling         image_tiling,
+        RHIImageUsageFlags     image_usage_flags,
+        RHIMemoryPropertyFlags memory_property_flags,
+        RHIImage*&             image,
+        RHIDeviceMemory*&      memory,
+        RHIImageCreateFlags    image_create_flags,
+        uint32_t               array_layers,
+        uint32_t               miplevels
+    )
     {
         VkImage        vk_image;
         VkDeviceMemory vk_device_memory;
-        VulkanUtil::createImage(m_physical_device,
-                                m_device,
-                                image_width,
-                                image_height,
-                                (VkFormat)format,
-                                (VkImageTiling)image_tiling,
-                                (VkImageUsageFlags)image_usage_flags,
-                                (VkMemoryPropertyFlags)memory_property_flags,
-                                vk_image,
-                                vk_device_memory,
-                                (VkImageCreateFlags)image_create_flags,
-                                array_layers,
-                                miplevels);
+        VulkanUtil::createImage(
+            m_physical_device,
+            m_device,
+            image_width,
+            image_height,
+            (VkFormat)format,
+            (VkImageTiling)image_tiling,
+            (VkImageUsageFlags)image_usage_flags,
+            (VkMemoryPropertyFlags)memory_property_flags,
+            vk_image,
+            vk_device_memory,
+            (VkImageCreateFlags)image_create_flags,
+            array_layers,
+            miplevels
+        );
 
         image  = new VulkanImage();
         memory = new VulkanDeviceMemory();
@@ -2930,13 +2977,15 @@ namespace Piccolo
         ((VulkanDeviceMemory*)memory)->setResource(vk_device_memory);
     }
 
-    void VulkanRHI::createImageView(RHIImage*           image,
-                                    RHIFormat           format,
-                                    RHIImageAspectFlags image_aspect_flags,
-                                    RHIImageViewType    view_type,
-                                    uint32_t            layout_count,
-                                    uint32_t            miplevels,
-                                    RHIImageView*&      image_view)
+    void VulkanRHI::createImageView(
+        RHIImage*           image,
+        RHIFormat           format,
+        RHIImageAspectFlags image_aspect_flags,
+        RHIImageViewType    view_type,
+        uint32_t            layout_count,
+        uint32_t            miplevels,
+        RHIImageView*&      image_view
+    )
     {
         image_view           = new VulkanImageView();
         VkImage     vk_image = ((VulkanImage*)image)->getResource();
@@ -2946,20 +2995,23 @@ namespace Piccolo
         ((VulkanImageView*)image_view)->setResource(vk_image_view);
     }
 
-    void VulkanRHI::createGlobalImage(RHIImage*&     image,
-                                      RHIImageView*& image_view,
-                                      VmaAllocation& image_allocation,
-                                      uint32_t       texture_image_width,
-                                      uint32_t       texture_image_height,
-                                      void*          texture_image_pixels,
-                                      RHIFormat      texture_image_format,
-                                      uint32_t       miplevels)
+    void VulkanRHI::createGlobalImage(
+        RHIImage*&     image,
+        RHIImageView*& image_view,
+        VmaAllocation& image_allocation,
+        uint32_t       texture_image_width,
+        uint32_t       texture_image_height,
+        void*          texture_image_pixels,
+        RHIFormat      texture_image_format,
+        uint32_t       miplevels
+    )
     {
         VkImage     vk_image;
         VkImageView vk_image_view;
 
         VulkanUtil::createGlobalImage(
-            this, vk_image, vk_image_view, image_allocation, texture_image_width, texture_image_height, texture_image_pixels, texture_image_format, miplevels);
+            this, vk_image, vk_image_view, image_allocation, texture_image_width, texture_image_height, texture_image_pixels, texture_image_format, miplevels
+        );
 
         image      = new VulkanImage();
         image_view = new VulkanImageView();
@@ -2967,20 +3019,23 @@ namespace Piccolo
         ((VulkanImageView*)image_view)->setResource(vk_image_view);
     }
 
-    void VulkanRHI::createCubeMap(RHIImage*&           image,
-                                  RHIImageView*&       image_view,
-                                  VmaAllocation&       image_allocation,
-                                  uint32_t             texture_image_width,
-                                  uint32_t             texture_image_height,
-                                  std::array<void*, 6> texture_image_pixels,
-                                  RHIFormat            texture_image_format,
-                                  uint32_t             miplevels)
+    void VulkanRHI::createCubeMap(
+        RHIImage*&           image,
+        RHIImageView*&       image_view,
+        VmaAllocation&       image_allocation,
+        uint32_t             texture_image_width,
+        uint32_t             texture_image_height,
+        std::array<void*, 6> texture_image_pixels,
+        RHIFormat            texture_image_format,
+        uint32_t             miplevels
+    )
     {
         VkImage     vk_image;
         VkImageView vk_image_view;
 
         VulkanUtil::createCubeMap(
-            this, vk_image, vk_image_view, image_allocation, texture_image_width, texture_image_height, texture_image_pixels, texture_image_format, miplevels);
+            this, vk_image, vk_image_view, image_allocation, texture_image_width, texture_image_height, texture_image_pixels, texture_image_format, miplevels
+        );
 
         image      = new VulkanImage();
         image_view = new VulkanImageView();
@@ -2997,7 +3052,8 @@ namespace Piccolo
         {
             VkImageView vk_image_view;
             vk_image_view = VulkanUtil::createImageView(
-                m_device, m_swapchain_images[i], (VkFormat)m_swapchain_image_format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1, 1);
+                m_device, m_swapchain_images[i], (VkFormat)m_swapchain_image_format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1, 1
+            );
             m_swapchain_imageviews[i] = new VulkanImageView();
             ((VulkanImageView*)m_swapchain_imageviews[i])->setResource(vk_image_view);
         }
@@ -3165,7 +3221,10 @@ namespace Piccolo
         m_swapchain_extent.height = chosen_extent.height;
         m_swapchain_extent.width  = chosen_extent.width;
 
-        m_scissor = {{0, 0}, {m_swapchain_extent.width, m_swapchain_extent.height}};
+        m_scissor = {
+            {                       0,                         0},
+            {m_swapchain_extent.width, m_swapchain_extent.height}
+        };
     }
 
     void VulkanRHI::clearSwapchain()
@@ -3326,10 +3385,12 @@ namespace Piccolo
         createFramebufferImageAndView();
     }
 
-    VkResult VulkanRHI::createDebugUtilsMessengerEXT(VkInstance                                instance,
-                                                     const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                                     const VkAllocationCallbacks*              pAllocator,
-                                                     VkDebugUtilsMessengerEXT*                 pDebugMessenger)
+    VkResult VulkanRHI::createDebugUtilsMessengerEXT(
+        VkInstance                                instance,
+        const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+        const VkAllocationCallbacks*              pAllocator,
+        VkDebugUtilsMessengerEXT*                 pDebugMessenger
+    )
     {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr)
@@ -3458,9 +3519,11 @@ namespace Piccolo
 
     VkFormat VulkanRHI::findDepthFormat()
     {
-        return findSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
-                                   VK_IMAGE_TILING_OPTIMAL,
-                                   VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+        return findSupportedFormat(
+            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
     }
 
     VkFormat VulkanRHI::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)

@@ -26,10 +26,12 @@ else
     exit 1
 fi
 
-# cmake -S . -B build -G "Xcode"
-cmake -S . -B build -G "Xcode" \
+# cmake -S . -B build -G "Xcode" "Ninja"
+cmake -S . -B build -G "Ninja" \
     -D CMAKE_C_COMPILER="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc" \
     -D CMAKE_CXX_COMPILER="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++" \
+    -D CMAKE_TOOLCHAIN_FILE=/Users/rocketsky/LibraryCode/vcpkg/scripts/buildsystems/vcpkg.cmake \
     -D CMAKE_POLICY_VERSION_MINIMUM=3.5 -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 cmake --build build --config "${CONFIG}"
+# open build/Piccolo.xcodeproj

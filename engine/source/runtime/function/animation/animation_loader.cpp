@@ -45,25 +45,25 @@ namespace Piccolo
             SkeletonBinding& vertex_binding = mesh_bind.bind[vertex_index];
             if (vertex_binding.index0 == 0)
             {
-                vertex_binding.index0  = bone_index;
+                vertex_binding.index0  = static_cast<int>(bone_index);
                 vertex_binding.weight0 = weight;
                 return;
             }
             if (vertex_binding.index1 == 0)
             {
-                vertex_binding.index1  = bone_index;
+                vertex_binding.index1  = static_cast<int>(bone_index);
                 vertex_binding.weight1 = weight;
                 return;
             }
             if (vertex_binding.index2 == 0)
             {
-                vertex_binding.index2  = bone_index;
+                vertex_binding.index2  = static_cast<int>(bone_index);
                 vertex_binding.weight2 = weight;
                 return;
             }
             if (vertex_binding.index3 == 0)
             {
-                vertex_binding.index3  = bone_index;
+                vertex_binding.index3  = static_cast<int>(bone_index);
                 vertex_binding.weight3 = weight;
                 return;
             }
