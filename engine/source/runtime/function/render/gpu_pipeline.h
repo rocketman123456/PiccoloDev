@@ -48,6 +48,7 @@ namespace Piccolo
     private:
         void createShaders();
         void createGraphicsPipeline();
+        void createFramebuffers();
 
         // TODO : add pipeline resource
         std::vector<std::string> m_shader_paths;
@@ -59,5 +60,7 @@ namespace Piccolo
         VkDevice         m_device;
         VkPipeline       m_pipeline;
         VkPipelineLayout m_pipeline_layout;
+
+        std::vector<VkFramebuffer> m_swap_chain_framebuffers;
     };
 } // namespace Piccolo

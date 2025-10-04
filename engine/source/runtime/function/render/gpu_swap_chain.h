@@ -26,9 +26,9 @@ namespace Piccolo
         void createSwapchain(VkDevice device, VkSurfaceKHR surface);
         void createImageViews(VkDevice device);
 
-        VkSurfaceFormatKHR      chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats);
-        VkPresentModeKHR        chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes);
-        VkExtent2D              chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats);
+        VkPresentModeKHR   chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes);
+        VkExtent2D         chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
         VkPhysicalDevice m_physical_device;
         VkDevice         m_logical_device;
