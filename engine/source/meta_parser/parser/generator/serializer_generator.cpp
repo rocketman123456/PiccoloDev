@@ -105,7 +105,7 @@ namespace Generator
             enum_def.set("enum_name", enum_temp->getName());
             enum_def.set("enum_qualified_name", enum_temp->getQualifiedName());
             enum_def.set("enum_display_name", enum_temp->getDisplayName());
-            
+
             enum_defines.push_back(enum_def);
         }
 

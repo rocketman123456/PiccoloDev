@@ -3,16 +3,16 @@
 #include "runtime/core/meta/reflection/reflection.h"
 
 #include <cassert>
-#include <vector>
 #include <map>
 #include <unordered_map>
+#include <vector>
 
 // Forward declarations for enums
 namespace Piccolo
 {
     enum class TestEnum : int;
     enum class StatusEnum;
-}
+} // namespace Piccolo
 
 namespace Piccolo
 {
@@ -25,7 +25,10 @@ namespace Piccolo
         template<typename T>
         static Json writePointer(T* instance)
         {
-            return Json::object {{"$typeName", Json {"*"}}, {"$context", Serializer::write(*instance)}};
+            return Json::object {
+                {"$typeName",                   Json {"*"}},
+                { "$context", Serializer::write(*instance)}
+            };
         }
 
         template<typename T>
@@ -41,8 +44,7 @@ namespace Piccolo
             }
             else
             {
-                instance = static_cast<T*>(
-                    Reflection::TypeMeta::newFromNameAndJson(type_name, json_context["$context"]).m_instance);
+                instance = static_cast<T*>(Reflection::TypeMeta::newFromNameAndJson(type_name, json_context["$context"]).m_instance);
             }
             return instance;
         }
@@ -52,8 +54,10 @@ namespace Piccolo
         {
             T*          instance_ptr = static_cast<T*>(instance.operator->());
             std::string type_name    = instance.getTypeName();
-            return Json::object {{"$typeName", Json(type_name)},
-                                  {"$context", Reflection::TypeMeta::writeByName(type_name, instance_ptr)}};
+            return Json::object {
+                {"$typeName", Json(type_name)},
+                {"$context", Reflection::TypeMeta::writeByName(type_name, instance_ptr)}
+            };
         }
 
         template<typename T>
@@ -128,7 +132,7 @@ namespace Piccolo
             for (const auto& pair : instance)
             {
                 std::string key_str = std::to_string(pair.first);
-                map_json[key_str] = Serializer::write(pair.second);
+                map_json[key_str]   = Serializer::write(pair.second);
             }
             return Json(map_json);
         }
@@ -157,7 +161,7 @@ namespace Piccolo
             for (const auto& pair : instance)
             {
                 std::string key_str = std::to_string(pair.first);
-                map_json[key_str] = Serializer::write(pair.second);
+                map_json[key_str]   = Serializer::write(pair.second);
             }
             return Json(map_json);
         }

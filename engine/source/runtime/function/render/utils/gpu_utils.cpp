@@ -75,9 +75,10 @@ namespace Piccolo
         std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families.data());
 
-        int i = 0;
-        for (const auto& queue_family : queue_families)
+        for (int i = 0; i < static_cast<int>(queue_families.size()); i++)
         {
+            const auto& queue_family = queue_families[i];
+
             if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {
                 indices.graphics_family = i;
@@ -100,8 +101,6 @@ namespace Piccolo
             {
                 break;
             }
-
-            i++;
         }
         return indices;
     }

@@ -45,6 +45,10 @@ namespace Piccolo
         GPUPipeline(VkDevice device, const GPUPipelineConfig& config);
         ~GPUPipeline();
 
+        VkPipeline                 getPipeline() const { return m_pipeline; }
+        VkPipelineLayout           getPipelineLayout() const { return m_pipeline_layout; }
+        std::vector<VkFramebuffer> getSwapChainFramebuffers() const { return m_swap_chain_framebuffers; }
+
     private:
         void createShaders();
         void createGraphicsPipeline();

@@ -14,18 +14,18 @@ std::string CursorType::GetDisplayName(void) const
     Utils::toString(clang_getTypeSpelling(m_handle), display_name);
 
     // For template types, try to get a more complete type name
-    // if (display_name.empty() || (display_name.find('<') == std::string::npos && m_handle.kind == CXType_Unexposed))
-    // {
-    //     // Try to get the canonical type
-    //     CXType canonical_type = clang_getCanonicalType(m_handle);
-    //     std::string canonical_name;
-    //     Utils::toString(clang_getTypeSpelling(canonical_type), canonical_name);
-    //
-    //     if (!canonical_name.empty() && canonical_name != display_name)
-    //     {
-    //         display_name = canonical_name;
-    //     }
-    // }
+    if (display_name.empty() || (display_name.find('<') == std::string::npos && m_handle.kind == CXType_Unexposed))
+    {
+        // Try to get the canonical type
+        CXType canonical_type = clang_getCanonicalType(m_handle);
+        std::string canonical_name;
+        Utils::toString(clang_getTypeSpelling(canonical_type), canonical_name);
+    
+        if (!canonical_name.empty() && canonical_name != display_name)
+        {
+            display_name = canonical_name;
+        }
+    }
 
     return display_name;
 }

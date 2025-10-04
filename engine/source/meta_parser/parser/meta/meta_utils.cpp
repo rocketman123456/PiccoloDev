@@ -22,16 +22,16 @@ namespace Utils
         std::string&& type_name = type.GetDisplayName();
         
         // For template types, try to get the canonical type spelling
-        // if (type_name.empty() || type_name.find('<') == std::string::npos)
-        // {
-        //     // Try to get the canonical type
-        //     auto canonical_type = type.GetCanonicalType();
-        //     std::string canonical_name = canonical_type.GetDisplayName();
-        //     if (!canonical_name.empty() && canonical_name != type_name)
-        //     {
-        //         type_name = canonical_name;
-        //     }
-        // }
+        if (type_name.empty() || type_name.find('<') == std::string::npos)
+        {
+            // Try to get the canonical type
+            auto canonical_type = type.GetCanonicalType();
+            std::string canonical_name = canonical_type.GetDisplayName();
+            if (!canonical_name.empty() && canonical_name != type_name)
+            {
+                type_name = canonical_name;
+            }
+        }
         
         return type_name;
     }

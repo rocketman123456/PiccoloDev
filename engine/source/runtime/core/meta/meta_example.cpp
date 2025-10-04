@@ -55,39 +55,39 @@ namespace Piccolo
         // Test3 example with std::map and std::unordered_map
         Test3 test3_in;
         test3_in.m_int = 42;
-        
+
         // Add some data to the map
         test3_in.m_int_map[1] = 100;
         test3_in.m_int_map[2] = 200;
         test3_in.m_int_map[3] = 300;
-        
+
         // Add some data to the unordered_map
         test3_in.m_int_unordered_map[10] = 1000;
         test3_in.m_int_unordered_map[20] = 2000;
         test3_in.m_int_unordered_map[30] = 3000;
 
         // Serialize Test3
-        auto test3_json_in = Serializer::write(test3_in);
+        auto        test3_json_in = Serializer::write(test3_in);
         std::string test3_context = test3_json_in.dump();
-        
+
         LOG_INFO("Test3 serialized:");
         LOG_INFO(test3_context.c_str());
 
         // Deserialize Test3
-        Test3 test3_out;
+        Test3  test3_out;
         auto&& test3_json = Json::parse(test3_context, err);
         Serializer::read(test3_json, test3_out);
-        
+
         LOG_INFO("Test3 deserialized - m_int: {}", test3_out.m_int);
         LOG_INFO("Test3 map size: {}", test3_out.m_int_map.size());
         LOG_INFO("Test3 unordered_map size: {}", test3_out.m_int_unordered_map.size());
-        
+
         // Verify map contents
         for (const auto& pair : test3_out.m_int_map)
         {
             LOG_INFO("Map[{}] = {}", pair.first, pair.second);
         }
-        
+
         // Verify unordered_map contents
         for (const auto& pair : test3_out.m_int_unordered_map)
         {
@@ -96,22 +96,22 @@ namespace Piccolo
 
         // Test enum serialization and deserialization
         TestWithEnum test_enum_in;
-        test_enum_in.m_test_enum = TestEnum::Value2;
+        test_enum_in.m_test_enum   = TestEnum::Value2;
         test_enum_in.m_status_enum = StatusEnum::Running;
         test_enum_in.m_regular_int = 123;
 
         // Serialize TestWithEnum
-        auto test_enum_json_in = Serializer::write(test_enum_in);
+        auto        test_enum_json_in = Serializer::write(test_enum_in);
         std::string test_enum_context = test_enum_json_in.dump();
-        
+
         LOG_INFO("TestWithEnum serialized:");
-        LOG_INFO(test_enum_context.c_str());
+        LOG_INFO(test_enum_context);
 
         // Deserialize TestWithEnum
         TestWithEnum test_enum_out;
-        auto&& test_enum_json = Json::parse(test_enum_context, err);
+        auto&&       test_enum_json = Json::parse(test_enum_context, err);
         Serializer::read(test_enum_json, test_enum_out);
-        
+
         LOG_INFO("TestWithEnum deserialized:");
         LOG_INFO("m_test_enum: {}", static_cast<int>(test_enum_out.m_test_enum));
         LOG_INFO("m_status_enum: {}", static_cast<int>(test_enum_out.m_status_enum));
@@ -136,7 +136,7 @@ namespace Piccolo
                     auto  typeMetaItem   = Reflection::TypeMeta::newMetaFromName(array_accesser.getElementTypeName());
                     for (int index = 0; index < count; ++index)
                     {
-                        std::cout << ":L:" << index << ":R:" << (int*)array_accesser.get(index, field_instance) << std::endl;
+                        std::cout << ":L:" << index << ":R:" << static_cast<int*>(array_accesser.get(index, field_instance)) << std::endl;
                     }
                 }
             }

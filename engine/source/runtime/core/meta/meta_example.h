@@ -72,9 +72,9 @@ namespace Piccolo
         REFLECTION_BODY(TestWithEnum);
 
     public:
-        TestEnum   m_test_enum;      // 带值的枚举
-        StatusEnum m_status_enum;    // 默认值枚举
-        int        m_regular_int;    // 普通字段
+        TestEnum   m_test_enum;   // 带值的枚举
+        StatusEnum m_status_enum; // 默认值枚举
+        int        m_regular_int; // 普通字段
     };
 
     void metaExample();

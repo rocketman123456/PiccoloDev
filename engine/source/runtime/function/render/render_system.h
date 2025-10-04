@@ -9,6 +9,8 @@ namespace Piccolo
     class GPUSwapChain;
     class GPUPipeline;
     class GPURenderPass;
+    class GPUCommandPool;
+    class GPUSyncObject;
 
     class RenderSystem
     {
@@ -20,17 +22,23 @@ namespace Piccolo
         void clear();
         void tick(float dt);
 
-        std::shared_ptr<GPUContext>    getContext() const { return m_context; }
-        std::shared_ptr<GPUDevice>     getDevice() const { return m_device; }
-        std::shared_ptr<GPUSwapChain>  getSwapChain() const { return m_swap_chain; }
-        std::shared_ptr<GPUPipeline>   getPipeline() const { return m_pipeline; }
-        std::shared_ptr<GPURenderPass> getRenderPass() const { return m_render_pass; }
+        std::shared_ptr<GPUContext>     getContext() const { return m_context; }
+        std::shared_ptr<GPUDevice>      getDevice() const { return m_device; }
+        std::shared_ptr<GPUSwapChain>   getSwapChain() const { return m_swap_chain; }
+        std::shared_ptr<GPUPipeline>    getPipeline() const { return m_pipeline; }
+        std::shared_ptr<GPURenderPass>  getRenderPass() const { return m_render_pass; }
+        std::shared_ptr<GPUCommandPool> getCommandPool() const { return m_command_pool; }
+        std::shared_ptr<GPUSyncObject>  getSyncObject() const { return m_sync_object; }
 
     private:
-        std::shared_ptr<GPUContext>    m_context;
-        std::shared_ptr<GPUDevice>     m_device;
-        std::shared_ptr<GPUSwapChain>  m_swap_chain;
-        std::shared_ptr<GPUPipeline>   m_pipeline;
-        std::shared_ptr<GPURenderPass> m_render_pass;
+        std::shared_ptr<GPUContext>     m_context;
+        std::shared_ptr<GPUDevice>      m_device;
+        std::shared_ptr<GPUSwapChain>   m_swap_chain;
+        std::shared_ptr<GPUPipeline>    m_pipeline;
+        std::shared_ptr<GPURenderPass>  m_render_pass;
+        std::shared_ptr<GPUCommandPool> m_command_pool;
+        std::shared_ptr<GPUSyncObject>  m_sync_object;
+
+        uint32_t m_current_frame = 0; // 当前帧索引
     };
 } // namespace Piccolo

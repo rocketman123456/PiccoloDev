@@ -85,6 +85,8 @@ namespace Piccolo
         g_runtime_global_context.m_window_system->pollEvents();
         g_runtime_global_context.m_window_system->setTitle(std::string("Piccolo - " + std::to_string(getFPS()) + " FPS").c_str());
 
+        rendererTick(delta_time);
+
         const bool should_window_close = g_runtime_global_context.m_window_system->shouldClose();
         return !should_window_close;
     }
