@@ -26,24 +26,31 @@ namespace Piccolo
 
     void RenderSystem::initialize(RenderSystemInitInfo init_info)
     {
+        LOG_INFO("开始初始化渲染系统...");
+        
+        // 获取必要的管理器
         std::shared_ptr<ConfigManager> config_manager = g_runtime_global_context.m_config_manager;
         ASSERT(config_manager);
         std::shared_ptr<AssetManager> asset_manager = g_runtime_global_context.m_asset_manager;
         ASSERT(asset_manager);
 
-        // render context initialize
+        // ========== 初始化渲染硬件接口(RHI) ==========
+        LOG_INFO("初始化渲染硬件接口...");
         RHIInitInfo rhi_init_info;
         rhi_init_info.window_system = init_info.window_system;
 
         m_rhi = std::make_shared<VulkanRHI>();
         m_rhi->initialize(rhi_init_info);
+        LOG_INFO("RHI初始化成功");
 
-        // global rendering resource
+        // ========== 加载全局渲染资源 ==========
+        LOG_INFO("加载全局渲染资源...");
         GlobalRenderingRes global_rendering_res;
         const std::string& global_rendering_res_url = config_manager->getGlobalRenderingResUrl();
+        
         asset_manager->loadAsset(global_rendering_res_url, global_rendering_res);
 
-        // upload ibl, color grading textures
+        // 准备IBL和颜色分级纹理数据
         LevelResourceDesc level_resource_desc;
         level_resource_desc.m_ibl_resource_desc.m_skybox_irradiance_map       = global_rendering_res.m_skybox_irradiance_map;
         level_resource_desc.m_ibl_resource_desc.m_skybox_specular_map         = global_rendering_res.m_skybox_specular_map;
@@ -86,35 +93,49 @@ namespace Piccolo
 
     void RenderSystem::tick(float delta_time)
     {
-        // process swap data between logic and render contexts
+        // 验证渲染系统组件是否已初始化
+        if (!m_rhi || !m_render_resource || !m_render_scene || !m_render_camera || !m_render_pipeline) {
+            LOG_ERROR("渲染系统组件未完全初始化，跳过渲染");
+            return;
+        }
+
+        // ========== 数据交换阶段 ==========
+        // 处理逻辑线程和渲染线程之间的数据交换
         processSwapData();
 
-        // prepare render command context
+        // ========== 渲染准备阶段 ==========
+        // 准备渲染命令上下文
         m_rhi->prepareContext();
 
-        // update per-frame buffer
+        // 更新每帧缓冲区数据（相机矩阵、光照信息等）
         m_render_resource->updatePerFrameBuffer(m_render_scene, m_render_camera);
 
-        // update per-frame visible objects
+        // 更新可见对象列表（视锥剔除、遮挡剔除等）
         m_render_scene->updateVisibleObjects(std::static_pointer_cast<RenderResource>(m_render_resource), m_render_camera);
 
-        // prepare pipeline's render passes data
+        // 准备渲染通道数据（着色器参数、纹理绑定等）
         m_render_pipeline->preparePassData(m_render_resource);
 
+        // ========== 调试绘制阶段 ==========
+        // 更新调试绘制管理器
         g_runtime_global_context.m_debugdraw_manager->tick(delta_time);
 
-        // render one frame
-        if (m_render_pipeline_type == RENDER_PIPELINE_TYPE::FORWARD_PIPELINE)
-        {
-            m_render_pipeline->forwardRender(m_rhi, m_render_resource);
-        }
-        else if (m_render_pipeline_type == RENDER_PIPELINE_TYPE::DEFERRED_PIPELINE)
-        {
-            m_render_pipeline->deferredRender(m_rhi, m_render_resource);
-        }
-        else
-        {
-            LOG_ERROR(__FUNCTION__, "unsupported render pipeline type");
+        // ========== 渲染执行阶段 ==========
+        // 根据管线类型执行相应的渲染流程
+        switch (m_render_pipeline_type) {
+            case RENDER_PIPELINE_TYPE::FORWARD_PIPELINE:
+                LOG_DEBUG("执行前向渲染管线");
+                m_render_pipeline->forwardRender(m_rhi, m_render_resource);
+                break;
+                
+            case RENDER_PIPELINE_TYPE::DEFERRED_PIPELINE:
+                LOG_DEBUG("执行延迟渲染管线");
+                m_render_pipeline->deferredRender(m_rhi, m_render_resource);
+                break;
+                
+            default:
+                LOG_ERROR("不支持的渲染管线类型: {}", static_cast<int>(m_render_pipeline_type));
+                break;
         }
     }
 

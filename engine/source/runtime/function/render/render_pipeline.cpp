@@ -18,7 +18,7 @@
 
 namespace Piccolo
 {
-    void RenderPipeline::initialize(RenderPipelineInitInfo init_info)
+    bool RenderPipeline::initialize(RenderPipelineInitInfo init_info)
     {
         m_point_light_shadow_pass = std::make_shared<PointLightShadowPass>();
         m_directional_light_pass  = std::make_shared<DirectionalLightShadowPass>();
@@ -52,7 +52,7 @@ namespace Piccolo
         m_directional_light_pass->initialize(nullptr);
 
         std::shared_ptr<MainCameraPass> main_camera_pass  = std::static_pointer_cast<MainCameraPass>(m_main_camera_pass);
-        std::shared_ptr<RenderPass>     _main_camera_pass = std::static_pointer_cast<RenderPass>(m_main_camera_pass);
+        std::shared_ptr<RenderPass>     main_camera_pass_render = std::static_pointer_cast<RenderPass>(m_main_camera_pass);
         std::shared_ptr<ParticlePass>   particle_pass     = std::static_pointer_cast<ParticlePass>(m_particle_pass);
 
         ParticlePassInitInfo particle_init_info {};
@@ -71,7 +71,7 @@ namespace Piccolo
 
         std::static_pointer_cast<ParticlePass>(m_particle_pass)->setupParticlePass();
 
-        std::vector<RHIDescriptorSetLayout*> descriptor_layouts = _main_camera_pass->getDescriptorSetLayouts();
+        std::vector<RHIDescriptorSetLayout*> descriptor_layouts = main_camera_pass_render->getDescriptorSetLayouts();
         std::static_pointer_cast<PointLightShadowPass>(m_point_light_shadow_pass)->setPerMeshLayout(descriptor_layouts[MainCameraPass::LayoutType::_per_mesh]);
         std::static_pointer_cast<DirectionalLightShadowPass>(m_directional_light_pass)
             ->setPerMeshLayout(descriptor_layouts[MainCameraPass::LayoutType::_per_mesh]);
@@ -80,28 +80,28 @@ namespace Piccolo
         m_directional_light_pass->postInitialize();
 
         ToneMappingPassInitInfo tone_mapping_init_info;
-        tone_mapping_init_info.render_pass      = _main_camera_pass->getRenderPass();
-        tone_mapping_init_info.input_attachment = _main_camera_pass->getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd];
+        tone_mapping_init_info.render_pass      = main_camera_pass_render->getRenderPass();
+        tone_mapping_init_info.input_attachment = main_camera_pass_render->getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd];
         m_tone_mapping_pass->initialize(&tone_mapping_init_info);
 
         ColorGradingPassInitInfo color_grading_init_info;
-        color_grading_init_info.render_pass      = _main_camera_pass->getRenderPass();
-        color_grading_init_info.input_attachment = _main_camera_pass->getFramebufferImageViews()[_main_camera_pass_backup_buffer_even];
+        color_grading_init_info.render_pass      = main_camera_pass_render->getRenderPass();
+        color_grading_init_info.input_attachment = main_camera_pass_render->getFramebufferImageViews()[_main_camera_pass_backup_buffer_even];
         m_color_grading_pass->initialize(&color_grading_init_info);
 
         VignettePassInitInfo vignette_init_info;
-        vignette_init_info.render_pass      = _main_camera_pass->getRenderPass();
-        vignette_init_info.input_attachment = _main_camera_pass->getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd];
+        vignette_init_info.render_pass      = main_camera_pass_render->getRenderPass();
+        vignette_init_info.input_attachment = main_camera_pass_render->getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd];
         m_vignette_pass->initialize(&vignette_init_info);
 
         UIPassInitInfo ui_init_info;
-        ui_init_info.render_pass = _main_camera_pass->getRenderPass();
+        ui_init_info.render_pass = main_camera_pass_render->getRenderPass();
         m_ui_pass->initialize(&ui_init_info);
 
         CombineUIPassInitInfo combine_ui_init_info;
-        combine_ui_init_info.render_pass            = _main_camera_pass->getRenderPass();
-        combine_ui_init_info.scene_input_attachment = _main_camera_pass->getFramebufferImageViews()[_main_camera_pass_backup_buffer_even];
-        combine_ui_init_info.ui_input_attachment    = _main_camera_pass->getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd];
+        combine_ui_init_info.render_pass            = main_camera_pass_render->getRenderPass();
+        combine_ui_init_info.scene_input_attachment = main_camera_pass_render->getFramebufferImageViews()[_main_camera_pass_backup_buffer_even];
+        combine_ui_init_info.ui_input_attachment    = main_camera_pass_render->getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd];
         m_combine_ui_pass->initialize(&combine_ui_init_info);
 
         PickPassInitInfo pick_init_info;
@@ -109,12 +109,14 @@ namespace Piccolo
         m_pick_pass->initialize(&pick_init_info);
 
         FXAAPassInitInfo fxaa_init_info;
-        fxaa_init_info.render_pass      = _main_camera_pass->getRenderPass();
-        fxaa_init_info.input_attachment = _main_camera_pass->getFramebufferImageViews()[_main_camera_pass_post_process_buffer_even];
+        fxaa_init_info.render_pass      = main_camera_pass_render->getRenderPass();
+        fxaa_init_info.input_attachment = main_camera_pass_render->getFramebufferImageViews()[_main_camera_pass_post_process_buffer_even];
         m_fxaa_pass->initialize(&fxaa_init_info);
+        
+        return true;
     }
 
-    void RenderPipeline::forwardRender(std::shared_ptr<RHI> rhi, std::shared_ptr<RenderResourceBase> render_resource)
+    bool RenderPipeline::forwardRender(std::shared_ptr<RHI> rhi, std::shared_ptr<RenderResourceBase> render_resource)
     {
         VulkanRHI*      vulkan_rhi      = static_cast<VulkanRHI*>(rhi.get());
         RenderResource* vulkan_resource = static_cast<RenderResource*>(render_resource.get());
@@ -128,7 +130,7 @@ namespace Piccolo
         bool recreate_swapchain = vulkan_rhi->prepareBeforePass(std::bind(&RenderPipeline::passUpdateAfterRecreateSwapchain, this));
         if (recreate_swapchain)
         {
-            return;
+            return false;
         }
 
         static_cast<DirectionalLightShadowPass*>(m_directional_light_pass.get())->draw();
@@ -163,9 +165,11 @@ namespace Piccolo
         vulkan_rhi->submitRendering(std::bind(&RenderPipeline::passUpdateAfterRecreateSwapchain, this));
         static_cast<ParticlePass*>(m_particle_pass.get())->copyNormalAndDepthImage();
         static_cast<ParticlePass*>(m_particle_pass.get())->simulate();
+        
+        return true;
     }
 
-    void RenderPipeline::deferredRender(std::shared_ptr<RHI> rhi, std::shared_ptr<RenderResourceBase> render_resource)
+    bool RenderPipeline::deferredRender(std::shared_ptr<RHI> rhi, std::shared_ptr<RenderResourceBase> render_resource)
     {
         VulkanRHI*      vulkan_rhi      = static_cast<VulkanRHI*>(rhi.get());
         RenderResource* vulkan_resource = static_cast<RenderResource*>(render_resource.get());
@@ -179,7 +183,7 @@ namespace Piccolo
         bool recreate_swapchain = vulkan_rhi->prepareBeforePass(std::bind(&RenderPipeline::passUpdateAfterRecreateSwapchain, this));
         if (recreate_swapchain)
         {
-            return;
+            return false;
         }
 
         static_cast<DirectionalLightShadowPass*>(m_directional_light_pass.get())->draw();
@@ -214,6 +218,8 @@ namespace Piccolo
         vulkan_rhi->submitRendering(std::bind(&RenderPipeline::passUpdateAfterRecreateSwapchain, this));
         static_cast<ParticlePass*>(m_particle_pass.get())->copyNormalAndDepthImage();
         static_cast<ParticlePass*>(m_particle_pass.get())->simulate();
+        
+        return true;
     }
 
     void RenderPipeline::passUpdateAfterRecreateSwapchain()
@@ -256,5 +262,12 @@ namespace Piccolo
     {
         MainCameraPass& main_camera_pass = *(static_cast<MainCameraPass*>(m_main_camera_pass.get()));
         main_camera_pass.m_selected_axis = selected_axis;
+    }
+
+    bool RenderPipeline::initializeRenderPasses(RenderPipelineInitInfo /* init_info */)
+    {
+        // 这个方法已经在initialize中实现了所有渲染通道的初始化
+        // 这里只是返回true表示成功
+        return true;
     }
 } // namespace Piccolo

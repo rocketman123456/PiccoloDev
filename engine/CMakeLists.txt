@@ -1,7 +1,7 @@
 
 set(ENGINE_ROOT_DIR "${PICCOLO_ROOT_DIR}/engine")
 set(THIRD_PARTY_DIR "${ENGINE_ROOT_DIR}/3rdparty")
-set(ENGINE_ASSET_DIR "/asset")
+set(ENGINE_ASSET_DIR "asset")
 
 set(DEPLOY_CONFIG_DIR "configs/deployment")
 set(DEVELOP_CONFIG_DIR "configs/development")
