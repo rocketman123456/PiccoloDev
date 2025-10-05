@@ -43,7 +43,6 @@ namespace Piccolo
         // Each frame can only be called once
         float calculateDeltaTime();
 
-    protected:
         bool m_is_quit {false};
 
         std::chrono::steady_clock::time_point m_last_tick_time_point {std::chrono::steady_clock::now()};

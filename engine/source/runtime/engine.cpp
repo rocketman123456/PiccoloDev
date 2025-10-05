@@ -10,8 +10,10 @@
 
 #include "runtime/function/event/event_system.h"
 
-#include "runtime/function/render/window_system.h"
+#include "runtime/function/render/profiler/gpu_profiler.h"
+#include "runtime/function/render/profiler/gpu_timestamp.h"
 #include "runtime/function/render/render_system.h"
+#include "runtime/function/render/window_system.h"
 
 namespace Piccolo
 {
@@ -100,6 +102,7 @@ namespace Piccolo
     bool PiccoloEngine::rendererTick(float delta_time)
     {
         g_runtime_global_context.m_render_system->tick(delta_time);
+
         return true;
     }
 

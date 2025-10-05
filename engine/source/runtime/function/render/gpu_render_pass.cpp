@@ -1,5 +1,6 @@
 #include "runtime/function/render/gpu_render_pass.h"
 #include "runtime/function/render/gpu_swap_chain.h"
+#include "runtime/function/render/utils/gpu_render_pass_builder.h"
 
 #include "runtime/core/base/macro.h"
 
@@ -10,10 +11,17 @@
 
 namespace Piccolo
 {
+    // 使用新的构建器创建渲染通道
+    GPURenderPass::GPURenderPass(VkDevice device, const GPURenderPassConfig& config)
+    {
+        m_device = device;
+        createRenderPassWithBuilder(config);
+    }
+
+    // 保持向后兼容的构造函数
     GPURenderPass::GPURenderPass(VkDevice device)
     {
         m_device = device;
-
         createRenderPass();
     }
 
@@ -69,5 +77,50 @@ namespace Piccolo
         {
             LOG_ERROR("failed to create render pass!");
         }
+    }
+
+    void GPURenderPass::createRenderPassWithBuilder(const GPURenderPassConfig& config)
+    {
+        GPURenderPassBuilder builder(m_device);
+        
+        // 应用配置
+        builder.setName(config.name)
+               .setDescription(config.description);
+        
+        for (const auto& attachment : config.attachments)
+        {
+            builder.addColorAttachment(attachment);
+        }
+        
+        for (const auto& subpass : config.subpasses)
+        {
+            builder.addSubpass(subpass);
+        }
+        
+        for (const auto& dependency : config.dependencies)
+        {
+            builder.addDependency(dependency);
+        }
+        
+        m_render_pass = builder.build();
+    }
+
+    // 静态工厂方法实现
+    std::shared_ptr<GPURenderPass> GPURenderPass::createBasicColorPass(VkDevice device, VkFormat color_format)
+    {
+        auto config = GPURenderPassConfigFactory::createBasicColorPass(color_format);
+        return std::make_shared<GPURenderPass>(device, config);
+    }
+
+    std::shared_ptr<GPURenderPass> GPURenderPass::createDepthColorPass(VkDevice device, VkFormat color_format, VkFormat depth_format)
+    {
+        auto config = GPURenderPassConfigFactory::createDepthColorPass(color_format, depth_format);
+        return std::make_shared<GPURenderPass>(device, config);
+    }
+
+    std::shared_ptr<GPURenderPass> GPURenderPass::createMultisamplePass(VkDevice device, VkFormat color_format, VkFormat depth_format, VkSampleCountFlagBits samples)
+    {
+        auto config = GPURenderPassConfigFactory::createMultisamplePass(color_format, depth_format, samples);
+        return std::make_shared<GPURenderPass>(device, config);
     }
 } // namespace Piccolo

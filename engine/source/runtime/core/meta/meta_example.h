@@ -51,6 +51,7 @@ namespace Piccolo
         REFLECTION_BODY(Test2);
 
     public:
+        std::vector<int>                                 m_int_vector;
         std::vector<Reflection::ReflectionPtr<BaseTest>> m_test_base_array;
     };
 

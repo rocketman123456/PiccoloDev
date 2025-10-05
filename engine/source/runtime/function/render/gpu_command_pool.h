@@ -1,7 +1,7 @@
 #pragma once
 
+#define VK_NO_PROTOTYPES
 #include <volk.h>
-// #include <vulkan/vulkan.h>
 #include <vector>
 
 namespace Piccolo
@@ -15,7 +15,7 @@ namespace Piccolo
         VkCommandBuffer getCommandBuffer(uint32_t frame_index) const { return m_command_buffers[frame_index]; }
         VkCommandPool   getCommandPool() const { return m_command_pool; }
 
-        void recordCommandBuffer(VkCommandBuffer command_buffer, int image_index);
+        void recordRenderCommands(VkCommandBuffer command_buffer, int image_index);
 
     private:
         void createCommandPool();

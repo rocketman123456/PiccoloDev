@@ -3,6 +3,7 @@
 #include "runtime/function/render/gpu_pipeline.h"
 #include "runtime/function/render/gpu_render_pass.h"
 #include "runtime/function/render/gpu_swap_chain.h"
+#include "runtime/function/render/profiler/gpu_profiler.h"
 
 #include "runtime/core/base/macro.h"
 
@@ -36,6 +37,7 @@ namespace Piccolo
         info.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         info.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         info.queueFamilyIndex = queue_family_index;
+        info.pNext            = nullptr;
 
         if (vkCreateCommandPool(m_device, &info, nullptr, &m_command_pool) != VK_SUCCESS)
         {
@@ -59,22 +61,17 @@ namespace Piccolo
         }
     }
 
-    void GPUCommandPool::recordCommandBuffer(VkCommandBuffer command_buffer, int image_index)
+    void GPUCommandPool::recordRenderCommands(VkCommandBuffer command_buffer, int image_index)
     {
-        VkCommandBufferBeginInfo begin_info {};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-        if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS)
-        {
-            LOG_ERROR("failed to begin recording command buffer!");
-            return;
-        }
+        // 注意：命令缓冲区应该已经在外部开始记录了
 
         auto render_pass       = g_runtime_global_context.m_render_system->getRenderPass()->getRenderPass();
         auto swap_chain_extent = g_runtime_global_context.m_render_system->getSwapChain()->getExtent();
         auto graphics_pipeline = g_runtime_global_context.m_render_system->getPipeline()->getPipeline();
         auto framebuffer       = g_runtime_global_context.m_render_system->getPipeline()->getSwapChainFramebuffers()[image_index];
         auto extent            = g_runtime_global_context.m_render_system->getSwapChain()->getExtent();
+        auto profiler          = g_runtime_global_context.m_render_system->getGPUProfiler();
+        auto current_frame     = g_runtime_global_context.m_render_system->getCurrentFrame();
 
         VkRenderPassBeginInfo render_pass_info {};
         render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -87,10 +84,18 @@ namespace Piccolo
         render_pass_info.clearValueCount = 1;
         render_pass_info.pClearValues    = &clear_color;
 
+        // 开始渲染通道性能分析
+        profiler->beginTimestamp(command_buffer, current_frame, "Render Pass");
+        
         vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
         {
+            // 开始管道绑定性能分析
+            profiler->beginTimestamp(command_buffer, current_frame, "Pipeline Bind");
             vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+            profiler->endTimestamp(command_buffer, current_frame);
 
+            // 开始视口设置性能分析
+            profiler->beginTimestamp(command_buffer, current_frame, "Viewport Setup");
             VkViewport viewport {};
             viewport.x        = 0.0f;
             viewport.y        = 0.0f;
@@ -104,14 +109,16 @@ namespace Piccolo
             scissor.offset = {0, 0};
             scissor.extent = extent;
             vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+            profiler->endTimestamp(command_buffer, current_frame);
 
+            // 开始绘制性能分析
+            profiler->beginTimestamp(command_buffer, current_frame, "Draw Call");
             vkCmdDraw(command_buffer, 3, 1, 0, 0);
+            profiler->endTimestamp(command_buffer, current_frame);
         }
         vkCmdEndRenderPass(command_buffer);
-
-        if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS)
-        {
-            LOG_ERROR("failed to record command buffer!");
-        }
+        
+        // 结束渲染通道性能分析
+        profiler->endTimestamp(command_buffer, current_frame);
     }
 } // namespace Piccolo

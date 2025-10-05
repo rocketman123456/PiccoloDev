@@ -20,19 +20,19 @@ namespace Utils
     std::string getTypeNameWithoutNamespace(const CursorType& type)
     {
         std::string&& type_name = type.GetDisplayName();
-        
+
         // For template types, try to get the canonical type spelling
         if (type_name.empty() || type_name.find('<') == std::string::npos)
         {
             // Try to get the canonical type
-            auto canonical_type = type.GetCanonicalType();
+            auto        canonical_type = type.GetCanonicalType();
             std::string canonical_name = canonical_type.GetDisplayName();
             if (!canonical_name.empty() && canonical_name != type_name)
             {
                 type_name = canonical_name;
             }
         }
-        
+
         return type_name;
     }
 
@@ -49,10 +49,7 @@ namespace Utils
         return name;
     }
 
-    std::string getQualifiedName(const Cursor& cursor, const Namespace& current_namespace)
-    {
-        return getQualifiedName(cursor.getSpelling(), current_namespace);
-    }
+    std::string getQualifiedName(const Cursor& cursor, const Namespace& current_namespace) { return getQualifiedName(cursor.getSpelling(), current_namespace); }
 
     std::string formatQualifiedName(std::string& source_string)
     {
@@ -60,6 +57,7 @@ namespace Utils
         Utils::replace(source_string, ':', 'S');
         Utils::replace(source_string, '>', 'R');
         Utils::replace(source_string, '*', 'P');
+        Utils::replace(source_string, ',', 'C');
         return source_string;
     }
 
@@ -179,21 +177,12 @@ namespace Utils
         }
     }
 
-    bool isVectorContainer(std::string type_name)
-    {
-        return type_name.find("std::vector<") == 0;
-    }
+    bool isVectorContainer(std::string type_name) { return type_name.find("std::vector<") == 0; }
 
     // Map container support functions
-    bool isMapContainer(std::string type_name)
-    {
-        return type_name.find("std::map<") == 0;
-    }
+    bool isMapContainer(std::string type_name) { return type_name.find("std::map<") == 0; }
 
-    bool isUnorderedMapContainer(std::string type_name)
-    {
-        return type_name.find("std::unordered_map<") == 0;
-    }
+    bool isUnorderedMapContainer(std::string type_name) { return type_name.find("std::unordered_map<") == 0; }
 
     std::string getMapKeyType(std::string map_type)
     {
@@ -202,9 +191,9 @@ namespace Utils
             return "";
         }
 
-        size_t left = map_type.find_first_of('<') + 1;
+        size_t left  = map_type.find_first_of('<') + 1;
         size_t comma = map_type.find_first_of(',', left);
-        
+
         if (left > 0 && comma < map_type.size() && left < comma)
         {
             std::string key_type = map_type.substr(left, comma - left);
@@ -222,7 +211,7 @@ namespace Utils
 
         size_t comma = map_type.find_first_of(',');
         size_t right = map_type.find_last_of('>');
-        
+
         if (comma < map_type.size() && right < map_type.size() && comma < right)
         {
             std::string value_type = map_type.substr(comma + 1, right - comma - 1);
@@ -390,7 +379,7 @@ namespace Utils
     std::string convertNameToUpperCamelCase(const std::string& name, std::string pat)
     {
         std::string ret_string;
-        auto&& name_spilts = split(name, pat);
+        auto&&      name_spilts = split(name, pat);
         for (auto& split_string : name_spilts)
         {
             split_string[0] = toupper(split_string[0]);

@@ -1,6 +1,7 @@
 #pragma once
 #include "runtime/function/render/gpu_shader.h"
 #include "runtime/function/render/utils/gpu_utils.h"
+#include "runtime/function/render/utils/gpu_pipeline_builder.h"
 
 #include <volk.h>
 // #include <vulkan/vulkan.h>
@@ -11,48 +12,45 @@
 
 namespace Piccolo
 {
-    // 着色器阶段配置
-    struct GPUShaderStageConfig
-    {
-        ShaderType  type;
-        std::string shader_path;
-        std::string entry_point = "main";
+    // 前向声明，完整定义在gpu_pipeline_builder.h中
+    struct GPUShaderStageConfig;
 
-        std::vector<std::string> defines;
-    };
-
-    // 管道配置结构
+    // 管道配置结构 (保持向后兼容)
     struct GPUPipelineConfig
     {
         std::string name;
         std::string description;
 
         std::vector<GPUShaderStageConfig> shader_stages;
-
-        // VertexInputConfig                  vertex_input;
-        // InputAssemblyConfig                input_assembly;
-        // RasterizationConfig                rasterization;
-        // MultisampleConfig                  multisample;
-        // DepthStencilConfig                 depth_stencil;
-        // ColorBlendConfig                   color_blend;
-        // DynamicStateConfig                 dynamic_state;
-        // std::map<std::string, std::string> parameters;
     };
 
     class GPUPipeline
     {
     public:
+        // 使用新的构建器创建管道
+        GPUPipeline(VkDevice device, const GPUPipelineBuilderConfig& config, VkRenderPass render_pass);
+        
+        // 保持向后兼容的构造函数
         GPUPipeline(VkDevice device, const GPUPipelineConfig& config);
+        
         ~GPUPipeline();
 
         VkPipeline                 getPipeline() const { return m_pipeline; }
         VkPipelineLayout           getPipelineLayout() const { return m_pipeline_layout; }
         std::vector<VkFramebuffer> getSwapChainFramebuffers() const { return m_swap_chain_framebuffers; }
 
+        // 静态工厂方法
+        static std::shared_ptr<GPUPipeline> createBasicTrianglePipeline(VkDevice device, VkRenderPass render_pass);
+        static std::shared_ptr<GPUPipeline> createDepthTestPipeline(VkDevice device, VkRenderPass render_pass);
+        static std::shared_ptr<GPUPipeline> createWireframePipeline(VkDevice device, VkRenderPass render_pass);
+
     private:
         void createShaders();
         void createGraphicsPipeline();
         void createFramebuffers();
+        
+        // 使用构建器创建管道
+        void createPipelineWithBuilder(const GPUPipelineBuilderConfig& config, VkRenderPass render_pass);
 
         // TODO : add pipeline resource
         std::vector<std::string> m_shader_paths;

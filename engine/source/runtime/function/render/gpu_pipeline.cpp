@@ -1,6 +1,7 @@
 #include "runtime/function/render/gpu_pipeline.h"
 #include "runtime/function/render/gpu_render_pass.h"
 #include "runtime/function/render/gpu_swap_chain.h"
+#include "runtime/function/render/utils/gpu_pipeline_builder.h"
 
 #include "runtime/core/base/macro.h"
 
@@ -11,6 +12,15 @@
 
 namespace Piccolo
 {
+    // 使用新的构建器创建管道
+    GPUPipeline::GPUPipeline(VkDevice device, const GPUPipelineBuilderConfig& config, VkRenderPass render_pass)
+    {
+        m_device = device;
+        createPipelineWithBuilder(config, render_pass);
+        createFramebuffers();
+    }
+
+    // 保持向后兼容的构造函数
     GPUPipeline::GPUPipeline(VkDevice device, const GPUPipelineConfig& config)
     {
         m_device = device;
@@ -186,5 +196,60 @@ namespace Piccolo
                 LOG_ERROR("failed to create framebuffer!");
             }
         }
+    }
+
+    void GPUPipeline::createPipelineWithBuilder(const GPUPipelineBuilderConfig& config, VkRenderPass render_pass)
+    {
+        GPUPipelineBuilder builder(m_device);
+        
+        // 应用配置
+        builder.setName(config.name)
+               .setDescription(config.description)
+               .setRenderPass(render_pass);
+        
+        for (const auto& stage : config.shader_stages)
+        {
+            builder.addShaderStage(stage);
+        }
+        
+        builder.setVertexInput(config.vertex_input)
+               .setInputAssembly(config.input_assembly)
+               .setRasterization(config.rasterization)
+               .setMultisample(config.multisample)
+               .setDepthStencil(config.depth_stencil)
+               .setColorBlend(config.color_blend)
+               .setDynamicState(config.dynamic_state);
+        
+        for (const auto& layout : config.descriptor_set_layouts)
+        {
+            builder.addDescriptorSetLayout(layout);
+        }
+        
+        for (const auto& range : config.push_constant_ranges)
+        {
+            builder.addPushConstantRange(range);
+        }
+        
+        m_pipeline = builder.buildGraphicsPipeline();
+        m_pipeline_layout = builder.getPipelineLayout();
+    }
+
+    // 静态工厂方法实现
+    std::shared_ptr<GPUPipeline> GPUPipeline::createBasicTrianglePipeline(VkDevice device, VkRenderPass render_pass)
+    {
+        auto config = GPUPipelineConfigFactory::createBasicTrianglePipeline();
+        return std::make_shared<GPUPipeline>(device, config, render_pass);
+    }
+
+    std::shared_ptr<GPUPipeline> GPUPipeline::createDepthTestPipeline(VkDevice device, VkRenderPass render_pass)
+    {
+        auto config = GPUPipelineConfigFactory::createDepthTestPipeline();
+        return std::make_shared<GPUPipeline>(device, config, render_pass);
+    }
+
+    std::shared_ptr<GPUPipeline> GPUPipeline::createWireframePipeline(VkDevice device, VkRenderPass render_pass)
+    {
+        auto config = GPUPipelineConfigFactory::createWireframePipeline();
+        return std::make_shared<GPUPipeline>(device, config, render_pass);
     }
 } // namespace Piccolo
