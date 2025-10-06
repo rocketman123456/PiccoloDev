@@ -1,7 +1,6 @@
 #pragma once
 #include "runtime/core/meta/reflection/reflection.h"
 
-
 #include <string>
 #include <vector>
 
@@ -34,9 +33,9 @@ namespace Piccolo
         REFLECTION_BODY(ObjectInstanceRes);
 
     public:
-        std::string              m_name;
-        std::string              m_definition;
-        bool                     m_active;
+        std::string m_name;
+        std::string m_definition;
+        bool        m_active;
 
         std::vector<Reflection::ReflectionPtr<Component>> m_instanced_components;
     };
