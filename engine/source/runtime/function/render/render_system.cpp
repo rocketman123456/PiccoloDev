@@ -2,10 +2,10 @@
 
 #include "runtime/core/base/macro.h"
 
+#include "runtime/function/global/global_context.h"
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
 
-#include "runtime/function/global/global_context.h"
 #include "runtime/function/render/debugdraw/debug_draw_manager.h"
 #include "runtime/function/render/render_camera.h"
 #include "runtime/function/render/render_pass.h"
@@ -27,7 +27,7 @@ namespace Piccolo
     void RenderSystem::initialize(RenderSystemInitInfo init_info)
     {
         LOG_INFO("开始初始化渲染系统...");
-        
+
         // 获取必要的管理器
         std::shared_ptr<ConfigManager> config_manager = g_runtime_global_context.m_config_manager;
         ASSERT(config_manager);
@@ -47,7 +47,7 @@ namespace Piccolo
         LOG_INFO("加载全局渲染资源...");
         GlobalRenderingRes global_rendering_res;
         const std::string& global_rendering_res_url = config_manager->getGlobalRenderingResUrl();
-        
+
         asset_manager->loadAsset(global_rendering_res_url, global_rendering_res);
 
         // 准备IBL和颜色分级纹理数据
@@ -94,7 +94,8 @@ namespace Piccolo
     void RenderSystem::tick(float delta_time)
     {
         // 验证渲染系统组件是否已初始化
-        if (!m_rhi || !m_render_resource || !m_render_scene || !m_render_camera || !m_render_pipeline) {
+        if (!m_rhi || !m_render_resource || !m_render_scene || !m_render_camera || !m_render_pipeline)
+        {
             LOG_ERROR("渲染系统组件未完全初始化，跳过渲染");
             return;
         }
@@ -122,17 +123,18 @@ namespace Piccolo
 
         // ========== 渲染执行阶段 ==========
         // 根据管线类型执行相应的渲染流程
-        switch (m_render_pipeline_type) {
+        switch (m_render_pipeline_type)
+        {
             case RENDER_PIPELINE_TYPE::FORWARD_PIPELINE:
                 LOG_DEBUG("执行前向渲染管线");
                 m_render_pipeline->forwardRender(m_rhi, m_render_resource);
                 break;
-                
+
             case RENDER_PIPELINE_TYPE::DEFERRED_PIPELINE:
                 LOG_DEBUG("执行延迟渲染管线");
                 m_render_pipeline->deferredRender(m_rhi, m_render_resource);
                 break;
-                
+
             default:
                 LOG_ERROR("不支持的渲染管线类型: {}", static_cast<int>(m_render_pipeline_type));
                 break;

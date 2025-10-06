@@ -1,11 +1,11 @@
 #pragma once
 
 #include "editor/include/axis.h"
-
 #include "runtime/function/framework/object/object.h"
 #include "runtime/function/render/render_object.h"
 
 #include <memory>
+#include <functional>
 
 namespace Piccolo
 {
@@ -26,6 +26,15 @@ namespace Piccolo
     public:
         void initialize();
         void tick(float delta_time);
+
+        // 新的场景管理方法
+        void setSelectedGObject(std::shared_ptr<GObject> object);
+        void clearSelection();
+        void addObjectToScene(std::shared_ptr<GObject> object);
+        void removeObjectFromScene(std::shared_ptr<GObject> object);
+        
+        // 设置选择回调
+        void setSelectionCallback(std::function<void(std::shared_ptr<GObject>)> callback);
 
     public:
         size_t   updateCursorOnAxis(
@@ -73,5 +82,9 @@ namespace Piccolo
         size_t m_selected_axis{ 3 };
 
         bool   m_is_show_axis = true;
+        
+        // 新的成员变量
+        std::shared_ptr<GObject> m_selected_object;
+        std::function<void(std::shared_ptr<GObject>)> m_selection_callback;
     };
 }

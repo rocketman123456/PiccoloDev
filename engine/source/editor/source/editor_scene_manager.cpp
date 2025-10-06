@@ -575,4 +575,70 @@ namespace Piccolo
     {
         return g_editor_global_context.m_render_system->getGuidOfPickedMesh(picked_uv);
     }
+
+    // 新的场景管理方法实现
+    void EditorSceneManager::setSelectedGObject(std::shared_ptr<GObject> object)
+    {
+        m_selected_object = object;
+        
+        if (object)
+        {
+            m_selected_gobject_id = object->getID();
+            
+            // 获取对象的变换矩阵
+            if (auto transform_component = object->tryGetComponent<TransformComponent>("TransformComponent"))
+            {
+                m_selected_object_matrix = transform_component->getMatrix();
+            }
+        }
+        else
+        {
+            m_selected_gobject_id = k_invalid_gobject_id;
+            m_selected_object_matrix = Matrix4x4::IDENTITY;
+        }
+        
+        // 调用选择回调
+        if (m_selection_callback)
+        {
+            m_selection_callback(object);
+        }
+    }
+
+    void EditorSceneManager::clearSelection()
+    {
+        setSelectedGObject(nullptr);
+    }
+
+    void EditorSceneManager::addObjectToScene(std::shared_ptr<GObject> object)
+    {
+        if (object && g_runtime_global_context.m_world_manager)
+        {
+            auto current_level = g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
+            if (current_level)
+            {
+                // 这里可以添加对象到场景的逻辑
+                // 具体实现取决于WorldManager的API
+            }
+        }
+    }
+
+    void EditorSceneManager::removeObjectFromScene(std::shared_ptr<GObject> object)
+    {
+        if (object && g_runtime_global_context.m_world_manager)
+        {
+            // 如果删除的是当前选中的对象，先清除选择
+            if (m_selected_object == object)
+            {
+                clearSelection();
+            }
+            
+            // 这里可以添加从场景中移除对象的逻辑
+            // 具体实现取决于WorldManager的API
+        }
+    }
+
+    void EditorSceneManager::setSelectionCallback(std::function<void(std::shared_ptr<GObject>)> callback)
+    {
+        m_selection_callback = callback;
+    }
 } // namespace Piccolo

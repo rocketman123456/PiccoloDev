@@ -1,14 +1,19 @@
 #pragma once
 
 #include "runtime/core/math/vector2.h"
-
 #include "runtime/function/render/render_camera.h"
+#include "runtime/function/framework/object/object.h"
 
 #include <vector>
+#include <memory>
 
 namespace Piccolo
 {
     class PiccoloEditor;
+    namespace Editor
+    {
+        class ModularEditorUI;
+    }
 
     enum class EditorCommand : unsigned int
     {
@@ -31,11 +36,18 @@ namespace Piccolo
         void initialize();
         void tick(float delta_time);
 
+        // 设置UI引用
+        void setEditorUI(std::shared_ptr<Editor::ModularEditorUI> editor_ui);
+
     public:
         void registerInput();
         void updateCursorOnAxis(Vector2 cursor_uv);
         void processEditorCommand();
         void onKeyInEditorMode(int key, int scancode, int action, int mods);
+        
+        // 新的UI交互方法
+        void handleObjectSelection(std::shared_ptr<GObject> object);
+        void handleObjectDeselection();
 
         void onKey(int key, int scancode, int action, int mods);
         void onReset();
@@ -65,5 +77,8 @@ namespace Piccolo
 
         size_t       m_cursor_on_axis {3};
         unsigned int m_editor_command {0};
+        
+        // UI引用
+        std::weak_ptr<Editor::ModularEditorUI> m_editor_ui;
     };
 } // namespace Piccolo

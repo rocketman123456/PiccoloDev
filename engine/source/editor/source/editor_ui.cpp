@@ -6,14 +6,10 @@
 
 #include "runtime/core/base/macro.h"
 #include "runtime/core/meta/reflection/reflection.h"
-
 #include "runtime/platform/path/path.h"
-
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
-
 #include "runtime/engine.h"
-
 #include "runtime/function/framework/component/mesh/mesh_component.h"
 #include "runtime/function/framework/component/transform/transform_component.h"
 #include "runtime/function/framework/level/level.h"
@@ -36,7 +32,7 @@ namespace Piccolo
     void DrawVecControl(const std::string& label, Piccolo::Vector3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
     void DrawVecControl(const std::string& label, Piccolo::Quaternion& values, float resetValue = 0.0f, float columnWidth = 100.0f);
 
-    EditorUI::EditorUI()
+    EditorUI::EditorUI() : Editor::ModularEditorUI()
     {
         const auto& asset_folder            = g_runtime_global_context.m_config_manager->getAssetFolder();
         m_editor_ui_creator["TreeNodePush"] = [this](const std::string& name, void* value_ptr) -> void {
@@ -303,7 +299,7 @@ namespace Piccolo
             ImGui::DockBuilderFinish(main_docking_id);
         }
 
-        ImGui::DockSpace(main_docking_id);
+        ImGui::DockSpace(main_docking_id, ImVec2(0.0f, 0.0f), 0);
 
         if (ImGui::BeginMenuBar())
         {
@@ -864,19 +860,20 @@ namespace Piccolo
 
     void EditorUI::initialize(WindowUIInitInfo init_info)
     {
+        // 调用基类的初始化方法
+        Editor::ModularEditorUI::initialize(init_info);
+        
+        // 设置编辑器特定的UI样式
+        setUIColorStyle();
+        
+        // 获取配置管理器
         std::shared_ptr<ConfigManager> config_manager = g_runtime_global_context.m_config_manager;
         ASSERT(config_manager);
-
-        // create imgui context
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-
-        // set ui content scale
+        
+        // 设置UI内容缩放
         float x_scale, y_scale;
         glfwGetWindowContentScale(init_info.window_system->getWindow(), &x_scale, &y_scale);
         float content_scale = fmaxf(1.0f, fmaxf(x_scale, y_scale));
-        windowContentScaleUpdate(content_scale);
-        glfwSetWindowContentScaleCallback(init_info.window_system->getWindow(), windowContentScaleCallback);
 
         // load font for imgui
         ImGuiIO& io = ImGui::GetIO();
@@ -983,7 +980,7 @@ namespace Piccolo
         colors[ImGuiCol_ModalWindowDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
     }
 
-    void EditorUI::preRender() { showEditorUI(); }
+    // preRender方法由基类处理，这里不需要重写
 
     void DrawVecControl(const std::string& label, Piccolo::Vector3& values, float resetValue, float columnWidth)
     {
@@ -1107,5 +1104,30 @@ namespace Piccolo
 
         ImGui::Columns(1);
         ImGui::PopID();
+    }
+
+    // 新的EditorUI方法实现
+    void EditorUI::setSelectedObject(std::shared_ptr<GObject> object)
+    {
+        // 调用基类的方法
+        Editor::ModularEditorUI::setSelectedObject(object);
+        
+        // 更新场景管理器中的选中对象
+        if (g_editor_global_context.m_scene_manager)
+        {
+            g_editor_global_context.m_scene_manager->setSelectedGObject(object);
+        }
+    }
+
+    void EditorUI::clearSelection()
+    {
+        // 调用基类的方法
+        Editor::ModularEditorUI::clearSelection();
+        
+        // 清除场景管理器中的选中对象
+        if (g_editor_global_context.m_scene_manager)
+        {
+            g_editor_global_context.m_scene_manager->setSelectedGObject(nullptr);
+        }
     }
 } // namespace Piccolo

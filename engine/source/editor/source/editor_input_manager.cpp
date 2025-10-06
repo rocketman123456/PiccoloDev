@@ -3,6 +3,7 @@
 #include "editor/include/editor.h"
 #include "editor/include/editor_global_context.h"
 #include "editor/include/editor_scene_manager.h"
+#include "editor/include/ui_components/modular_editor_ui.h"
 
 #include "runtime/engine.h"
 #include "runtime/function/framework/level/level.h"
@@ -16,7 +17,15 @@
 
 namespace Piccolo
 {
-    void EditorInputManager::initialize() { registerInput(); }
+    void EditorInputManager::initialize() 
+    { 
+        registerInput(); 
+    }
+    
+    void EditorInputManager::setEditorUI(std::shared_ptr<Editor::ModularEditorUI> editor_ui)
+    {
+        m_editor_ui = editor_ui;
+    }
 
     void EditorInputManager::tick(float delta_time) { processEditorCommand(); }
 
@@ -296,5 +305,36 @@ namespace Piccolo
     bool EditorInputManager::isCursorInRect(Vector2 pos, Vector2 size) const
     {
         return pos.x <= m_mouse_x && m_mouse_x <= pos.x + size.x && pos.y <= m_mouse_y && m_mouse_y <= pos.y + size.y;
+    }
+
+    // 新的UI交互方法实现
+    void EditorInputManager::handleObjectSelection(std::shared_ptr<GObject> object)
+    {
+        // 通知UI组件对象被选中
+        if (auto editor_ui = m_editor_ui.lock())
+        {
+            editor_ui->setSelectedObject(object);
+        }
+        
+        // 通知场景管理器
+        if (g_editor_global_context.m_scene_manager)
+        {
+            g_editor_global_context.m_scene_manager->setSelectedGObject(object);
+        }
+    }
+
+    void EditorInputManager::handleObjectDeselection()
+    {
+        // 通知UI组件清除选择
+        if (auto editor_ui = m_editor_ui.lock())
+        {
+            editor_ui->clearSelection();
+        }
+        
+        // 通知场景管理器
+        if (g_editor_global_context.m_scene_manager)
+        {
+            g_editor_global_context.m_scene_manager->setSelectedGObject(nullptr);
+        }
     }
 } // namespace Piccolo
