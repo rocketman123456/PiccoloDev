@@ -1,34 +1,4 @@
 {
   "objects": [
-    {
-      "name": "Ground",
-      "active": true,
-      "definition": "asset/objects/environment/floor/floor.object.json",
-      "instanced_components": [
-        {
-          "$context": {
-            "transform": {
-              "rotation": {
-                "w": 1,
-                "x": 0,
-                "y": 0,
-                "z": 0
-              },
-              "scale": {
-                "x": 1,
-                "y": 1,
-                "z": 1
-              },
-              "position": {
-                "x": 0,
-                "y": 0,
-                "z": 0
-              }
-            }
-          },
-          "$typeName": "TransformComponent"
-        }
-      ]
-    }
   ]
 }

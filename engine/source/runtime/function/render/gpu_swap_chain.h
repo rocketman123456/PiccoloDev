@@ -22,6 +22,9 @@ namespace Piccolo
         const std::vector<VkImage>&     getImages() const { return m_images; }
         const std::vector<VkImageView>& getImageViews() const { return m_image_views; }
 
+        void cleanupSwapChain();
+        void recreateSwapChain();
+
     private:
         void createSwapchain(VkDevice device, VkSurfaceKHR surface);
         void createImageViews(VkDevice device);

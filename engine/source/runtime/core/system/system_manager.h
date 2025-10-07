@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/core/system/subsystem.h"
+#include "runtime/core/system/system.h"
 
 namespace Piccolo
 {

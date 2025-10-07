@@ -29,6 +29,7 @@ namespace Piccolo
 
         m_file_system   = std::make_shared<FileSystem>();
         m_logger_system = std::make_shared<LogSystem>();
+
         m_asset_manager = std::make_shared<AssetManager>();
 
         m_event_system = std::make_shared<EventSystem>();
@@ -63,6 +64,7 @@ namespace Piccolo
         m_event_system.reset();
 
         m_asset_manager.reset();
+
         m_logger_system.reset();
         m_file_system.reset();
         m_config_manager.reset();

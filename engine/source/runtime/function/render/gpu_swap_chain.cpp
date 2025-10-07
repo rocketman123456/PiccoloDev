@@ -173,4 +173,34 @@ namespace Piccolo
         }
     }
 
+    void GPUSwapChain::cleanupSwapChain()
+    {
+        for (auto image_view : m_image_views)
+        {
+            vkDestroyImageView(m_logical_device, image_view, nullptr);
+        }
+
+        vkDestroySwapchainKHR(m_logical_device, m_swapchain, nullptr);
+    }
+
+    void GPUSwapChain::recreateSwapChain()
+    {
+        auto* window = g_runtime_global_context.m_window_system->getWindow();
+
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(m_logical_device);
+
+        cleanupSwapChain();
+
+        createSwapchain(m_logical_device, m_surface);
+        createImageViews(m_logical_device);
+    }
+
 } // namespace Piccolo

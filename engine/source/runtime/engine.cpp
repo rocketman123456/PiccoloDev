@@ -1,7 +1,6 @@
 ﻿#include "runtime/engine.h"
 
 #include "runtime/core/base/macro.h"
-#include "runtime/core/meta/reflection/reflection_register.h"
 
 #include "runtime/core/log/log_system.h"
 #include "runtime/platform/file_service/file_service.h"
@@ -27,8 +26,6 @@ namespace Piccolo
 
     void PiccoloEngine::startEngine(const std::string& config_file_path)
     {
-        Reflection::TypeMetaRegister::metaRegister();
-
         g_runtime_global_context.startSystems(config_file_path);
 
         LOG_INFO("engine start");
@@ -39,8 +36,6 @@ namespace Piccolo
         LOG_INFO("engine shutdown");
 
         g_runtime_global_context.shutdownSystems();
-
-        Reflection::TypeMetaRegister::metaUnregister();
     }
 
     void PiccoloEngine::initialize()

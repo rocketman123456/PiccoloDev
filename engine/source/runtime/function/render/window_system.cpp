@@ -2,8 +2,17 @@
 
 #include "runtime/core/base/macro.h"
 
+#include "runtime/function/global/global_context.h"
+#include "runtime/function/render/render_system.h"
+
 namespace Piccolo
 {
+    static void framebuffer_resize_callback(GLFWwindow* window, int width, int height)
+    {
+        //
+        g_runtime_global_context.m_render_system->setFramebufferResized(true);
+    }
+
     WindowSystem::~WindowSystem()
     {
         glfwDestroyWindow(m_window);
@@ -18,6 +27,8 @@ namespace Piccolo
         // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         m_window = glfwCreateWindow(create_info.width, create_info.height, create_info.title, nullptr, nullptr);
+
+        glfwSetFramebufferSizeCallback(m_window, framebuffer_resize_callback);
 
         if (!m_window)
         {

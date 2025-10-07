@@ -40,6 +40,10 @@ namespace Piccolo
 
         uint32_t getCurrentFrame() const { return m_current_frame; }
 
+        bool isFramebufferResized() const { return m_framebuffer_resized; }
+
+        void setFramebufferResized(bool resized) { m_framebuffer_resized = resized; }
+
     private:
         void initializeRenderResources();
         void createDefaultPipeline();
@@ -56,6 +60,8 @@ namespace Piccolo
         // 新的工具类
         std::shared_ptr<GPURenderResourceManager> m_resource_manager;
         std::shared_ptr<GPURenderStateManager>    m_state_manager;
+
+        bool m_framebuffer_resized = false;
 
         uint32_t m_current_frame = 0; // 当前帧索引
     };

@@ -1,7 +1,7 @@
 #pragma once
 #include "runtime/function/render/gpu_shader.h"
-#include "runtime/function/render/utils/gpu_utils.h"
 #include "runtime/function/render/utils/gpu_pipeline_builder.h"
+#include "runtime/function/render/utils/gpu_utils.h"
 
 #include <volk.h>
 // #include <vulkan/vulkan.h>
@@ -29,10 +29,10 @@ namespace Piccolo
     public:
         // 使用新的构建器创建管道
         GPUPipeline(VkDevice device, const GPUPipelineBuilderConfig& config, VkRenderPass render_pass);
-        
+
         // 保持向后兼容的构造函数
         GPUPipeline(VkDevice device, const GPUPipelineConfig& config);
-        
+
         ~GPUPipeline();
 
         VkPipeline                 getPipeline() const { return m_pipeline; }
@@ -44,11 +44,13 @@ namespace Piccolo
         static std::shared_ptr<GPUPipeline> createDepthTestPipeline(VkDevice device, VkRenderPass render_pass);
         static std::shared_ptr<GPUPipeline> createWireframePipeline(VkDevice device, VkRenderPass render_pass);
 
+        void createFramebuffers();
+        void destroyFramebuffers();
+
     private:
         void createShaders();
         void createGraphicsPipeline();
-        void createFramebuffers();
-        
+
         // 使用构建器创建管道
         void createPipelineWithBuilder(const GPUPipelineBuilderConfig& config, VkRenderPass render_pass);
 

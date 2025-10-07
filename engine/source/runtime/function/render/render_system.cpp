@@ -61,6 +61,7 @@ namespace Piccolo
         m_device.reset();
         m_context.reset();
     }
+
     void RenderSystem::tick(float /*dt*/)
     {
         // 开始新帧的性能分析
@@ -79,8 +80,24 @@ namespace Piccolo
         vkWaitForFences(m_device->getDevice(), 1, &in_flight_fence, VK_TRUE, UINT64_MAX);
         vkResetFences(m_device->getDevice(), 1, &in_flight_fence);
         uint32_t image_index;
-        vkAcquireNextImageKHR(m_device->getDevice(), m_swap_chain->getSwapchain(), UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index);
+        VkResult result =
+            vkAcquireNextImageKHR(m_device->getDevice(), m_swap_chain->getSwapchain(), UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index);
         cpu_profiler->endTimestamp("Frame Wait");
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            cpu_profiler->beginTimestamp("Recreate Swap Chain");
+            m_swap_chain->recreateSwapChain();
+            m_pipeline->destroyFramebuffers();
+            m_pipeline->createFramebuffers();
+            cpu_profiler->endTimestamp("Recreate Swap Chain");
+            return;
+        }
+        else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        {
+            LOG_ERROR("failed to acquire swap chain image!");
+            return;
+        }
 
         cpu_profiler->beginTimestamp("Command Buffer Reset");
         vkResetCommandBuffer(command_buffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
@@ -154,8 +171,24 @@ namespace Piccolo
         present_info.pImageIndices = &image_index;
 
         cpu_profiler->beginTimestamp("Present");
-        vkQueuePresentKHR(m_device->getPresentQueue(), &present_info);
+        result = vkQueuePresentKHR(m_device->getPresentQueue(), &present_info);
         cpu_profiler->endTimestamp("Present");
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebuffer_resized)
+        {
+            m_framebuffer_resized = false;
+
+            cpu_profiler->beginTimestamp("Recreate Swap Chain");
+            m_swap_chain->recreateSwapChain();
+            m_pipeline->destroyFramebuffers();
+            m_pipeline->createFramebuffers();
+            cpu_profiler->endTimestamp("Recreate Swap Chain");
+        }
+        else if (result != VK_SUCCESS)
+        {
+            LOG_ERROR("failed to present swap chain image!");
+            return;
+        }
 
         // 结束帧性能分析并记录数据
         gpu_profiler->endFrame(m_current_frame);

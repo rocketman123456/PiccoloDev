@@ -198,39 +198,45 @@ namespace Piccolo
         }
     }
 
+    void GPUPipeline::destroyFramebuffers()
+    {
+        for (auto& framebuffer : m_swap_chain_framebuffers)
+        {
+            vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+        }
+    }
+
     void GPUPipeline::createPipelineWithBuilder(const GPUPipelineBuilderConfig& config, VkRenderPass render_pass)
     {
         GPUPipelineBuilder builder(m_device);
-        
+
         // 应用配置
-        builder.setName(config.name)
-               .setDescription(config.description)
-               .setRenderPass(render_pass);
-        
+        builder.setName(config.name).setDescription(config.description).setRenderPass(render_pass);
+
         for (const auto& stage : config.shader_stages)
         {
             builder.addShaderStage(stage);
         }
-        
+
         builder.setVertexInput(config.vertex_input)
-               .setInputAssembly(config.input_assembly)
-               .setRasterization(config.rasterization)
-               .setMultisample(config.multisample)
-               .setDepthStencil(config.depth_stencil)
-               .setColorBlend(config.color_blend)
-               .setDynamicState(config.dynamic_state);
-        
+            .setInputAssembly(config.input_assembly)
+            .setRasterization(config.rasterization)
+            .setMultisample(config.multisample)
+            .setDepthStencil(config.depth_stencil)
+            .setColorBlend(config.color_blend)
+            .setDynamicState(config.dynamic_state);
+
         for (const auto& layout : config.descriptor_set_layouts)
         {
             builder.addDescriptorSetLayout(layout);
         }
-        
+
         for (const auto& range : config.push_constant_ranges)
         {
             builder.addPushConstantRange(range);
         }
-        
-        m_pipeline = builder.buildGraphicsPipeline();
+
+        m_pipeline        = builder.buildGraphicsPipeline();
         m_pipeline_layout = builder.getPipelineLayout();
     }
 

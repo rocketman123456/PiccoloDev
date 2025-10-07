@@ -23,7 +23,7 @@ namespace Piccolo
     {
         Includer::IncludeResult* Includer::includeSystem(const char* headerName, const char*, size_t) { return includeLocal(headerName, nullptr, 0); }
 
-        Includer::IncludeResult* Includer::includeLocal(const char* headerName, const char*, size_t)
+        Includer::IncludeResult* Includer::includeLocal(const char* header_name, const char*, size_t)
         {
             std::string path;
             if (g_runtime_global_context.m_asset_manager)
@@ -32,7 +32,7 @@ namespace Piccolo
             }
             else
             {
-                path = std::filesystem::path("asset/shader/include") / headerName;
+                path = std::filesystem::path("asset/shader/include") / header_name;
             }
 
             std::ifstream file(path);
