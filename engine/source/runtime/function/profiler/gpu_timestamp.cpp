@@ -1,4 +1,4 @@
-#include "runtime/function/render/profiler/gpu_timestamp.h"
+#include "runtime/function/profiler/gpu_timestamp.h"
 
 #include "runtime/core/base/macro.h"
 #include "runtime/core/log/log_system.h"
@@ -34,9 +34,6 @@ namespace Piccolo
         m_timestamps.resize(queries_per_frame * max_frames);
         m_timestamps_data.resize(queries_per_frame * max_frames * 2);
 
-        // m_timestamps      = new GPUTimestamp[queries_per_frame * max_frames];
-        // m_timestamps_data = new uint64_t[queries_per_frame * max_frames * 2];
-
         LOG_INFO("GPU Timestamp Manager initialized with {} queries per frame, {} max frames", queries_per_frame, max_frames);
     }
 
@@ -44,6 +41,8 @@ namespace Piccolo
     {
         if (m_query_pool != VK_NULL_HANDLE)
         {
+            // 等待设备空闲，确保所有命令缓冲区都已完成执行
+            vkDeviceWaitIdle(m_device);
             vkDestroyQueryPool(m_device, m_query_pool, nullptr);
             m_query_pool = VK_NULL_HANDLE;
         }

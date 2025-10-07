@@ -3,7 +3,8 @@
 #include "runtime/function/render/gpu_pipeline.h"
 #include "runtime/function/render/gpu_render_pass.h"
 #include "runtime/function/render/gpu_swap_chain.h"
-#include "runtime/function/render/profiler/gpu_profiler.h"
+
+#include "runtime/function/profiler/gpu_profiler.h"
 
 #include "runtime/core/base/macro.h"
 
@@ -70,8 +71,9 @@ namespace Piccolo
         auto graphics_pipeline = g_runtime_global_context.m_render_system->getPipeline()->getPipeline();
         auto framebuffer       = g_runtime_global_context.m_render_system->getPipeline()->getSwapChainFramebuffers()[image_index];
         auto extent            = g_runtime_global_context.m_render_system->getSwapChain()->getExtent();
-        auto profiler          = g_runtime_global_context.m_render_system->getGPUProfiler();
         auto current_frame     = g_runtime_global_context.m_render_system->getCurrentFrame();
+
+        auto profiler = g_runtime_global_context.m_gpu_profiler;
 
         VkRenderPassBeginInfo render_pass_info {};
         render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -86,7 +88,7 @@ namespace Piccolo
 
         // 开始渲染通道性能分析
         profiler->beginTimestamp(command_buffer, current_frame, "Render Pass");
-        
+
         vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
         {
             // 开始管道绑定性能分析
@@ -117,7 +119,7 @@ namespace Piccolo
             profiler->endTimestamp(command_buffer, current_frame);
         }
         vkCmdEndRenderPass(command_buffer);
-        
+
         // 结束渲染通道性能分析
         profiler->endTimestamp(command_buffer, current_frame);
     }

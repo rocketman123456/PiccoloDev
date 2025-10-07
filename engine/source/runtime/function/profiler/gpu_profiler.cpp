@@ -1,4 +1,4 @@
-#include "runtime/function/render/profiler/gpu_profiler.h"
+#include "runtime/function/profiler/gpu_profiler.h"
 
 #include "runtime/core/base/macro.h"
 
@@ -13,6 +13,9 @@ namespace Piccolo
         // 预分配时间戳缓冲区
         m_current_timestamps.resize(queries_per_frame);
 
+        m_queries_per_frame = queries_per_frame;
+        m_max_frames        = max_frames;
+
         LOG_INFO("GPU Profiler initialized with {} queries per frame, {} max frames", queries_per_frame, max_frames);
     }
 
@@ -20,6 +23,8 @@ namespace Piccolo
     {
         if (m_timestamp_manager)
         {
+            // 等待设备空闲，确保所有命令缓冲区都已完成执行
+            vkDeviceWaitIdle(m_device);
             m_timestamp_manager->clear();
             m_timestamp_manager.reset();
         }
@@ -45,8 +50,8 @@ namespace Piccolo
         }
 
         // 重置当前帧的所有查询
-        uint32_t first_query = frame_index * 64 * 2; // 每帧64个查询，每个查询2个时间戳
-        uint32_t query_count = 64 * 2;
+        uint32_t first_query = frame_index * m_queries_per_frame * 2; // 每帧的查询起始位置
+        uint32_t query_count = m_queries_per_frame * 2; // 每帧的查询数量
         vkCmdResetQueryPool(command_buffer, m_timestamp_manager->getQueryPool(), first_query, query_count);
     }
 
@@ -75,7 +80,7 @@ namespace Piccolo
         if (query_index != UINT32_MAX)
         {
             // 记录开始时间戳
-            uint32_t timestamp_index = frame_index * 64 * 2 + query_index * 2; // 每帧64个查询，每个查询2个时间戳
+            uint32_t timestamp_index = frame_index * m_queries_per_frame * 2 + query_index * 2; // 每帧的查询起始位置 + 当前查询的偏移
             vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_timestamp_manager->getQueryPool(), timestamp_index);
         }
     }
@@ -91,7 +96,7 @@ namespace Piccolo
         if (query_index != UINT32_MAX)
         {
             // 记录结束时间戳
-            uint32_t timestamp_index = frame_index * 64 * 2 + query_index * 2 + 1; // 每帧64个查询，每个查询2个时间戳
+            uint32_t timestamp_index = frame_index * m_queries_per_frame * 2 + query_index * 2 + 1; // 每帧的查询起始位置 + 当前查询的偏移 + 1
             vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_timestamp_manager->getQueryPool(), timestamp_index);
         }
     }

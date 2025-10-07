@@ -10,10 +10,11 @@
 
 #include "runtime/function/event/event_system.h"
 
-#include "runtime/function/render/profiler/gpu_profiler.h"
-#include "runtime/function/render/profiler/gpu_timestamp.h"
 #include "runtime/function/render/render_system.h"
 #include "runtime/function/render/window_system.h"
+
+#include "runtime/function/profiler/cpu_profiler.h"
+#include "runtime/function/profiler/gpu_profiler.h"
 
 namespace Piccolo
 {
@@ -89,6 +90,16 @@ namespace Piccolo
 
         rendererTick(delta_time);
 
+        LOG_INFO("=== Frame {} completed ===", m_frame_count);
+        if (g_runtime_global_context.m_gpu_profiler->hasValidData() || g_runtime_global_context.m_cpu_profiler->hasValidData())
+        {
+            logProfilerData();
+        }
+        else
+        {
+            LOG_INFO("No profiler data available for frame {}", m_frame_count);
+        }
+
         const bool should_window_close = g_runtime_global_context.m_window_system->shouldClose();
         return !should_window_close;
     }
@@ -120,5 +131,64 @@ namespace Piccolo
         }
 
         m_fps = static_cast<int>(1.f / m_average_duration);
+    }
+
+    void PiccoloEngine::logProfilerData()
+    {
+        bool has_gpu_data = g_runtime_global_context.m_gpu_profiler->hasValidData();
+        bool has_cpu_data = g_runtime_global_context.m_cpu_profiler->hasValidData();
+
+        if (!has_gpu_data && !has_cpu_data)
+        {
+            LOG_DEBUG("=== Profiler Data (Frame {}) - No valid data ===", m_frame_count);
+            return;
+        }
+
+        LOG_DEBUG("=== Profiler Data (Frame {}) ===", m_frame_count);
+
+        // 输出GPU profiler数据
+        if (has_gpu_data)
+        {
+            const GPUTimestamp* gpu_timestamps = g_runtime_global_context.m_gpu_profiler->getTimestamps();
+            uint32_t            gpu_count      = g_runtime_global_context.m_gpu_profiler->getTimestampCount();
+
+            LOG_DEBUG("--- GPU Profiler Data ({} timestamps) ---", gpu_count);
+            for (uint32_t i = 0; i < gpu_count; ++i)
+            {
+                const GPUTimestamp& timestamp = gpu_timestamps[i];
+                LOG_DEBUG(
+                    "  GPU {}: {:.3f} ms (start: {}, end: {})",
+                    timestamp.name ? timestamp.name : "Unknown",
+                    timestamp.elapsed_ms,
+                    timestamp.start,
+                    timestamp.end
+                );
+            }
+        }
+        else
+        {
+            LOG_DEBUG("--- GPU Profiler Data - No valid data ---");
+        }
+
+        // 输出CPU profiler数据
+        if (has_cpu_data)
+        {
+            const CPUTimestamp* cpu_timestamps = g_runtime_global_context.m_cpu_profiler->getTimestamps();
+            uint32_t            cpu_count      = g_runtime_global_context.m_cpu_profiler->getTimestampCount();
+
+            LOG_DEBUG("--- CPU Profiler Data ({} timestamps) ---", cpu_count);
+            for (uint32_t i = 0; i < cpu_count; ++i)
+            {
+                const CPUTimestamp& timestamp = cpu_timestamps[i];
+                // LOG_INFO("  CPU {}: {:.3f} ms (start: {:.3f}, end: {:.3f})", timestamp.name, timestamp.elapsed_ms, timestamp.start_time, timestamp.end_time);
+                LOG_DEBUG("  CPU {}: {:.3f} ms", timestamp.name, timestamp.elapsed_ms);
+            }
+        }
+        else
+        {
+            LOG_DEBUG("--- CPU Profiler Data - No valid data ---");
+        }
+
+        LOG_DEBUG("=== End Profiler Data ===");
     }
 } // namespace Piccolo

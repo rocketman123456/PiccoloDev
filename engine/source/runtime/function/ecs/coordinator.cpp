@@ -2,7 +2,7 @@
 
 namespace Piccolo
 {
-    Coordinator g_coordinator = {};
+    // Coordinator g_coordinator = {};
 
     void Coordinator::init()
     {

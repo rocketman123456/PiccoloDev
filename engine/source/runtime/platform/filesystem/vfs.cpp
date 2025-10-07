@@ -4,11 +4,11 @@
 #include "runtime/core/utils/string_utils.h"
 
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <sstream>
 #include <utility>
-#include <filesystem>
 
 #ifdef __APPLE__
 #include <limits.h>
@@ -35,19 +35,19 @@ namespace Piccolo
     namespace vfs
     {
         Blob::Blob(void* data, size_t size)
-            : data_(data)
-            , size_(size)
+            : m_data(data)
+            , m_size(size)
         {}
         Blob::~Blob()
         {
-            if (data_)
+            if (m_data)
             {
-                free(data_);
+                free(m_data);
             }
         }
 
-        const void* Blob::data() const { return data_; }
-        size_t      Blob::size() const { return size_; }
+        const void* Blob::data() const { return m_data; }
+        size_t      Blob::size() const { return m_size; }
 
         // -----------------------------------------------------------------------------------------------------
         // -----------------------------------------------------------------------------------------------------
@@ -234,7 +234,7 @@ namespace Piccolo
                 return enumerateNativeFiles(patten.c_str(), false, callback);
             }
 
-            int numEntries = 0;
+            int num_entries = 0;
             for (const auto& ext : extensions)
             {
                 std::string pattern = (path / ("*" + ext)).generic_string();
@@ -243,10 +243,10 @@ namespace Piccolo
                 if (result < 0)
                     return result;
 
-                numEntries += result;
+                num_entries += result;
             }
 
-            return numEntries;
+            return num_entries;
         }
 
         int NativeFileSystem::enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates)
@@ -262,19 +262,22 @@ namespace Piccolo
         // -----------------------------------------------------------------------------------------------------
 
         RelativeFileSystem::RelativeFileSystem(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& basePath)
-            : underlyingFS_(std::move(fs))
-            , basePath_(basePath.lexically_normal())
+            : m_underlying_fs(std::move(fs))
+            , m_base_path(basePath.lexically_normal())
         {}
 
-        bool RelativeFileSystem::isFolderExists(const std::filesystem::path& name) { return underlyingFS_->isFolderExists(basePath_ / name.relative_path()); }
+        bool RelativeFileSystem::isFolderExists(const std::filesystem::path& name)
+        {
+            return m_underlying_fs->isFolderExists(m_base_path / name.relative_path());
+        }
 
-        bool RelativeFileSystem::isFileExists(const std::filesystem::path& name) { return underlyingFS_->isFileExists(basePath_ / name.relative_path()); }
+        bool RelativeFileSystem::isFileExists(const std::filesystem::path& name) { return m_underlying_fs->isFileExists(m_base_path / name.relative_path()); }
 
-        IBlobPtr RelativeFileSystem::readFile(const std::filesystem::path& name) { return underlyingFS_->readFile(basePath_ / name.relative_path()); }
+        IBlobPtr RelativeFileSystem::readFile(const std::filesystem::path& name) { return m_underlying_fs->readFile(m_base_path / name.relative_path()); }
 
         bool RelativeFileSystem::writeFile(const std::filesystem::path& name, const void* data, size_t size)
         {
-            return underlyingFS_->writeFile(basePath_ / name.relative_path(), data, size);
+            return m_underlying_fs->writeFile(m_base_path / name.relative_path(), data, size);
         }
 
         int RelativeFileSystem::enumerateFiles(
@@ -284,12 +287,12 @@ namespace Piccolo
             bool                            allowDuplicates
         )
         {
-            return underlyingFS_->enumerateFiles(basePath_ / path.relative_path(), extensions, callback, allowDuplicates);
+            return m_underlying_fs->enumerateFiles(m_base_path / path.relative_path(), extensions, callback, allowDuplicates);
         }
 
         int RelativeFileSystem::enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates)
         {
-            return underlyingFS_->enumerateDirectories(basePath_ / path.relative_path(), callback, allowDuplicates);
+            return m_underlying_fs->enumerateDirectories(m_base_path / path.relative_path(), callback, allowDuplicates);
         }
 
         // -----------------------------------------------------------------------------------------------------
@@ -304,7 +307,7 @@ namespace Piccolo
                 return;
             }
 
-            mountPoints_.push_back(std::make_pair(path.lexically_normal().generic_string(), fs));
+            m_mount_points.push_back(std::make_pair(path.lexically_normal().generic_string(), fs));
         }
 
         void VFileSystem::mount(const std::filesystem::path& path, const std::filesystem::path& nativePath)
@@ -316,11 +319,11 @@ namespace Piccolo
         {
             std::string spath = path.lexically_normal().generic_string();
 
-            for (size_t index = 0; index < mountPoints_.size(); index++)
+            for (size_t index = 0; index < m_mount_points.size(); index++)
             {
-                if (mountPoints_[index].first == spath)
+                if (m_mount_points[index].first == spath)
                 {
-                    mountPoints_.erase(mountPoints_.begin() + index);
+                    m_mount_points.erase(m_mount_points.begin() + index);
                     return true;
                 }
             }
@@ -332,7 +335,7 @@ namespace Piccolo
         {
             std::string spath = path.lexically_normal().generic_string();
 
-            for (auto mp : mountPoints_)
+            for (auto& mp : m_mount_points)
             {
                 if (spath.find(mp.first, 0) == 0 && ((spath.length() == mp.first.length()) || (spath[mp.first.length()] == '/')))
                 {
@@ -381,13 +384,13 @@ namespace Piccolo
 
         std::filesystem::path VFileSystem::getFullPath(const std::filesystem::path& name) const
         {
-            std::filesystem::path relativePath;
+            std::filesystem::path relative_path;
             IFileSystem*          fs = nullptr;
 
-            if (findMountPoint(name, &relativePath, &fs))
+            if (findMountPoint(name, &relative_path, &fs))
             {
-                auto fullPath = fs->getFullPath(relativePath);
-                return fs->getFullPath(relativePath);
+                auto full_path = fs->getFullPath(relative_path);
+                return fs->getFullPath(relative_path);
             }
 
             return name;
@@ -395,10 +398,10 @@ namespace Piccolo
 
         IBlobPtr VFileSystem::readFile(const std::filesystem::path& name)
         {
-            std::filesystem::path relativePath;
+            std::filesystem::path relative_path;
             IFileSystem*          fs = nullptr;
 
-            if (findMountPoint(name, &relativePath, &fs))
+            if (findMountPoint(name, &relative_path, &fs))
             {
                 return fs->readFile(name);
             }
@@ -408,10 +411,10 @@ namespace Piccolo
 
         bool VFileSystem::writeFile(const std::filesystem::path& name, const void* data, size_t size)
         {
-            std::filesystem::path relativePath;
+            std::filesystem::path relative_path;
             IFileSystem*          fs = nullptr;
 
-            if (findMountPoint(name, &relativePath, &fs))
+            if (findMountPoint(name, &relative_path, &fs))
             {
                 return fs->writeFile(name, data, size);
             }
@@ -426,10 +429,10 @@ namespace Piccolo
             bool                            allowDuplicates
         )
         {
-            std::filesystem::path relativePath;
+            std::filesystem::path relative_path;
             IFileSystem*          fs = nullptr;
 
-            if (findMountPoint(path, &relativePath, &fs))
+            if (findMountPoint(path, &relative_path, &fs))
             {
                 return fs->enumerateFiles(path, extensions, callback, allowDuplicates);
             }
@@ -439,10 +442,10 @@ namespace Piccolo
 
         int VFileSystem::enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates)
         {
-            std::filesystem::path relativePath;
+            std::filesystem::path relative_path;
             IFileSystem*          fs = nullptr;
 
-            if (findMountPoint(path, &relativePath, &fs))
+            if (findMountPoint(path, &relative_path, &fs))
             {
                 return fs->enumerateDirectories(path, callback, allowDuplicates);
             }
@@ -475,14 +478,14 @@ namespace Piccolo
             }
         }
 
-        std::string Piccolo::vfs::getFileSearchRegex(const std::filesystem::path& path, const std::vector<std::string>& extensions)
+        std::string getFileSearchRegex(const std::filesystem::path& path, const std::vector<std::string>& extensions)
         {
-            std::filesystem::path normalizedPath    = path.lexically_normal();
-            std::string           normalizedPathStr = normalizedPath.generic_string();
+            std::filesystem::path normalized_path     = path.lexically_normal();
+            std::string           normalized_path_str = normalized_path.generic_string();
 
             std::stringstream regex;
-            appendPatternToRegex(normalizedPathStr, regex);
-            if (!Piccolo::string_utils::ends_with(normalizedPathStr, "/") && !normalizedPath.empty())
+            appendPatternToRegex(normalized_path_str, regex);
+            if (!Piccolo::string_utils::ends_with(normalized_path_str, "/") && !normalized_path.empty())
                 regex << '/';
             regex << "[^/]+";
 
@@ -503,7 +506,7 @@ namespace Piccolo
             return regex.str();
         }
 
-        std::filesystem::path Piccolo::vfs::getCurrentProcessDirectory()
+        std::filesystem::path getCurrentProcessDirectory()
         {
 #ifdef WIN32
             wchar_t buf[MAX_PATH];

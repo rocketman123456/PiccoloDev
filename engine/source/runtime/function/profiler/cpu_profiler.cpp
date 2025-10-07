@@ -1,4 +1,4 @@
-#include "runtime/function/render/profiler/cpu_profiler.h"
+#include "runtime/function/profiler/cpu_profiler.h"
 
 #include "runtime/core/base/macro.h"
 

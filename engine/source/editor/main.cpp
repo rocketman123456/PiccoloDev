@@ -1,10 +1,12 @@
+#include "runtime/engine.h"
+
+#include "editor/editor.h"
+
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <unordered_map>
-
-#include "runtime/engine.h"
 
 // https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
 #define PICCOLO_XSTR(s) PICCOLO_STR(s)

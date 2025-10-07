@@ -43,8 +43,8 @@ namespace Piccolo
             [[nodiscard]] size_t      size() const override;
 
         private:
-            void*  data_ = nullptr;
-            size_t size_ = 0;
+            void*  m_data = nullptr;
+            size_t m_size = 0;
         };
 
         using enumerate_callback_t = const std::function<void(std::string_view)>&;
@@ -121,9 +121,9 @@ namespace Piccolo
         public:
             RelativeFileSystem(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& basePath);
 
-            [[nodiscard]] const std::filesystem::path& getBasePath() const { return basePath_; }
+            [[nodiscard]] const std::filesystem::path& getBasePath() const { return m_base_path; }
 
-            std::filesystem::path getFullPath(const std::filesystem::path& name) const override { return basePath_ / name.relative_path(); }
+            std::filesystem::path getFullPath(const std::filesystem::path& name) const override { return m_base_path / name.relative_path(); }
 
             bool     isFolderExists(const std::filesystem::path& name) override;
             bool     isFileExists(const std::filesystem::path& name) override;
@@ -139,8 +139,8 @@ namespace Piccolo
             int enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates /* = false */) override;
 
         private:
-            std::shared_ptr<IFileSystem> underlyingFS_;
-            std::filesystem::path        basePath_;
+            std::shared_ptr<IFileSystem> m_underlying_fs;
+            std::filesystem::path        m_base_path;
         };
 
         // A virtual file system that allows mounting, or attaching, other VFS objects to paths.
@@ -148,7 +148,7 @@ namespace Piccolo
         class VFileSystem : public IFileSystem
         {
         public:
-            std::filesystem::path getFullPath(const std::filesystem::path& name) const;
+            std::filesystem::path getFullPath(const std::filesystem::path& name) const override;
 
             void mount(const std::filesystem::path& path, std::shared_ptr<IFileSystem> fs);
             void mount(const std::filesystem::path& path, const std::filesystem::path& nativePath);
@@ -170,7 +170,7 @@ namespace Piccolo
         private:
             bool findMountPoint(const std::filesystem::path& path, std::filesystem::path* pRelativePath, IFileSystem** ppFS) const;
 
-            std::vector<std::pair<std::string, std::shared_ptr<IFileSystem>>> mountPoints_;
+            std::vector<std::pair<std::string, std::shared_ptr<IFileSystem>>> m_mount_points;
         };
 
         std::string getFileSearchRegex(const std::filesystem::path& path, const std::vector<std::string>& extensions);

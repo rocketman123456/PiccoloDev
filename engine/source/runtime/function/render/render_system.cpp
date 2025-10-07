@@ -10,10 +10,15 @@
 #include "runtime/function/render/gpu_render_state_manager.h"
 #include "runtime/function/render/gpu_swap_chain.h"
 #include "runtime/function/render/gpu_sync_object.h"
-#include "runtime/function/render/profiler/cpu_profiler.h"
-#include "runtime/function/render/profiler/gpu_profiler.h"
+
+#include "runtime/function/profiler/cpu_profiler.h"
+#include "runtime/function/profiler/gpu_profiler.h"
 
 #include "runtime/core/base/macro.h"
+
+#include "runtime/function/global/global_context.h"
+#include "runtime/resource/asset_manager/asset_manager.h"
+#include "runtime/resource/config_manager/config_manager.h"
 
 #include <memory>
 
@@ -30,13 +35,6 @@ namespace Piccolo
         m_resource_manager = std::make_shared<GPURenderResourceManager>(m_device->getDevice());
         m_state_manager    = std::make_shared<GPURenderStateManager>(m_device->getDevice());
 
-        // 初始化性能分析器
-        m_gpu_profiler = std::make_shared<GPUProfiler>();
-        m_gpu_profiler->initialize(m_device->getDevice(), m_device->getPhysicalDevice(), 64, 3); // 每帧64个查询，最多3帧
-
-        m_cpu_profiler = std::make_shared<CPUProfiler>();
-        m_cpu_profiler->initialize();
-
         // 初始化渲染资源
         initializeRenderResources();
 
@@ -50,10 +48,6 @@ namespace Piccolo
     void RenderSystem::clear()
     {
         vkDeviceWaitIdle(m_device->getDevice());
-
-        // 清理性能分析器
-        m_gpu_profiler.reset();
-        m_cpu_profiler.reset();
 
         // 清理新的工具类
         m_state_manager.reset();
@@ -70,55 +64,58 @@ namespace Piccolo
     void RenderSystem::tick(float /*dt*/)
     {
         // 开始新帧的性能分析
-        m_gpu_profiler->beginFrame(m_current_frame);
-        m_cpu_profiler->beginFrame(m_current_frame);
+        auto gpu_profiler = g_runtime_global_context.m_gpu_profiler;
+        auto cpu_profiler = g_runtime_global_context.m_cpu_profiler;
+
+        gpu_profiler->beginFrame(m_current_frame);
+        cpu_profiler->beginFrame(m_current_frame);
 
         auto in_flight_fence           = m_sync_object->getInFlightFence(m_current_frame);
         auto image_available_semaphore = m_sync_object->getImageAvailableSemaphore(m_current_frame);
         auto command_buffer            = m_command_pool->getCommandBuffer(m_current_frame);
 
         // draw frame
-        m_cpu_profiler->beginTimestamp("Frame Wait");
+        cpu_profiler->beginTimestamp("Frame Wait");
         vkWaitForFences(m_device->getDevice(), 1, &in_flight_fence, VK_TRUE, UINT64_MAX);
         vkResetFences(m_device->getDevice(), 1, &in_flight_fence);
         uint32_t image_index;
         vkAcquireNextImageKHR(m_device->getDevice(), m_swap_chain->getSwapchain(), UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index);
-        m_cpu_profiler->endTimestamp("Frame Wait");
+        cpu_profiler->endTimestamp("Frame Wait");
 
-        m_cpu_profiler->beginTimestamp("Command Buffer Reset");
+        cpu_profiler->beginTimestamp("Command Buffer Reset");
         vkResetCommandBuffer(command_buffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
-        m_cpu_profiler->endTimestamp("Command Buffer Reset");
+        cpu_profiler->endTimestamp("Command Buffer Reset");
 
         // 开始记录命令缓冲区
         VkCommandBufferBeginInfo begin_info {};
         begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-        m_cpu_profiler->beginTimestamp("Command Buffer Begin");
+        cpu_profiler->beginTimestamp("Command Buffer Begin");
         if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS)
         {
             LOG_ERROR("failed to begin recording command buffer!");
             return;
         }
-        m_cpu_profiler->endTimestamp("Command Buffer Begin");
+        cpu_profiler->endTimestamp("Command Buffer Begin");
 
-        m_gpu_profiler->resetQueryPool(command_buffer, m_current_frame);
+        gpu_profiler->resetQueryPool(command_buffer, m_current_frame);
 
         // 开始性能分析 - 必须在命令缓冲区开始记录后调用
-        m_gpu_profiler->beginTimestamp(command_buffer, m_current_frame, "Command Record");
-        m_cpu_profiler->beginTimestamp("Command Record");
+        gpu_profiler->beginTimestamp(command_buffer, m_current_frame, "Command Record");
+        cpu_profiler->beginTimestamp("Command Record");
         // 记录渲染命令
         m_command_pool->recordRenderCommands(command_buffer, image_index);
         // 结束性能分析
-        m_cpu_profiler->endTimestamp("Command Record");
-        m_gpu_profiler->endTimestamp(command_buffer, m_current_frame);
+        cpu_profiler->endTimestamp("Command Record");
+        gpu_profiler->endTimestamp(command_buffer, m_current_frame);
 
-        m_cpu_profiler->beginTimestamp("Command Buffer End");
+        cpu_profiler->beginTimestamp("Command Buffer End");
         if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS)
         {
             LOG_ERROR("failed to record command buffer!");
             return;
         }
-        m_cpu_profiler->endTimestamp("Command Buffer End");
+        cpu_profiler->endTimestamp("Command Buffer End");
 
         VkSubmitInfo submit_info {};
         submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -136,13 +133,13 @@ namespace Piccolo
         submit_info.signalSemaphoreCount = 1;
         submit_info.pSignalSemaphores    = signal_semaphores;
 
-        m_cpu_profiler->beginTimestamp("Queue Submit");
+        cpu_profiler->beginTimestamp("Queue Submit");
         if (vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submit_info, m_sync_object->getInFlightFence(m_current_frame)) != VK_SUCCESS)
         {
             LOG_ERROR("failed to submit draw command buffer!");
             return; // 提交失败时直接返回，避免继续执行可能导致的问题
         }
-        m_cpu_profiler->endTimestamp("Queue Submit");
+        cpu_profiler->endTimestamp("Queue Submit");
 
         VkPresentInfoKHR present_info {};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -156,29 +153,13 @@ namespace Piccolo
 
         present_info.pImageIndices = &image_index;
 
-        m_cpu_profiler->beginTimestamp("Present");
+        cpu_profiler->beginTimestamp("Present");
         vkQueuePresentKHR(m_device->getPresentQueue(), &present_info);
-        m_cpu_profiler->endTimestamp("Present");
+        cpu_profiler->endTimestamp("Present");
 
         // 结束帧性能分析并记录数据
-        m_gpu_profiler->endFrame(m_current_frame);
-        m_cpu_profiler->endFrame(m_current_frame);
-
-        // 每帧输出性能数据（用于调试）
-        static uint32_t frame_count = 0;
-        frame_count++;
-
-        // 简单显示帧计数
-        LOG_INFO("=== Frame {} completed ===", frame_count);
-
-        if (m_gpu_profiler->hasValidData() || m_cpu_profiler->hasValidData())
-        {
-            logProfilerData();
-        }
-        else
-        {
-            LOG_INFO("No profiler data available for frame {}", frame_count);
-        }
+        gpu_profiler->endFrame(m_current_frame);
+        cpu_profiler->endFrame(m_current_frame);
 
         // 更新帧索引，循环使用同步对象
         m_current_frame = (m_current_frame + 1) % m_sync_object->getMaxFramesInFlight();
@@ -204,64 +185,5 @@ namespace Piccolo
     {
         // 使用新的工厂方法创建基础三角形管道
         m_pipeline = GPUPipeline::createBasicTrianglePipeline(m_device->getDevice(), m_render_pass->getRenderPass());
-    }
-
-    void RenderSystem::logProfilerData()
-    {
-        bool has_gpu_data = m_gpu_profiler->hasValidData();
-        bool has_cpu_data = m_cpu_profiler->hasValidData();
-
-        if (!has_gpu_data && !has_cpu_data)
-        {
-            LOG_INFO("=== Profiler Data (Frame {}) - No valid data ===", m_current_frame);
-            return;
-        }
-
-        LOG_INFO("=== Profiler Data (Frame {}) ===", m_current_frame);
-
-        // 输出GPU profiler数据
-        if (has_gpu_data)
-        {
-            const GPUTimestamp* gpu_timestamps = m_gpu_profiler->getTimestamps();
-            uint32_t            gpu_count      = m_gpu_profiler->getTimestampCount();
-
-            LOG_INFO("--- GPU Profiler Data ({} timestamps) ---", gpu_count);
-            for (uint32_t i = 0; i < gpu_count; ++i)
-            {
-                const GPUTimestamp& timestamp = gpu_timestamps[i];
-                LOG_INFO(
-                    "  GPU {}: {:.3f} ms (start: {}, end: {})",
-                    timestamp.name ? timestamp.name : "Unknown",
-                    timestamp.elapsed_ms,
-                    timestamp.start,
-                    timestamp.end
-                );
-            }
-        }
-        else
-        {
-            LOG_INFO("--- GPU Profiler Data - No valid data ---");
-        }
-
-        // 输出CPU profiler数据
-        if (has_cpu_data)
-        {
-            const CPUTimestamp* cpu_timestamps = m_cpu_profiler->getTimestamps();
-            uint32_t            cpu_count      = m_cpu_profiler->getTimestampCount();
-
-            LOG_INFO("--- CPU Profiler Data ({} timestamps) ---", cpu_count);
-            for (uint32_t i = 0; i < cpu_count; ++i)
-            {
-                const CPUTimestamp& timestamp = cpu_timestamps[i];
-                // LOG_INFO("  CPU {}: {:.3f} ms (start: {:.3f}, end: {:.3f})", timestamp.name, timestamp.elapsed_ms, timestamp.start_time, timestamp.end_time);
-                LOG_INFO("  CPU {}: {:.3f} ms", timestamp.name, timestamp.elapsed_ms);
-            }
-        }
-        else
-        {
-            LOG_INFO("--- CPU Profiler Data - No valid data ---");
-        }
-
-        LOG_INFO("=== End Profiler Data ===");
     }
 } // namespace Piccolo

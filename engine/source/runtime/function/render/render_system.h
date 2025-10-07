@@ -38,16 +38,12 @@ namespace Piccolo
         std::shared_ptr<GPURenderResourceManager> getResourceManager() const { return m_resource_manager; }
         std::shared_ptr<GPURenderStateManager>    getStateManager() const { return m_state_manager; }
 
-        // 性能分析器访问器
-        std::shared_ptr<GPUProfiler> getGPUProfiler() const { return m_gpu_profiler; }
-        std::shared_ptr<CPUProfiler> getCPUProfiler() const { return m_cpu_profiler; }
         uint32_t getCurrentFrame() const { return m_current_frame; }
 
     private:
         void initializeRenderResources();
         void createDefaultPipeline();
         void createDefaultRenderPass();
-        void logProfilerData();
 
         std::shared_ptr<GPUContext>     m_context;
         std::shared_ptr<GPUDevice>      m_device;
@@ -60,10 +56,6 @@ namespace Piccolo
         // 新的工具类
         std::shared_ptr<GPURenderResourceManager> m_resource_manager;
         std::shared_ptr<GPURenderStateManager>    m_state_manager;
-
-        // 性能分析器
-        std::shared_ptr<GPUProfiler> m_gpu_profiler;
-        std::shared_ptr<CPUProfiler> m_cpu_profiler;
 
         uint32_t m_current_frame = 0; // 当前帧索引
     };

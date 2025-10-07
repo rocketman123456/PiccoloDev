@@ -54,9 +54,6 @@ namespace Piccolo
         std::vector<GPUTimestamp> m_timestamps;
         std::vector<uint64_t>     m_timestamps_data;
 
-        // GPUTimestamp* m_timestamps      = nullptr;
-        // uint64_t*     m_timestamps_data = nullptr;
-
         uint32_t m_queries_per_frame = 0;
         uint32_t m_max_frames        = 0;
         uint32_t m_current_query     = 0;

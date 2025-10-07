@@ -15,6 +15,9 @@ namespace Piccolo
     class WindowSystem;
     class RenderSystem;
 
+    class CPUProfiler;
+    class GPUProfiler;
+
     struct EngineInitParams;
 
     /// Manage the lifetime and creation/destruction order of all global system
@@ -36,6 +39,9 @@ namespace Piccolo
 
         std::shared_ptr<WindowSystem> m_window_system; 
         std::shared_ptr<RenderSystem> m_render_system;
+
+        std::shared_ptr<CPUProfiler> m_cpu_profiler;
+        std::shared_ptr<GPUProfiler> m_gpu_profiler;
     };
 
     extern RuntimeGlobalContext g_runtime_global_context;

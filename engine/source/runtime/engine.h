@@ -39,9 +39,10 @@ namespace Piccolo
 
         void calculateFPS(float delta_time);
 
-        
         // Each frame can only be called once
         float calculateDeltaTime();
+
+        void logProfilerData();
 
         bool m_is_quit {false};
 

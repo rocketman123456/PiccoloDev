@@ -9,9 +9,14 @@
 
 #include "runtime/function/event/event_system.h"
 
-#include "runtime/function/render/profiler/gpu_profiler.h"
+#include "runtime/function/render/gpu_device.h"
 #include "runtime/function/render/render_system.h"
 #include "runtime/function/render/window_system.h"
+
+#include "runtime/function/ecs/coordinator.h"
+
+#include "runtime/function/profiler/cpu_profiler.h"
+#include "runtime/function/profiler/gpu_profiler.h"
 
 namespace Piccolo
 {
@@ -35,10 +40,21 @@ namespace Piccolo
 
         m_render_system = std::make_shared<RenderSystem>();
         m_render_system->initialize();
+
+        m_cpu_profiler = std::make_shared<CPUProfiler>();
+        m_cpu_profiler->initialize();
+        m_gpu_profiler = std::make_shared<GPUProfiler>();
+        {
+            auto device = m_render_system->getDevice();
+            m_gpu_profiler->initialize(device->getDevice(), device->getPhysicalDevice(), 64, 3); // 每帧64个查询，最多3帧
+        }
     }
 
     void RuntimeGlobalContext::shutdownSystems()
     {
+        m_gpu_profiler.reset();
+        m_cpu_profiler.reset();
+
         m_render_system->clear();
         m_render_system.reset();
         m_window_system.reset();

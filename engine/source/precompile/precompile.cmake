@@ -7,30 +7,30 @@ configure_file(${PICCOLO_PRECOMPILE_PARAMS_IN_PATH} ${PICCOLO_PRECOMPILE_PARAMS_
 #
 # use wine for linux
 if (CMAKE_HOST_WIN32)
-    set(PRECOMPILE_PRE_EXE)
-	set(PRECOMPILE_PARSER ${PRECOMPILE_TOOLS_PATH}/PiccoloParser.exe)
-    set(sys_include "*") 
+  set(PRECOMPILE_PRE_EXE)
+  set(PRECOMPILE_PARSER ${PRECOMPILE_TOOLS_PATH}/PiccoloParser.exe)
+  set(sys_include "*") 
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux" )
-    set(PRECOMPILE_PRE_EXE)
-	set(PRECOMPILE_PARSER ${PRECOMPILE_TOOLS_PATH}/PiccoloParser)
-    set(sys_include "/usr/include/c++/9/") 
-    #execute_process(COMMAND chmod a+x ${PRECOMPILE_PARSER} WORKING_DIRECTORY ${PRECOMPILE_TOOLS_PATH})
+  set(PRECOMPILE_PRE_EXE)
+  set(PRECOMPILE_PARSER ${PRECOMPILE_TOOLS_PATH}/PiccoloParser)
+  set(sys_include "/usr/include/c++/9/") 
+  #execute_process(COMMAND chmod a+x ${PRECOMPILE_PARSER} WORKING_DIRECTORY ${PRECOMPILE_TOOLS_PATH})
 elseif(CMAKE_HOST_APPLE)
-    find_program(XCRUN_EXECUTABLE xcrun)
-    if(NOT XCRUN_EXECUTABLE)
-      message(FATAL_ERROR "xcrun not found!!!")
-    endif()
+  find_program(XCRUN_EXECUTABLE xcrun)
+  if(NOT XCRUN_EXECUTABLE)
+    message(FATAL_ERROR "xcrun not found!!!")
+  endif()
 
-    execute_process(
-      COMMAND ${XCRUN_EXECUTABLE} --sdk macosx --show-sdk-platform-path
-      OUTPUT_VARIABLE osx_sdk_platform_path_test
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+  execute_process(
+    COMMAND ${XCRUN_EXECUTABLE} --sdk macosx --show-sdk-platform-path
+    OUTPUT_VARIABLE osx_sdk_platform_path_test
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
 
-    set(PRECOMPILE_PRE_EXE)
-	  set(PRECOMPILE_PARSER ${PRECOMPILE_TOOLS_PATH}/PiccoloParser)
-    # set(sys_include "${osx_sdk_platform_path_test}/../../Toolchains/XcodeDefault.xctoolchain/usr/include/c++/v1")
-    set(sys_include "${osx_sdk_platform_path_test}/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1")
+  set(PRECOMPILE_PRE_EXE)
+  set(PRECOMPILE_PARSER ${PRECOMPILE_TOOLS_PATH}/PiccoloParser)
+  # set(sys_include "${osx_sdk_platform_path_test}/../../Toolchains/XcodeDefault.xctoolchain/usr/include/c++/v1")
+  set(sys_include "${osx_sdk_platform_path_test}/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1")
 endif()
 
 set (PARSER_INPUT ${CMAKE_BINARY_DIR}/parser_header.h)

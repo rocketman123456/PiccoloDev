@@ -80,5 +80,5 @@ namespace Piccolo
         std::unique_ptr<SystemManager>    m_system_manager;
     };
 
-    extern Coordinator g_coordinator;
+    // extern Coordinator g_coordinator;
 } // namespace Piccolo

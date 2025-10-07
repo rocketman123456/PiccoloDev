@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/function/render/profiler/gpu_timestamp.h"
+#include "runtime/function/profiler/gpu_timestamp.h"
 
 #include <volk.h>
 
@@ -39,6 +39,9 @@ namespace Piccolo
     private:
         VkDevice                             m_device = VK_NULL_HANDLE;
         std::unique_ptr<GPUTimestampManager> m_timestamp_manager;
+
+        uint32_t m_queries_per_frame {0};
+        uint32_t m_max_frames {0};
 
         std::vector<GPUTimestamp> m_current_timestamps;
         uint32_t                  m_current_frame = 0;

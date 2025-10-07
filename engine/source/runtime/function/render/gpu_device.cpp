@@ -56,11 +56,11 @@ namespace Piccolo
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(dev, nullptr, &extensionCount, availableExtensions.data());
 
-        // LOG_DEBUG("support extensions:")
-        // for (const auto& ext : availableExtensions)
-        // {
-        //     LOG_DEBUG("  {}", ext.extensionName);
-        // }
+        LOG_DEBUG("support extensions:")
+        for (const auto& ext : availableExtensions)
+        {
+            LOG_DEBUG("  {}", ext.extensionName);
+        }
 
         std::set<std::string> required(m_device_extensions.begin(), m_device_extensions.end());
 
@@ -120,13 +120,13 @@ namespace Piccolo
         auto indices = findQueueFamilies(m_physical_device, m_surface);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t>                   uniqueQueueFamilies = {
+        std::set<uint32_t>                   unique_queue_families = {
             indices.graphics_family.value(),
             indices.present_family.value(),
         };
 
         float queuePriority = 1.0f;
-        for (uint32_t queueFamily : uniqueQueueFamilies)
+        for (uint32_t queueFamily : unique_queue_families)
         {
             VkDeviceQueueCreateInfo queueCreateInfo {};
             queueCreateInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -136,19 +136,21 @@ namespace Piccolo
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        // float                   queuePriority = 1.0f;
-        // VkDeviceQueueCreateInfo queueInfo {};
-        // queueInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        // queueInfo.queueFamilyIndex = m_graphics_queue_family;
-        // queueInfo.queueCount       = 1;
-        // queueInfo.pQueuePriorities = &queuePriority;
-
         VkDeviceCreateInfo createInfo {};
         createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         createInfo.enabledExtensionCount   = static_cast<uint32_t>(m_device_extensions.size());
         createInfo.ppEnabledExtensionNames = m_device_extensions.data();
         createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos       = queueCreateInfos.data();
+
+        // VkPhysicalDeviceHostQueryResetFeaturesEXT query_extension {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT};
+
+        // VkPhysicalDeviceFeatures2 physical_device_features;
+        // physical_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR;
+        // physical_device_features.pNext = &query_extension;
+        // vkGetPhysicalDeviceFeatures2KHR(m_physical_device, &physical_device_features);
+        // physical_device_features.hostQueryReset = VK_TRUE;
+        // vkGetPhysicalDeviceFeatures2(m_physical_device, &physical_device_features);
 
         if (m_enable_descriptor_indexing)
         {
@@ -159,7 +161,6 @@ namespace Piccolo
             VkPhysicalDeviceFeatures2 features2 {};
             features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             features2.pNext = &indexingFeatures;
-
             vkGetPhysicalDeviceFeatures2(m_physical_device, &features2);
 
             createInfo.pNext = &indexingFeatures; // enable descriptor indexing if available
