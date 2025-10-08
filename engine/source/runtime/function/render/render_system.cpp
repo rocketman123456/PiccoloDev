@@ -28,8 +28,14 @@
 
 namespace Piccolo
 {
+    // const std::vector<Vertex> vertices = {
+    //     {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    //     { {0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    //     {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    // };
+
     const std::vector<Vertex> vertices = {
-        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
         { {0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
         {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
     };
@@ -45,14 +51,14 @@ namespace Piccolo
         m_resource_manager = std::make_shared<GPURenderResourceManager>(m_device->getDevice(), m_device->getPhysicalDevice());
         m_state_manager    = std::make_shared<GPURenderStateManager>(m_device->getDevice());
 
-        // 初始化渲染资源
-        initializeRenderResources();
-
         // 使用交换链图像数量作为最大并发帧数，确保每个图像都有独立的命令缓冲区和同步对象
         uint32_t max_frames_in_flight = static_cast<uint32_t>(m_swap_chain->getImages().size());
 
         m_command_pool = std::make_shared<GPUCommandPool>(m_device->getDevice(), max_frames_in_flight);
         m_sync_object  = std::make_shared<GPUSyncObject>(m_device->getDevice(), max_frames_in_flight);
+
+        // 初始化渲染资源
+        initializeRenderResources();
     }
 
     void RenderSystem::clear()
@@ -241,39 +247,75 @@ namespace Piccolo
 
     void RenderSystem::createRenderResource()
     {
-        VkBufferCreateInfo buffer_info {};
-        buffer_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        buffer_info.size        = sizeof(vertices[0]) * vertices.size();
-        buffer_info.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        // VkBufferCreateInfo buffer_info {};
+        // buffer_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        // buffer_info.size        = sizeof(vertices[0]) * vertices.size();
+        // buffer_info.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        // buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateBuffer(m_device->getDevice(), &buffer_info, nullptr, &m_vertex_buffer) != VK_SUCCESS)
-        {
-            LOG_ERROR("failed to create vertex buffer!");
-            return;
-        }
+        // if (vkCreateBuffer(m_device->getDevice(), &buffer_info, nullptr, &m_vertex_buffer) != VK_SUCCESS)
+        // {
+        //     LOG_ERROR("failed to create vertex buffer!");
+        //     return;
+        // }
 
-        VkMemoryRequirements mem_requirements;
-        vkGetBufferMemoryRequirements(m_device->getDevice(), m_vertex_buffer, &mem_requirements);
+        // VkMemoryRequirements mem_requirements;
+        // vkGetBufferMemoryRequirements(m_device->getDevice(), m_vertex_buffer, &mem_requirements);
 
-        VkMemoryAllocateInfo alloc_info {};
-        alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        alloc_info.allocationSize  = mem_requirements.size;
-        alloc_info.memoryTypeIndex = find_memory_type(
-            m_device->getPhysicalDevice(), mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        // VkMemoryAllocateInfo alloc_info {};
+        // alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        // alloc_info.allocationSize  = mem_requirements.size;
+        // alloc_info.memoryTypeIndex = find_memory_type(
+        //     m_device->getPhysicalDevice(), mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        // );
+
+        // if (vkAllocateMemory(m_device->getDevice(), &alloc_info, nullptr, &m_vertex_buffer_memory) != VK_SUCCESS)
+        // {
+        //     LOG_ERROR("failed to allocate vertex buffer memory!");
+        //     return;
+        // }
+
+        // vkBindBufferMemory(m_device->getDevice(), m_vertex_buffer, m_vertex_buffer_memory, 0);
+
+        // void* data;
+        // vkMapMemory(m_device->getDevice(), m_vertex_buffer_memory, 0, buffer_info.size, 0, &data);
+        // memcpy(data, vertices.data(), static_cast<size_t>(buffer_info.size));
+        // vkUnmapMemory(m_device->getDevice(), m_vertex_buffer_memory);
+
+        // -------------------------------------------------------------
+
+        // 使用新的GPU缓冲区工具函数创建顶点缓冲区
+        size_t buffer_size = sizeof(vertices[0]) * vertices.size();
+
+        VkBuffer       staging_buffer        = GPUBufferUtility::createBuffer(m_device->getDevice(), buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+        VkDeviceMemory staging_buffer_memory = GPUBufferUtility::allocateBufferMemory(
+            m_device->getDevice(), m_device->getPhysicalDevice(), staging_buffer, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         );
-
-        if (vkAllocateMemory(m_device->getDevice(), &alloc_info, nullptr, &m_vertex_buffer_memory) != VK_SUCCESS)
-        {
-            LOG_ERROR("failed to allocate vertex buffer memory!");
-            return;
-        }
-
-        vkBindBufferMemory(m_device->getDevice(), m_vertex_buffer, m_vertex_buffer_memory, 0);
+        GPUBufferUtility::bindBufferMemory(m_device->getDevice(), staging_buffer, staging_buffer_memory);
 
         void* data;
-        vkMapMemory(m_device->getDevice(), m_vertex_buffer_memory, 0, buffer_info.size, 0, &data);
-        memcpy(data, vertices.data(), static_cast<size_t>(buffer_info.size));
-        vkUnmapMemory(m_device->getDevice(), m_vertex_buffer_memory);
+        vkMapMemory(m_device->getDevice(), staging_buffer_memory, 0, buffer_size, 0, &data);
+        memcpy(data, vertices.data(), buffer_size);
+        vkUnmapMemory(m_device->getDevice(), staging_buffer_memory);
+
+        // GPUBufferUtility::destroyBuffer(m_device->getDevice(), staging_buffer);
+        // GPUBufferUtility::freeBufferMemory(m_device->getDevice(), m_device->getPhysicalDevice(), staging_buffer_memory);
+
+        // 创建顶点缓冲区（使用设备本地内存以获得更好的性能）
+        m_vertex_buffer =
+            GPUBufferUtility::createBuffer(m_device->getDevice(), buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        // 分配设备本地内存（性能更好）
+        m_vertex_buffer_memory =
+            GPUBufferUtility::allocateBufferMemory(m_device->getDevice(), m_device->getPhysicalDevice(), m_vertex_buffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        GPUBufferUtility::bindBufferMemory(m_device->getDevice(), m_vertex_buffer, m_vertex_buffer_memory);
+        GPUBufferUtility::copyBuffer(
+            m_device->getDevice(), m_command_pool->getCommandPool(), m_device->getGraphicsQueue(), staging_buffer, m_vertex_buffer, buffer_size
+        );
+
+        vkDestroyBuffer(m_device->getDevice(), staging_buffer, nullptr);
+        vkFreeMemory(m_device->getDevice(), staging_buffer_memory, nullptr);
+
+        LOG_INFO("顶点缓冲区创建和上传完成，大小: {} 字节", buffer_size);
     }
 } // namespace Piccolo
