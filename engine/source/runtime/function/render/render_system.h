@@ -1,5 +1,8 @@
 #pragma once
 
+#include <volk.h>
+// #include <vulkan/vulkan.h>
+
 #include <memory>
 
 namespace Piccolo
@@ -41,13 +44,13 @@ namespace Piccolo
         uint32_t getCurrentFrame() const { return m_current_frame; }
 
         bool isFramebufferResized() const { return m_framebuffer_resized; }
-
         void setFramebufferResized(bool resized) { m_framebuffer_resized = resized; }
 
     private:
         void initializeRenderResources();
         void createDefaultPipeline();
         void createDefaultRenderPass();
+        void createRenderResource();
 
         std::shared_ptr<GPUContext>     m_context;
         std::shared_ptr<GPUDevice>      m_device;

@@ -18,6 +18,15 @@ namespace Piccolo
         std::vector<std::string> defines;
     };
 
+    // 管道配置结构 (保持向后兼容)
+    struct GPUPipelineConfig
+    {
+        std::string name;
+        std::string description;
+
+        std::vector<GPUShaderStageConfig> shader_stages;
+    };
+
     // 顶点输入配置
     struct VertexInputConfig
     {
@@ -194,6 +203,8 @@ namespace Piccolo
     public:
         // 基础三角形渲染管道
         static GPUPipelineBuilderConfig createBasicTrianglePipeline();
+
+        static GPUPipelineBuilderConfig createAdvancedTrianglePipeline();
 
         // 带深度测试的管道
         static GPUPipelineBuilderConfig createDepthTestPipeline();

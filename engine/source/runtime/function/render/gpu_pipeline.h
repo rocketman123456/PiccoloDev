@@ -4,7 +4,6 @@
 #include "runtime/function/render/utils/gpu_utils.h"
 
 #include <volk.h>
-// #include <vulkan/vulkan.h>
 
 #include <memory>
 #include <string>
@@ -15,14 +14,7 @@ namespace Piccolo
     // 前向声明，完整定义在gpu_pipeline_builder.h中
     struct GPUShaderStageConfig;
 
-    // 管道配置结构 (保持向后兼容)
-    struct GPUPipelineConfig
-    {
-        std::string name;
-        std::string description;
-
-        std::vector<GPUShaderStageConfig> shader_stages;
-    };
+    struct GPUPipelineConfig;
 
     class GPUPipeline
     {
@@ -38,11 +30,6 @@ namespace Piccolo
         VkPipeline                 getPipeline() const { return m_pipeline; }
         VkPipelineLayout           getPipelineLayout() const { return m_pipeline_layout; }
         std::vector<VkFramebuffer> getSwapChainFramebuffers() const { return m_swap_chain_framebuffers; }
-
-        // 静态工厂方法
-        static std::shared_ptr<GPUPipeline> createBasicTrianglePipeline(VkDevice device, VkRenderPass render_pass);
-        static std::shared_ptr<GPUPipeline> createDepthTestPipeline(VkDevice device, VkRenderPass render_pass);
-        static std::shared_ptr<GPUPipeline> createWireframePipeline(VkDevice device, VkRenderPass render_pass);
 
         void createFramebuffers();
         void destroyFramebuffers();

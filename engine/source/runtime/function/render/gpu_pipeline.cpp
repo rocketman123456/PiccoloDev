@@ -1,5 +1,6 @@
 #include "runtime/function/render/gpu_pipeline.h"
 #include "runtime/function/render/gpu_render_pass.h"
+#include "runtime/function/render/gpu_render_resource.h"
 #include "runtime/function/render/gpu_swap_chain.h"
 #include "runtime/function/render/utils/gpu_pipeline_builder.h"
 
@@ -240,22 +241,4 @@ namespace Piccolo
         m_pipeline_layout = builder.getPipelineLayout();
     }
 
-    // 静态工厂方法实现
-    std::shared_ptr<GPUPipeline> GPUPipeline::createBasicTrianglePipeline(VkDevice device, VkRenderPass render_pass)
-    {
-        auto config = GPUPipelineConfigFactory::createBasicTrianglePipeline();
-        return std::make_shared<GPUPipeline>(device, config, render_pass);
-    }
-
-    std::shared_ptr<GPUPipeline> GPUPipeline::createDepthTestPipeline(VkDevice device, VkRenderPass render_pass)
-    {
-        auto config = GPUPipelineConfigFactory::createDepthTestPipeline();
-        return std::make_shared<GPUPipeline>(device, config, render_pass);
-    }
-
-    std::shared_ptr<GPUPipeline> GPUPipeline::createWireframePipeline(VkDevice device, VkRenderPass render_pass)
-    {
-        auto config = GPUPipelineConfigFactory::createWireframePipeline();
-        return std::make_shared<GPUPipeline>(device, config, render_pass);
-    }
 } // namespace Piccolo

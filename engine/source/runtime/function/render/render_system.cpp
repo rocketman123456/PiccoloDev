@@ -10,6 +10,8 @@
 #include "runtime/function/render/gpu_render_state_manager.h"
 #include "runtime/function/render/gpu_swap_chain.h"
 #include "runtime/function/render/gpu_sync_object.h"
+#include "runtime/function/render/utils/gpu_pipeline_builder.h"
+#include "runtime/function/render/utils/gpu_render_pass_builder.h"
 
 #include "runtime/function/profiler/cpu_profiler.h"
 #include "runtime/function/profiler/gpu_profiler.h"
@@ -17,13 +19,20 @@
 #include "runtime/core/base/macro.h"
 
 #include "runtime/function/global/global_context.h"
+#include "runtime/function/render/gpu_render_resource.h"
 #include "runtime/resource/asset_manager/asset_manager.h"
 #include "runtime/resource/config_manager/config_manager.h"
 
-#include <memory>
+#include <array>
 
 namespace Piccolo
 {
+    const std::vector<Vertex> vertices = {
+        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        { {0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    };
+
     void RenderSystem::initialize()
     {
         // 初始化基础GPU组件
@@ -203,6 +212,9 @@ namespace Piccolo
         // 创建默认渲染通道
         createDefaultRenderPass();
 
+        // 创建渲染资源
+        createRenderResource();
+
         // 创建默认管道
         createDefaultPipeline();
     }
@@ -211,12 +223,24 @@ namespace Piccolo
     {
         // 使用新的工厂方法创建基础颜色渲染通道
         auto color_format = m_swap_chain->getImageFormat();
-        m_render_pass     = GPURenderPass::createBasicColorPass(m_device->getDevice(), color_format);
+        // m_render_pass     = GPURenderPass::createBasicColorPass(m_device->getDevice(), color_format);
+
+        auto config   = GPURenderPassConfigFactory::createBasicColorPass(color_format);
+        m_render_pass = std::make_shared<GPURenderPass>(m_device->getDevice(), config);
+    }
+
+    void RenderSystem::createRenderResource()
+    {
+        auto binding_description    = Vertex::getBindingDescription();
+        auto attribute_descriptions = Vertex::getAttributeDescriptions();
     }
 
     void RenderSystem::createDefaultPipeline()
     {
         // 使用新的工厂方法创建基础三角形管道
-        m_pipeline = GPUPipeline::createBasicTrianglePipeline(m_device->getDevice(), m_render_pass->getRenderPass());
+        // m_pipeline = GPUPipeline::createBasicTrianglePipeline(m_device->getDevice(), m_render_pass->getRenderPass());
+
+        auto config = GPUPipelineConfigFactory::createAdvancedTrianglePipeline();
+        m_pipeline  = std::make_shared<GPUPipeline>(m_device->getDevice(), config, m_render_pass->getRenderPass());
     }
 } // namespace Piccolo
