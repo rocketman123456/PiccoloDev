@@ -4,6 +4,7 @@
 #include "runtime/function/render/gpu_shader.h"
 #include "runtime/function/render/utils/gpu_pipeline_builder.h"
 #include "runtime/function/render/utils/gpu_render_pass_builder.h"
+#include "runtime/function/render/utils/gpu_buffer_builder.h"
 
 #include <memory>
 #include <string>
@@ -17,7 +18,7 @@ namespace Piccolo
     class GPURenderResourceManager
     {
     public:
-        explicit GPURenderResourceManager(VkDevice device);
+        explicit GPURenderResourceManager(VkDevice device, VkPhysicalDevice physical_device);
         ~GPURenderResourceManager();
 
         // 管道管理
@@ -45,6 +46,20 @@ namespace Piccolo
         void          destroyFramebuffer(const std::string& name);
         void          destroyAllFramebuffers();
 
+        // 缓冲区管理
+        GPUBufferInfo createBuffer(const std::string& name, const GPUBufferConfig& config);
+        GPUBufferInfo createBuffer(const std::string& name, const GPUBufferConfig& config, void* initial_data, size_t data_size);
+        GPUBufferInfo getBuffer(const std::string& name) const;
+        void          destroyBuffer(const std::string& name);
+        void          destroyAllBuffers();
+
+        // 便捷的缓冲区创建方法
+        GPUBufferInfo createVertexBuffer(const std::string& name, size_t size, bool dynamic = false);
+        GPUBufferInfo createIndexBuffer(const std::string& name, size_t size, bool dynamic = false);
+        GPUBufferInfo createUniformBuffer(const std::string& name, size_t size, bool dynamic = true);
+        GPUBufferInfo createStorageBuffer(const std::string& name, size_t size, bool dynamic = false);
+        GPUBufferInfo createStagingBuffer(const std::string& name, size_t size);
+
         // 清理所有资源
         void clear();
 
@@ -53,13 +68,16 @@ namespace Piccolo
         size_t getRenderPassCount() const { return m_render_passes.size(); }
         size_t getDescriptorSetLayoutCount() const { return m_descriptor_set_layouts.size(); }
         size_t getFramebufferCount() const { return m_framebuffers.size(); }
+        size_t getBufferCount() const { return m_buffers.size(); }
 
     private:
-        VkDevice m_device;
+        VkDevice         m_device;
+        VkPhysicalDevice m_physical_device;
 
         std::unordered_map<std::string, VkPipeline>            m_pipelines;
         std::unordered_map<std::string, VkRenderPass>          m_render_passes;
         std::unordered_map<std::string, VkDescriptorSetLayout> m_descriptor_set_layouts;
         std::unordered_map<std::string, VkFramebuffer>         m_framebuffers;
+        std::unordered_map<std::string, GPUBufferInfo>         m_buffers;
     };
 } // namespace Piccolo

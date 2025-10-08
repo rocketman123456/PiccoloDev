@@ -13,6 +13,8 @@ namespace Piccolo
 
     class EventSystem;
 
+    class WorldManager;
+
     class WindowSystem;
     class RenderSystem;
 
@@ -38,6 +40,8 @@ namespace Piccolo
         std::shared_ptr<AssetManager> m_asset_manager;
 
         std::shared_ptr<EventSystem> m_event_system;
+
+        std::shared_ptr<WorldManager> m_world_manager;
 
         std::shared_ptr<WindowSystem> m_window_system;
         std::shared_ptr<RenderSystem> m_render_system;

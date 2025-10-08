@@ -7,8 +7,8 @@
 
 namespace Piccolo
 {
-    GPURenderResourceManager::GPURenderResourceManager(VkDevice device)
-        : m_device(device)
+    GPURenderResourceManager::GPURenderResourceManager(VkDevice device, VkPhysicalDevice physical_device)
+        : m_device(device), m_physical_device(physical_device)
     {
         LOG_INFO("GPURenderResourceManager initialized");
     }
@@ -286,8 +286,146 @@ namespace Piccolo
         LOG_INFO("Destroyed all framebuffers");
     }
 
+    // 缓冲区管理实现
+    GPUBufferInfo GPURenderResourceManager::createBuffer(const std::string& name, const GPUBufferConfig& config)
+    {
+        // 检查是否已存在
+        if (m_buffers.find(name) != m_buffers.end())
+        {
+            LOG_WARN("Buffer '{}' already exists, destroying old one", name);
+            destroyBuffer(name);
+        }
+
+        // 使用构建器创建缓冲区
+        GPUBufferBuilder builder(m_device, m_physical_device);
+        
+        // 应用配置
+        builder.setName(config.name)
+               .setDescription(config.description)
+               .setSize(config.size)
+               .setType(config.type)
+               .setUsage(config.usage)
+               .setMemoryType(config.memory_type)
+               .setUsageFlags(config.usage_flags)
+               .setMemoryPropertyFlags(config.memory_property_flags)
+               .setPersistent(config.persistent)
+               .setCoherent(config.coherent)
+               .setCached(config.cached);
+
+        if (config.initial_data)
+        {
+            builder.setInitialData(config.initial_data);
+        }
+
+        GPUBufferInfo buffer_info = builder.build();
+        m_buffers[name] = buffer_info;
+
+        LOG_INFO("Created buffer: {}", name);
+        return buffer_info;
+    }
+
+    GPUBufferInfo GPURenderResourceManager::createBuffer(const std::string& name, const GPUBufferConfig& config, void* initial_data, size_t data_size)
+    {
+        // 检查是否已存在
+        if (m_buffers.find(name) != m_buffers.end())
+        {
+            LOG_WARN("Buffer '{}' already exists, destroying old one", name);
+            destroyBuffer(name);
+        }
+
+        // 使用构建器创建缓冲区
+        GPUBufferBuilder builder(m_device, m_physical_device);
+        
+        // 应用配置
+        builder.setName(config.name)
+               .setDescription(config.description)
+               .setSize(config.size)
+               .setType(config.type)
+               .setUsage(config.usage)
+               .setMemoryType(config.memory_type)
+               .setUsageFlags(config.usage_flags)
+               .setMemoryPropertyFlags(config.memory_property_flags)
+               .setPersistent(config.persistent)
+               .setCoherent(config.coherent)
+               .setCached(config.cached);
+
+        GPUBufferInfo buffer_info = builder.buildWithData(initial_data, data_size);
+        m_buffers[name] = buffer_info;
+
+        LOG_INFO("Created buffer with data: {}", name);
+        return buffer_info;
+    }
+
+    GPUBufferInfo GPURenderResourceManager::getBuffer(const std::string& name) const
+    {
+        auto it = m_buffers.find(name);
+        if (it != m_buffers.end())
+        {
+            return it->second;
+        }
+        return GPUBufferInfo{}; // 返回空的缓冲区信息
+    }
+
+    void GPURenderResourceManager::destroyBuffer(const std::string& name)
+    {
+        auto it = m_buffers.find(name);
+        if (it != m_buffers.end())
+        {
+            GPUBufferUtils::destroyBuffer(m_device, it->second);
+            m_buffers.erase(it);
+            LOG_INFO("Destroyed buffer: {}", name);
+        }
+    }
+
+    void GPURenderResourceManager::destroyAllBuffers()
+    {
+        for (auto& [name, buffer_info] : m_buffers)
+        {
+            GPUBufferUtils::destroyBuffer(m_device, buffer_info);
+        }
+        m_buffers.clear();
+        LOG_INFO("Destroyed all buffers");
+    }
+
+    // 便捷的缓冲区创建方法
+    GPUBufferInfo GPURenderResourceManager::createVertexBuffer(const std::string& name, size_t size, bool dynamic)
+    {
+        auto config = GPUBufferConfigFactory::createVertexBufferConfig(size, dynamic);
+        config.name = name;
+        return createBuffer(name, config);
+    }
+
+    GPUBufferInfo GPURenderResourceManager::createIndexBuffer(const std::string& name, size_t size, bool dynamic)
+    {
+        auto config = GPUBufferConfigFactory::createIndexBufferConfig(size, dynamic);
+        config.name = name;
+        return createBuffer(name, config);
+    }
+
+    GPUBufferInfo GPURenderResourceManager::createUniformBuffer(const std::string& name, size_t size, bool dynamic)
+    {
+        auto config = GPUBufferConfigFactory::createUniformBufferConfig(size, dynamic);
+        config.name = name;
+        return createBuffer(name, config);
+    }
+
+    GPUBufferInfo GPURenderResourceManager::createStorageBuffer(const std::string& name, size_t size, bool dynamic)
+    {
+        auto config = GPUBufferConfigFactory::createStorageBufferConfig(size, dynamic);
+        config.name = name;
+        return createBuffer(name, config);
+    }
+
+    GPUBufferInfo GPURenderResourceManager::createStagingBuffer(const std::string& name, size_t size)
+    {
+        auto config = GPUBufferConfigFactory::createStagingBufferConfig(size);
+        config.name = name;
+        return createBuffer(name, config);
+    }
+
     void GPURenderResourceManager::clear()
     {
+        destroyAllBuffers();
         destroyAllFramebuffers();
         destroyAllDescriptorSetLayouts();
         destroyAllRenderPasses();

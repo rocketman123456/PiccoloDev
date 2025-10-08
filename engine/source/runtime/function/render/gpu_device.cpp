@@ -143,20 +143,16 @@ namespace Piccolo
         createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos       = queueCreateInfos.data();
 
-        // VkPhysicalDeviceHostQueryResetFeaturesEXT query_extension {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT};
-
-        // VkPhysicalDeviceFeatures2 physical_device_features;
-        // physical_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR;
-        // physical_device_features.pNext = &query_extension;
-        // vkGetPhysicalDeviceFeatures2KHR(m_physical_device, &physical_device_features);
-        // physical_device_features.hostQueryReset = VK_TRUE;
-        // vkGetPhysicalDeviceFeatures2(m_physical_device, &physical_device_features);
+        // 启用hostQueryReset功能以支持vkResetQueryPool
+        VkPhysicalDeviceHostQueryResetFeaturesEXT host_query_reset_features {};
+        host_query_reset_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT;
+        host_query_reset_features.hostQueryReset = VK_TRUE;
 
         if (m_enable_descriptor_indexing)
         {
             VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures {};
             indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-            indexingFeatures.pNext = nullptr;
+            indexingFeatures.pNext = &host_query_reset_features; // 链接到hostQueryReset功能
 
             VkPhysicalDeviceFeatures2 features2 {};
             features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -177,7 +173,7 @@ namespace Piccolo
         }
         else
         {
-            createInfo.pNext = nullptr;
+            createInfo.pNext = &host_query_reset_features; // 即使没有descriptor indexing也启用hostQueryReset
 
             m_bindless_supported = false;
             LOG_WARN("Bindless not supported on this GPU.");

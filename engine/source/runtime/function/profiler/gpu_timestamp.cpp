@@ -23,6 +23,7 @@ namespace Piccolo
         query_pool_info.sType      = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
         query_pool_info.queryType  = VK_QUERY_TYPE_TIMESTAMP;
         query_pool_info.queryCount = queries_per_frame * max_frames * 2; // 每个查询需要开始和结束时间戳
+        query_pool_info.flags      = 0; // 确保没有特殊标志
 
         if (vkCreateQueryPool(m_device, &query_pool_info, nullptr, &m_query_pool) != VK_SUCCESS)
         {
@@ -33,6 +34,10 @@ namespace Piccolo
         // 分配时间戳数据缓冲区
         m_timestamps.resize(queries_per_frame * max_frames);
         m_timestamps_data.resize(queries_per_frame * max_frames * 2);
+
+        // 重置查询池中的所有查询
+        // 注意：vkResetQueryPool需要VK_EXT_host_query_reset扩展支持
+        vkResetQueryPool(m_device, m_query_pool, 0, queries_per_frame * max_frames * 2);
 
         LOG_INFO("GPU Timestamp Manager initialized with {} queries per frame, {} max frames", queries_per_frame, max_frames);
     }
@@ -162,6 +167,9 @@ namespace Piccolo
             return UINT32_MAX;
         }
 
+        // 保存要返回的查询索引（递减前的值）
+        uint32_t query_index = m_current_query - 1;
+        
         m_current_query--;
         m_depth--;
 
@@ -175,7 +183,17 @@ namespace Piccolo
             m_parent_index = 0;
         }
 
-        return m_current_query;
+        return query_index;
+    }
+
+    uint32_t GPUTimestampManager::getTimestampStartIndex(uint32_t frame_index, uint32_t query_index) const
+    {
+        return frame_index * m_queries_per_frame * 2 + query_index * 2;
+    }
+
+    uint32_t GPUTimestampManager::getTimestampEndIndex(uint32_t frame_index, uint32_t query_index) const
+    {
+        return frame_index * m_queries_per_frame * 2 + query_index * 2 + 1;
     }
 
 } // namespace Piccolo

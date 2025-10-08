@@ -33,6 +33,8 @@ find_path(REFL_CPP_INCLUDE_DIRS "refl.hpp")
 # target_include_directories(main PRIVATE ${REFL_CPP_INCLUDE_DIRS})
 find_package(reflectcpp CONFIG REQUIRED)
 # target_link_libraries(main PRIVATE reflectcpp::reflectcpp)
+find_package(glm CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE glm::glm-header-only)
 
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)

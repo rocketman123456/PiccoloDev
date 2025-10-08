@@ -207,7 +207,7 @@ namespace Piccolo
         ~EventSystem() = default;
 
         void initialize();
-        void clear();
+        void finalize();
         void tick(float dt);
 
         std::shared_ptr<EventBus> global_event_bus;

@@ -113,6 +113,10 @@ namespace Piccolo
             vkCmdSetScissor(command_buffer, 0, 1, &scissor);
             profiler->endTimestamp(command_buffer, current_frame);
 
+            VkBuffer     vertex_buffers[] = {g_runtime_global_context.m_render_system->getVertexBuffer()};
+            VkDeviceSize offsets[]        = {0};
+            vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+
             // 开始绘制性能分析
             profiler->beginTimestamp(command_buffer, current_frame, "Draw Call");
             vkCmdDraw(command_buffer, 3, 1, 0, 0);

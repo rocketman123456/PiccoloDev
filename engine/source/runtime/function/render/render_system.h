@@ -46,6 +46,9 @@ namespace Piccolo
         bool isFramebufferResized() const { return m_framebuffer_resized; }
         void setFramebufferResized(bool resized) { m_framebuffer_resized = resized; }
 
+        // TODO : make it in manager
+        VkBuffer getVertexBuffer() const { return m_vertex_buffer; }
+
     private:
         void initializeRenderResources();
         void createDefaultPipeline();
@@ -63,6 +66,9 @@ namespace Piccolo
         // 新的工具类
         std::shared_ptr<GPURenderResourceManager> m_resource_manager;
         std::shared_ptr<GPURenderStateManager>    m_state_manager;
+
+        VkBuffer m_vertex_buffer; // TODO : make it in manager
+        VkDeviceMemory m_vertex_buffer_memory;
 
         bool m_framebuffer_resized = false;
 

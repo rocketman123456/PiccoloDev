@@ -69,6 +69,7 @@ namespace Piccolo
         // Required device extensions
         const std::vector<const char*> m_device_extensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME, // 支持vkResetQueryPool
 #ifdef __APPLE__
             "VK_KHR_portability_subset",
 #else

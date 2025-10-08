@@ -11,7 +11,7 @@ namespace Piccolo
         resource_event_bus = std::make_shared<EventBus>();
     }
 
-    void EventSystem::clear()
+    void EventSystem::finalize()
     {
         global_event_bus.reset();
         physics_event_bus.reset();

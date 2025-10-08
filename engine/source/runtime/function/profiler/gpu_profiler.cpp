@@ -49,10 +49,23 @@ namespace Piccolo
             return;
         }
 
-        // 重置当前帧的所有查询
+        // 使用主机端重置而不是命令缓冲区重置
+        // 这确保查询在命令缓冲区执行之前就被重置了
         uint32_t first_query = frame_index * m_queries_per_frame * 2; // 每帧的查询起始位置
         uint32_t query_count = m_queries_per_frame * 2; // 每帧的查询数量
-        vkCmdResetQueryPool(command_buffer, m_timestamp_manager->getQueryPool(), first_query, query_count);
+        
+        // 确保查询索引在有效范围内
+        uint32_t total_queries = m_queries_per_frame * m_max_frames * 2;
+        if (first_query < total_queries && first_query + query_count <= total_queries)
+        {
+            vkResetQueryPool(m_device, m_timestamp_manager->getQueryPool(), first_query, query_count);
+            LOG_DEBUG("Reset query pool (host): frame={}, first_query={}, query_count={}", frame_index, first_query, query_count);
+        }
+        else
+        {
+            LOG_WARN("Query pool reset out of bounds: frame={}, first_query={}, query_count={}, total_queries={}", 
+                    frame_index, first_query, query_count, total_queries);
+        }
     }
 
     void GPUProfiler::endFrame(uint32_t frame_index)
@@ -79,9 +92,10 @@ namespace Piccolo
         uint32_t query_index = m_timestamp_manager->push(frame_index, name);
         if (query_index != UINT32_MAX)
         {
-            // 记录开始时间戳
-            uint32_t timestamp_index = frame_index * m_queries_per_frame * 2 + query_index * 2; // 每帧的查询起始位置 + 当前查询的偏移
+            // 获取GPU时间戳管理器中计算好的开始时间戳索引
+            uint32_t timestamp_index = m_timestamp_manager->getTimestampStartIndex(frame_index, query_index);
             vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_timestamp_manager->getQueryPool(), timestamp_index);
+            // LOG_DEBUG("Begin timestamp: frame={}, query_index={}, timestamp_index={}", frame_index, query_index, timestamp_index);
         }
     }
 
@@ -95,9 +109,10 @@ namespace Piccolo
         uint32_t query_index = m_timestamp_manager->pop(frame_index);
         if (query_index != UINT32_MAX)
         {
-            // 记录结束时间戳
-            uint32_t timestamp_index = frame_index * m_queries_per_frame * 2 + query_index * 2 + 1; // 每帧的查询起始位置 + 当前查询的偏移 + 1
+            // 获取GPU时间戳管理器中计算好的结束时间戳索引
+            uint32_t timestamp_index = m_timestamp_manager->getTimestampEndIndex(frame_index, query_index);
             vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_timestamp_manager->getQueryPool(), timestamp_index);
+            // LOG_DEBUG("End timestamp: frame={}, query_index={}, timestamp_index={}", frame_index, query_index, timestamp_index);
         }
     }
 

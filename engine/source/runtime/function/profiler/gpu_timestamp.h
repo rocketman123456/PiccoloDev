@@ -47,6 +47,10 @@ namespace Piccolo
         // 获取时间戳周期（纳秒）
         double getTimestampPeriod() const { return m_timestamp_period; }
 
+        // 获取时间戳索引
+        uint32_t getTimestampStartIndex(uint32_t frame_index, uint32_t query_index) const;
+        uint32_t getTimestampEndIndex(uint32_t frame_index, uint32_t query_index) const;
+
     private:
         VkDevice    m_device     = VK_NULL_HANDLE;
         VkQueryPool m_query_pool = VK_NULL_HANDLE;

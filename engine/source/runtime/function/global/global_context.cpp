@@ -13,6 +13,8 @@
 #include "runtime/function/render/render_system.h"
 #include "runtime/function/render/window_system.h"
 
+#include "runtime/function/framework/world/world_manager.h"
+
 #include "runtime/function/ecs/coordinator.h"
 
 #include "runtime/function/profiler/cpu_profiler.h"
@@ -35,6 +37,9 @@ namespace Piccolo
         m_event_system = std::make_shared<EventSystem>();
         m_event_system->initialize();
 
+        m_world_manager = std::make_shared<WorldManager>();
+        m_world_manager->initialize();
+
         m_window_system = std::make_shared<WindowSystem>();
         WindowCreateInfo window_create_info;
         m_window_system->initialize(window_create_info);
@@ -45,10 +50,10 @@ namespace Piccolo
         m_cpu_profiler = std::make_shared<CPUProfiler>();
         m_cpu_profiler->initialize();
         m_gpu_profiler = std::make_shared<GPUProfiler>();
-        {
-            auto device = m_render_system->getDevice();
-            m_gpu_profiler->initialize(device->getDevice(), device->getPhysicalDevice(), 64, 3); // 每帧64个查询，最多3帧
-        }
+        // {
+        //     auto device = m_render_system->getDevice();
+        //     m_gpu_profiler->initialize(device->getDevice(), device->getPhysicalDevice(), 64, 3); // 每帧64个查询，最多3帧
+        // }
     }
 
     void RuntimeGlobalContext::shutdownSystems()
@@ -60,7 +65,10 @@ namespace Piccolo
         m_render_system.reset();
         m_window_system.reset();
 
-        m_event_system->clear();
+        m_world_manager->finalize();
+        m_world_manager.reset();
+
+        m_event_system->finalize();
         m_event_system.reset();
 
         m_asset_manager.reset();

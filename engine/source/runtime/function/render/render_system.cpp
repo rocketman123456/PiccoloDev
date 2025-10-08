@@ -10,6 +10,7 @@
 #include "runtime/function/render/gpu_render_state_manager.h"
 #include "runtime/function/render/gpu_swap_chain.h"
 #include "runtime/function/render/gpu_sync_object.h"
+#include "runtime/function/render/utils/gpu_buffer_utils.h"
 #include "runtime/function/render/utils/gpu_pipeline_builder.h"
 #include "runtime/function/render/utils/gpu_render_pass_builder.h"
 
@@ -41,7 +42,7 @@ namespace Piccolo
         m_swap_chain = std::make_shared<GPUSwapChain>(m_device->getPhysicalDevice(), m_device->getDevice(), m_device->getSurface());
 
         // 初始化新的工具类
-        m_resource_manager = std::make_shared<GPURenderResourceManager>(m_device->getDevice());
+        m_resource_manager = std::make_shared<GPURenderResourceManager>(m_device->getDevice(), m_device->getPhysicalDevice());
         m_state_manager    = std::make_shared<GPURenderStateManager>(m_device->getDevice());
 
         // 初始化渲染资源
@@ -57,6 +58,9 @@ namespace Piccolo
     void RenderSystem::clear()
     {
         vkDeviceWaitIdle(m_device->getDevice());
+
+        vkDestroyBuffer(m_device->getDevice(), m_vertex_buffer, nullptr);
+        vkFreeMemory(m_device->getDevice(), m_vertex_buffer_memory, nullptr);
 
         // 清理新的工具类
         m_state_manager.reset();
@@ -77,7 +81,7 @@ namespace Piccolo
         auto gpu_profiler = g_runtime_global_context.m_gpu_profiler;
         auto cpu_profiler = g_runtime_global_context.m_cpu_profiler;
 
-        gpu_profiler->beginFrame(m_current_frame);
+        // gpu_profiler->beginFrame(m_current_frame);
         cpu_profiler->beginFrame(m_current_frame);
 
         auto in_flight_fence           = m_sync_object->getInFlightFence(m_current_frame);
@@ -124,16 +128,17 @@ namespace Piccolo
         }
         cpu_profiler->endTimestamp("Command Buffer Begin");
 
-        gpu_profiler->resetQueryPool(command_buffer, m_current_frame);
+        // 临时禁用GPU profiler来测试
+        // gpu_profiler->resetQueryPool(command_buffer, m_current_frame);
 
         // 开始性能分析 - 必须在命令缓冲区开始记录后调用
-        gpu_profiler->beginTimestamp(command_buffer, m_current_frame, "Command Record");
+        // gpu_profiler->beginTimestamp(command_buffer, m_current_frame, "Command Record");
         cpu_profiler->beginTimestamp("Command Record");
         // 记录渲染命令
         m_command_pool->recordRenderCommands(command_buffer, image_index);
         // 结束性能分析
         cpu_profiler->endTimestamp("Command Record");
-        gpu_profiler->endTimestamp(command_buffer, m_current_frame);
+        // gpu_profiler->endTimestamp(command_buffer, m_current_frame);
 
         cpu_profiler->beginTimestamp("Command Buffer End");
         if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS)
@@ -200,7 +205,7 @@ namespace Piccolo
         }
 
         // 结束帧性能分析并记录数据
-        gpu_profiler->endFrame(m_current_frame);
+        // gpu_profiler->endFrame(m_current_frame);
         cpu_profiler->endFrame(m_current_frame);
 
         // 更新帧索引，循环使用同步对象
@@ -223,24 +228,52 @@ namespace Piccolo
     {
         // 使用新的工厂方法创建基础颜色渲染通道
         auto color_format = m_swap_chain->getImageFormat();
-        // m_render_pass     = GPURenderPass::createBasicColorPass(m_device->getDevice(), color_format);
 
         auto config   = GPURenderPassConfigFactory::createBasicColorPass(color_format);
         m_render_pass = std::make_shared<GPURenderPass>(m_device->getDevice(), config);
     }
 
-    void RenderSystem::createRenderResource()
-    {
-        auto binding_description    = Vertex::getBindingDescription();
-        auto attribute_descriptions = Vertex::getAttributeDescriptions();
-    }
-
     void RenderSystem::createDefaultPipeline()
     {
-        // 使用新的工厂方法创建基础三角形管道
-        // m_pipeline = GPUPipeline::createBasicTrianglePipeline(m_device->getDevice(), m_render_pass->getRenderPass());
-
         auto config = GPUPipelineConfigFactory::createAdvancedTrianglePipeline();
         m_pipeline  = std::make_shared<GPUPipeline>(m_device->getDevice(), config, m_render_pass->getRenderPass());
+    }
+
+    void RenderSystem::createRenderResource()
+    {
+        VkBufferCreateInfo buffer_info {};
+        buffer_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        buffer_info.size        = sizeof(vertices[0]) * vertices.size();
+        buffer_info.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateBuffer(m_device->getDevice(), &buffer_info, nullptr, &m_vertex_buffer) != VK_SUCCESS)
+        {
+            LOG_ERROR("failed to create vertex buffer!");
+            return;
+        }
+
+        VkMemoryRequirements mem_requirements;
+        vkGetBufferMemoryRequirements(m_device->getDevice(), m_vertex_buffer, &mem_requirements);
+
+        VkMemoryAllocateInfo alloc_info {};
+        alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        alloc_info.allocationSize  = mem_requirements.size;
+        alloc_info.memoryTypeIndex = find_memory_type(
+            m_device->getPhysicalDevice(), mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        );
+
+        if (vkAllocateMemory(m_device->getDevice(), &alloc_info, nullptr, &m_vertex_buffer_memory) != VK_SUCCESS)
+        {
+            LOG_ERROR("failed to allocate vertex buffer memory!");
+            return;
+        }
+
+        vkBindBufferMemory(m_device->getDevice(), m_vertex_buffer, m_vertex_buffer_memory, 0);
+
+        void* data;
+        vkMapMemory(m_device->getDevice(), m_vertex_buffer_memory, 0, buffer_info.size, 0, &data);
+        memcpy(data, vertices.data(), static_cast<size_t>(buffer_info.size));
+        vkUnmapMemory(m_device->getDevice(), m_vertex_buffer_memory);
     }
 } // namespace Piccolo
