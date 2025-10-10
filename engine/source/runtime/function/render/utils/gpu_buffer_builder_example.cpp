@@ -33,44 +33,44 @@ namespace Piccolo
     {
         // 使用构建器创建顶点缓冲区
         GPUBufferBuilder builder(device, physical_device);
-        
+
         return builder.setName("ExampleVertexBuffer")
-                     .setDescription("示例顶点缓冲区")
-                     .asVertexBuffer(1024 * 1024) // 1MB
-                     .setUsage(BufferUsage::Static)
-                     .build();
+            .setDescription("示例顶点缓冲区")
+            .asVertexBuffer(1024 * 1024) // 1MB
+            .setUsage(BufferUsage::Static)
+            .build();
     }
 
     GPUBufferInfo GPUBufferBuilderExample::createUniformBufferExample(VkDevice device, VkPhysicalDevice physical_device)
     {
         // 使用预定义配置创建统一缓冲区
-        auto config = GPUBufferConfigFactory::createUniformBufferConfig(256, true); // 256字节，动态
-        config.name = "ExampleUniformBuffer";
+        auto config        = GPUBufferConfigFactory::createUniformBufferConfig(256, true); // 256字节，动态
+        config.name        = "ExampleUniformBuffer";
         config.description = "示例统一缓冲区";
 
         GPUBufferBuilder builder(device, physical_device);
         return builder.setName(config.name)
-                     .setDescription(config.description)
-                     .setSize(config.size)
-                     .setType(config.type)
-                     .setUsage(config.usage)
-                     .setMemoryType(config.memory_type)
-                     .setUsageFlags(config.usage_flags)
-                     .setMemoryPropertyFlags(config.memory_property_flags)
-                     .build();
+            .setDescription(config.description)
+            .setSize(config.size)
+            .setType(config.type)
+            .setUsage(config.usage)
+            .setMemoryType(config.memory_type)
+            .setUsageFlags(config.usage_flags)
+            .setMemoryPropertyFlags(config.memory_property_flags)
+            .build();
     }
 
     GPUBufferInfo GPUBufferBuilderExample::createStorageBufferExample(VkDevice device, VkPhysicalDevice physical_device)
     {
         // 使用便捷方法创建存储缓冲区
         GPUBufferBuilder builder(device, physical_device);
-        
+
         return builder.setName("ExampleStorageBuffer")
-                     .setDescription("示例存储缓冲区")
-                     .asStorageBuffer(512 * 1024) // 512KB
-                     .setUsage(BufferUsage::Dynamic)
-                     .setMemoryType(BufferMemoryType::HostVisible)
-                     .build();
+            .setDescription("示例存储缓冲区")
+            .asStorageBuffer(512 * 1024) // 512KB
+            .setUsage(BufferUsage::Dynamic)
+            .setMemoryType(BufferMemoryType::HostVisible)
+            .build();
     }
 
     void GPUBufferBuilderExample::demonstrateResourceManagerUsage(VkDevice device, VkPhysicalDevice physical_device)
@@ -88,8 +88,8 @@ namespace Piccolo
         LOG_INFO("通过资源管理器创建统一缓冲区: {} 字节", uniform_buffer.size);
 
         // 2. 使用配置创建缓冲区
-        auto config = GPUBufferConfigFactory::createStorageBufferConfig(512 * 1024, false);
-        config.name = "ManagedStorageBuffer";
+        auto config        = GPUBufferConfigFactory::createStorageBufferConfig(512 * 1024, false);
+        config.name        = "ManagedStorageBuffer";
         config.description = "通过资源管理器管理的存储缓冲区";
 
         auto storage_buffer = resource_manager.createBuffer("ManagedStorageBuffer", config);

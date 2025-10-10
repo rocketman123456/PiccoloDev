@@ -6,67 +6,62 @@
 
 namespace Piccolo
 {
-    // 基础内存类型查找函数
-    uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    /**
+     * @brief 查找合适的内存类型
+     * 
+     * 根据内存类型过滤器和属性要求查找最适合的内存类型索引
+     * 
+     * @param physical_device 物理设备
+     * @param type_filter 内存类型过滤器（位掩码）
+     * @param properties 所需的内存属性
+     * @return 内存类型索引，失败返回-1
+     */
+    uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);
 
-    // 缓冲区上传相关结构
-    struct BufferUploadInfo
-    {
-        VkBuffer       buffer;
-        VkDeviceMemory memory;
-        size_t         size;
-        size_t         offset;
-        void*          data;
-        bool           use_staging;
-    };
-
-    // 暂存缓冲区管理器
-    class StagingBufferManager
-    {
-    public:
-        StagingBufferManager(VkDevice device, VkPhysicalDevice physical_device, VkCommandPool command_pool, VkQueue queue);
-        ~StagingBufferManager();
-
-        // 创建暂存缓冲区
-        VkBuffer createStagingBuffer(size_t size, VkDeviceMemory& memory);
-
-        // 销毁暂存缓冲区
-        void destroyStagingBuffer(VkBuffer buffer, VkDeviceMemory memory);
-
-        // 上传数据到GPU缓冲区
-        void uploadToBuffer(VkBuffer dst_buffer, void* data, size_t size, size_t offset = 0);
-
-        // 批量上传
-        void uploadMultipleBuffers(const std::vector<BufferUploadInfo>& uploads);
-
-        // 清理所有暂存缓冲区
-        void cleanup();
-
-    private:
-        VkDevice         m_device;
-        VkPhysicalDevice m_physical_device;
-        VkCommandPool    m_command_pool;
-        VkQueue          m_queue;
-
-        struct StagingBuffer
-        {
-            VkBuffer       buffer;
-            VkDeviceMemory memory;
-            size_t         size;
-            bool           in_use;
-        };
-
-        std::vector<StagingBuffer> m_staging_buffers;
-        size_t                     m_current_offset;
-    };
-
-    // GPU缓冲区工具函数
+    /**
+     * @brief GPU缓冲区工具函数命名空间
+     * 
+     * 提供各种Vulkan缓冲区操作的实用工具函数，包括：
+     * - 缓冲区的创建和销毁
+     * - 内存分配和管理
+     * - 数据上传和下载
+     * - 缓冲区复制操作
+     * - 性能优化工具
+     */
     namespace GPUBufferUtility
     {
-        // 基础缓冲区操作
-        VkBuffer       createBuffer(VkDevice device, size_t size, VkBufferUsageFlags usage);
+        // ========== 基础缓冲区操作 ==========
+        
+        /**
+         * @brief 创建Vulkan缓冲区
+         * 
+         * @param device Vulkan设备
+         * @param size 缓冲区大小（字节）
+         * @param usage 缓冲区使用标志
+         * @return 创建的缓冲区句柄，失败返回VK_NULL_HANDLE
+         */
+        VkBuffer createBuffer(VkDevice device, size_t size, VkBufferUsageFlags usage);
+        
+        /**
+         * @brief 为缓冲区分配内存
+         * 
+         * @param device Vulkan设备
+         * @param physical_device 物理设备
+         * @param buffer 目标缓冲区
+         * @param properties 内存属性要求
+         * @return 分配的内存句柄，失败返回VK_NULL_HANDLE
+         */
         VkDeviceMemory allocateBufferMemory(VkDevice device, VkPhysicalDevice physical_device, VkBuffer buffer, VkMemoryPropertyFlags properties);
-        void           bindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset = 0);
+        
+        /**
+         * @brief 绑定缓冲区内存
+         * 
+         * @param device Vulkan设备
+         * @param buffer 缓冲区
+         * @param memory 内存
+         * @param offset 内存偏移量
+         */
+        void bindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset = 0);
 
         // 缓冲区上传函数
         void uploadDataToBuffer(
@@ -139,33 +134,21 @@ namespace Piccolo
         void updateBufferData(VkDevice device, VkDeviceMemory memory, void* data, size_t size, size_t offset = 0);
         void readBufferData(VkDevice device, VkDeviceMemory memory, void* data, size_t size, size_t offset = 0);
 
-        // 缓冲区池管理
-        class BufferPool
-        {
-        public:
-            BufferPool(VkDevice device, VkPhysicalDevice physical_device, size_t buffer_size, VkBufferUsageFlags usage_flags);
-            ~BufferPool();
+        // 暂存缓冲区管理
+        VkBuffer createStagingBuffer(VkDevice device, VkPhysicalDevice physical_device, size_t size, VkDeviceMemory& memory);
+        void     destroyStagingBuffer(VkDevice device, VkBuffer buffer, VkDeviceMemory memory);
 
-            VkBuffer allocateBuffer();
-            void     freeBuffer(VkBuffer buffer);
-            void     cleanup();
-
-        private:
-            VkDevice           m_device;
-            VkPhysicalDevice   m_physical_device;
-            size_t             m_buffer_size;
-            VkBufferUsageFlags m_usage_flags;
-
-            struct PooledBuffer
-            {
-                VkBuffer       buffer;
-                VkDeviceMemory memory;
-                bool           in_use;
-            };
-
-            std::vector<PooledBuffer> m_buffers;
-            std::vector<size_t>       m_free_indices;
-        };
+        // 使用暂存缓冲区上传数据
+        void uploadDataWithStagingBuffer(
+            VkDevice         device,
+            VkPhysicalDevice physical_device,
+            VkCommandPool    command_pool,
+            VkQueue          queue,
+            VkBuffer         dst_buffer,
+            void*            data,
+            size_t           size,
+            size_t           offset = 0
+        );
 
         // 批量操作工具
         void batchUploadBuffers(

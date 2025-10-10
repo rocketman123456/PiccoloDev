@@ -117,9 +117,14 @@ namespace Piccolo
             VkDeviceSize offsets[]        = {0};
             vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
 
+            VkBuffer     index_buffers[] = {g_runtime_global_context.m_render_system->getIndexBuffer()};
+            VkDeviceSize index_offsets[] = {0};
+            vkCmdBindIndexBuffer(command_buffer, index_buffers[0], index_offsets[0], VK_INDEX_TYPE_UINT16);
+
             // 开始绘制性能分析
             profiler->beginTimestamp(command_buffer, current_frame, "Draw Call");
-            vkCmdDraw(command_buffer, 3, 1, 0, 0);
+            // vkCmdDraw(command_buffer, 3, 1, 0, 0);
+            vkCmdDrawIndexed(command_buffer, 6, 1, 0, 0, 0);
             profiler->endTimestamp(command_buffer, current_frame);
         }
         vkCmdEndRenderPass(command_buffer);

@@ -4,19 +4,18 @@
 
 #include <algorithm>
 #include <cstring>
-#include <sstream>
 
 namespace Piccolo
 {
     // 基础内存类型查找函数
-    uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t typeFilter, VkMemoryPropertyFlags properties)
+    uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties)
     {
         VkPhysicalDeviceMemoryProperties mem_properties;
         vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
 
         for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
         {
-            if ((typeFilter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
+            if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
             {
                 return i;
             }
@@ -24,110 +23,6 @@ namespace Piccolo
 
         LOG_ERROR("failed to find suitable memory type!");
         return -1;
-    }
-
-    // StagingBufferManager 实现
-    StagingBufferManager::StagingBufferManager(VkDevice device, VkPhysicalDevice physical_device, VkCommandPool command_pool, VkQueue queue)
-        : m_device(device)
-        , m_physical_device(physical_device)
-        , m_command_pool(command_pool)
-        , m_queue(queue)
-        , m_current_offset(0)
-    {}
-
-    StagingBufferManager::~StagingBufferManager() { cleanup(); }
-
-    VkBuffer StagingBufferManager::createStagingBuffer(size_t size, VkDeviceMemory& memory)
-    {
-        VkBufferCreateInfo buffer_info {};
-        buffer_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        buffer_info.size        = size;
-        buffer_info.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        VkBuffer buffer;
-        if (vkCreateBuffer(m_device, &buffer_info, nullptr, &buffer) != VK_SUCCESS)
-        {
-            LOG_ERROR("Failed to create staging buffer");
-            return VK_NULL_HANDLE;
-        }
-
-        VkMemoryRequirements mem_requirements;
-        vkGetBufferMemoryRequirements(m_device, buffer, &mem_requirements);
-
-        VkMemoryAllocateInfo alloc_info {};
-        alloc_info.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        alloc_info.allocationSize = mem_requirements.size;
-        alloc_info.memoryTypeIndex =
-            find_memory_type(m_physical_device, mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        if (vkAllocateMemory(m_device, &alloc_info, nullptr, &memory) != VK_SUCCESS)
-        {
-            vkDestroyBuffer(m_device, buffer, nullptr);
-            LOG_ERROR("Failed to allocate staging buffer memory");
-            return VK_NULL_HANDLE;
-        }
-
-        vkBindBufferMemory(m_device, buffer, memory, 0);
-
-        m_staging_buffers.push_back({buffer, memory, size, false});
-        return buffer;
-    }
-
-    void StagingBufferManager::destroyStagingBuffer(VkBuffer buffer, VkDeviceMemory memory)
-    {
-        vkDestroyBuffer(m_device, buffer, nullptr);
-        vkFreeMemory(m_device, memory, nullptr);
-
-        auto it = std::find_if(m_staging_buffers.begin(), m_staging_buffers.end(), [buffer](const StagingBuffer& sb) { return sb.buffer == buffer; });
-        if (it != m_staging_buffers.end())
-        {
-            m_staging_buffers.erase(it);
-        }
-    }
-
-    void StagingBufferManager::uploadToBuffer(VkBuffer dst_buffer, void* data, size_t size, size_t offset)
-    {
-        VkDeviceMemory staging_memory;
-        VkBuffer       staging_buffer = createStagingBuffer(size, staging_memory);
-
-        // 映射并复制数据
-        void* mapped_data;
-        vkMapMemory(m_device, staging_memory, 0, size, 0, &mapped_data);
-        memcpy(mapped_data, data, size);
-        vkUnmapMemory(m_device, staging_memory);
-
-        // 复制缓冲区
-        GPUBufferUtility::copyBuffer(m_device, m_command_pool, m_queue, staging_buffer, dst_buffer, size, 0, offset);
-
-        // 清理暂存缓冲区
-        destroyStagingBuffer(staging_buffer, staging_memory);
-    }
-
-    void StagingBufferManager::uploadMultipleBuffers(const std::vector<BufferUploadInfo>& uploads)
-    {
-        for (const auto& upload : uploads)
-        {
-            if (upload.use_staging)
-            {
-                uploadToBuffer(upload.buffer, upload.data, upload.size, upload.offset);
-            }
-            else
-            {
-                GPUBufferUtility::uploadDataDirect(m_device, upload.memory, upload.data, upload.size, upload.offset);
-            }
-        }
-    }
-
-    void StagingBufferManager::cleanup()
-    {
-        for (const auto& staging_buffer : m_staging_buffers)
-        {
-            vkDestroyBuffer(m_device, staging_buffer.buffer, nullptr);
-            vkFreeMemory(m_device, staging_buffer.memory, nullptr);
-        }
-        m_staging_buffers.clear();
-        m_current_offset = 0;
     }
 
     // GPUBufferUtility 命名空间实现
@@ -499,69 +394,80 @@ namespace Piccolo
             }
         }
 
-        // BufferPool 实现
-        BufferPool::BufferPool(VkDevice device, VkPhysicalDevice physical_device, size_t buffer_size, VkBufferUsageFlags usage_flags)
-            : m_device(device)
-            , m_physical_device(physical_device)
-            , m_buffer_size(buffer_size)
-            , m_usage_flags(usage_flags)
-        {}
-
-        BufferPool::~BufferPool() { cleanup(); }
-
-        VkBuffer BufferPool::allocateBuffer()
+        // 暂存缓冲区管理
+        VkBuffer createStagingBuffer(VkDevice device, VkPhysicalDevice physical_device, size_t size, VkDeviceMemory& memory)
         {
-            // 查找空闲缓冲区
-            for (auto& buffer : m_buffers)
-            {
-                if (!buffer.in_use)
-                {
-                    buffer.in_use = true;
-                    return buffer.buffer;
-                }
-            }
+            VkBufferCreateInfo buffer_info {};
+            buffer_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            buffer_info.size        = size;
+            buffer_info.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            // 创建新缓冲区
-            VkBuffer buffer = createBuffer(m_device, m_buffer_size, m_usage_flags);
-            if (buffer == VK_NULL_HANDLE)
+            VkBuffer buffer;
+            if (vkCreateBuffer(device, &buffer_info, nullptr, &buffer) != VK_SUCCESS)
             {
+                LOG_ERROR("Failed to create staging buffer");
                 return VK_NULL_HANDLE;
             }
 
-            VkDeviceMemory memory = allocateBufferMemory(m_device, m_physical_device, buffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            if (memory == VK_NULL_HANDLE)
+            VkMemoryRequirements mem_requirements;
+            vkGetBufferMemoryRequirements(device, buffer, &mem_requirements);
+
+            VkMemoryAllocateInfo alloc_info {};
+            alloc_info.sType          = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            alloc_info.allocationSize = mem_requirements.size;
+            alloc_info.memoryTypeIndex =
+                find_memory_type(physical_device, mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+            if (vkAllocateMemory(device, &alloc_info, nullptr, &memory) != VK_SUCCESS)
             {
-                vkDestroyBuffer(m_device, buffer, nullptr);
+                vkDestroyBuffer(device, buffer, nullptr);
+                LOG_ERROR("Failed to allocate staging buffer memory");
                 return VK_NULL_HANDLE;
             }
 
-            bindBufferMemory(m_device, buffer, memory);
-
-            m_buffers.push_back({buffer, memory, true});
+            vkBindBufferMemory(device, buffer, memory, 0);
             return buffer;
         }
 
-        void BufferPool::freeBuffer(VkBuffer buffer)
+        void destroyStagingBuffer(VkDevice device, VkBuffer buffer, VkDeviceMemory memory)
         {
-            for (auto& pooled_buffer : m_buffers)
-            {
-                if (pooled_buffer.buffer == buffer)
-                {
-                    pooled_buffer.in_use = false;
-                    break;
-                }
-            }
+            vkDestroyBuffer(device, buffer, nullptr);
+            vkFreeMemory(device, memory, nullptr);
         }
 
-        void BufferPool::cleanup()
+        void uploadDataWithStagingBuffer(
+            VkDevice         device,
+            VkPhysicalDevice physical_device,
+            VkCommandPool    command_pool,
+            VkQueue          queue,
+            VkBuffer         dst_buffer,
+            void*            data,
+            size_t           size,
+            size_t           offset
+        )
         {
-            for (const auto& pooled_buffer : m_buffers)
+            // 创建暂存缓冲区
+            VkDeviceMemory staging_memory;
+            VkBuffer       staging_buffer = createStagingBuffer(device, physical_device, size, staging_memory);
+
+            if (staging_buffer == VK_NULL_HANDLE)
             {
-                vkDestroyBuffer(m_device, pooled_buffer.buffer, nullptr);
-                vkFreeMemory(m_device, pooled_buffer.memory, nullptr);
+                LOG_ERROR("Failed to create staging buffer for upload");
+                return;
             }
-            m_buffers.clear();
-            m_free_indices.clear();
+
+            // 映射并复制数据
+            void* mapped_data;
+            vkMapMemory(device, staging_memory, 0, size, 0, &mapped_data);
+            memcpy(mapped_data, data, size);
+            vkUnmapMemory(device, staging_memory);
+
+            // 复制缓冲区
+            copyBuffer(device, command_pool, queue, staging_buffer, dst_buffer, size, 0, offset);
+
+            // 清理暂存缓冲区
+            destroyStagingBuffer(device, staging_buffer, staging_memory);
         }
 
         // 批量操作工具
