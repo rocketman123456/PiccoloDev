@@ -35,6 +35,8 @@ find_package(reflectcpp CONFIG REQUIRED)
 # target_link_libraries(main PRIVATE reflectcpp::reflectcpp)
 find_package(glm CONFIG REQUIRED)
 # target_link_libraries(main PRIVATE glm::glm-header-only)
+find_package(glad CONFIG REQUIRED)
+# target_link_libraries(main PRIVATE glad::glad)
 
 # ---- Include guards ----
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
