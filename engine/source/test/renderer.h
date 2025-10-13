@@ -1,9 +1,12 @@
 #pragma once
 
 #include "jolt_character_test_common.h"
-#include "camera.h"
-#include "terrain_system.h"
-#include "character_controller.h"
+
+// 前向声明
+class Camera;
+class TerrainSystem;
+class CharacterController;
+class PhysicsManager;
 
 // 渲染器
 class Renderer
@@ -25,12 +28,16 @@ public:
     void CreateCharacterDebugGeometry();
     void CreateGroundCollisionSolidGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
                                            const std::map<std::pair<int, int>, float>& terrain_data);
+    void CreateSideWallCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_side_wall_bodies,
+                                         const std::map<std::pair<int, int>, float>& terrain_data);
 
     // 几何体更新
     void UpdateDebugCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
                                      const std::map<std::pair<int, int>, float>& terrain_data);
     void UpdateGroundCollisionSolidGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
                                            const std::map<std::pair<int, int>, float>& terrain_data);
+    void UpdateSideWallCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_side_wall_bodies,
+                                         const std::map<std::pair<int, int>, float>& terrain_data);
 
     // OpenGL资源访问
     GLuint GetCapsuleVAO() const { return m_capsule_vao; }
@@ -41,6 +48,8 @@ public:
     int GetCharacterDebugVertexCount() const { return m_character_debug_vertex_count; }
     GLuint GetGroundCollisionVAO() const { return m_ground_collision_vao; }
     int GetGroundCollisionVertexCount() const { return m_ground_collision_vertex_count; }
+    GLuint GetSideWallCollisionVAO() const { return m_side_wall_collision_vao; }
+    int GetSideWallCollisionVertexCount() const { return m_side_wall_collision_vertex_count; }
 
 private:
     ShaderManager* m_shader_manager;
@@ -64,13 +73,19 @@ private:
     GLuint m_ground_collision_vao;
     GLuint m_ground_collision_vbo;
     int m_ground_collision_vertex_count;
+    
+    // 侧墙碰撞体
+    GLuint m_side_wall_collision_vao;
+    GLuint m_side_wall_collision_vbo;
+    int m_side_wall_collision_vertex_count;
 
     // 内部方法
     void SetupOpenGLState();
-    void RenderTerrain(const Camera& camera, const TerrainSystem& terrain_system);
+    void RenderTerrain(const Camera& camera, const TerrainSystem& terrain_system, const glm::mat4& view_proj_matrix);
     void RenderCharacter(const Camera& camera, const CharacterController& character_controller);
     void RenderDebugCollisionMesh(const Camera& camera);
     void RenderGroundCollisionSolid(const Camera& camera, const TerrainSystem& terrain_system);
+    void RenderSideWallCollisionSolid(const Camera& camera);
     void RenderCharacterDebug(const Camera& camera, const CharacterController& character_controller);
     
     void CleanupOpenGLResources();

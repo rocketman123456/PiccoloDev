@@ -31,17 +31,6 @@ JoltCharacterTestApp::~JoltCharacterTestApp()
 
 bool JoltCharacterTestApp::Initialize()
 {
-    cout << "=== Jolt Physics 角色控制器示例 ===" << endl;
-    cout << "控制说明：" << endl;
-    cout << "  WASD       - 移动角色" << endl;
-    cout << "  空格       - 跳跃" << endl;
-    cout << "  P          - 切换鼠标捕获（旋转摄像机）" << endl;
-    cout << "  O          - 切换地形碰撞网格显示（绿色线框）" << endl;
-    cout << "  B          - 切换地面碰撞体显示（蓝色实心）" << endl;
-    cout << "  C          - 切换角色碰撞体显示（红色线框）" << endl;
-    cout << "  鼠标滚轮   - 调整摄像机距离" << endl;
-    cout << "  ESC        - 退出" << endl;
-    cout << "====================================" << endl;
 
     if (!InitializeGLFW())
     {
@@ -68,7 +57,6 @@ bool JoltCharacterTestApp::Initialize()
     }
 
     m_initialized = true;
-    cout << "应用程序初始化完成" << endl;
     return true;
 }
 
@@ -275,16 +263,17 @@ bool JoltCharacterTestApp::InitializeSystems()
     m_shader_manager = new ShaderManager();
     m_renderer = new Renderer();
 
-    // 初始化各个系统
-    if (!m_physics_manager->Initialize())
-    {
-        cerr << "物理管理器初始化失败" << endl;
-        return false;
-    }
-
+    // 先初始化地形系统
     if (!m_terrain_system->Initialize())
     {
         cerr << "地形系统初始化失败" << endl;
+        return false;
+    }
+
+    // 使用地形系统初始化物理管理器
+    if (!m_physics_manager->Initialize(m_terrain_system))
+    {
+        cerr << "物理管理器初始化失败" << endl;
         return false;
     }
 
@@ -359,6 +348,14 @@ void JoltCharacterTestApp::Update(float delta_time)
     {
         m_renderer->UpdateGroundCollisionSolidGeometry(
             m_physics_manager->GetActivePhysicsBodies(),
+            m_terrain_system->GetGeneratedTerrain()
+        );
+    }
+    
+    if (debug_options.debug_side_wall_collision_solid)
+    {
+        m_renderer->UpdateSideWallCollisionGeometry(
+            m_physics_manager->GetActiveSideWallBodies(),
             m_terrain_system->GetGeneratedTerrain()
         );
     }

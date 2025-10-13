@@ -1,4 +1,5 @@
 #include "physics_manager.h"
+#include "terrain_system.h"
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/TempAllocator.h>
@@ -81,31 +82,12 @@ ValidateResult MyContactListener::OnContactValidate(const Body& inBody1, const B
     return ValidateResult::AcceptAllContactsForThisBodyPair;
 }
 
-void MyContactListener::OnContactAdded(const Body& inBody1, const Body& inBody2, const ContactManifold& inManifold, ContactSettings& ioSettings)
-{
-    // 可以在这里添加联系处理逻辑
-}
+void MyContactListener::OnContactAdded(const Body&, const Body&, const ContactManifold&, ContactSettings&) {}
+void MyContactListener::OnContactPersisted(const Body&, const Body&, const ContactManifold&, ContactSettings&) {}
+void MyContactListener::OnContactRemoved(const SubShapeIDPair&) {}
 
-void MyContactListener::OnContactPersisted(const Body& inBody1, const Body& inBody2, const ContactManifold& inManifold, ContactSettings& ioSettings)
-{
-    // 可以在这里添加持续联系处理逻辑
-}
-
-void MyContactListener::OnContactRemoved(const SubShapeIDPair& inSubShapePair)
-{
-    // 可以在这里添加联系移除处理逻辑
-}
-
-// MyBodyActivationListener 实现
-void MyBodyActivationListener::OnBodyActivated(const BodyID& inBodyID, uint64 inBodyUserData)
-{
-    // 可以在这里添加身体激活处理逻辑
-}
-
-void MyBodyActivationListener::OnBodyDeactivated(const BodyID& inBodyID, uint64 inBodyUserData)
-{
-    // 可以在这里添加身体停用处理逻辑
-}
+void MyBodyActivationListener::OnBodyActivated(const BodyID&, uint64) {}
+void MyBodyActivationListener::OnBodyDeactivated(const BodyID&, uint64) {}
 
 // PhysicsManager 实现
 PhysicsManager::PhysicsManager()
@@ -123,6 +105,12 @@ PhysicsManager::~PhysicsManager()
 }
 
 bool PhysicsManager::Initialize()
+{
+    // 调用不带地形系统的版本，使用默认位置
+    return Initialize(nullptr);
+}
+
+bool PhysicsManager::Initialize(TerrainSystem* terrain_system)
 {
     // 注册所有 Jolt 的类型
     RegisterDefaultAllocator();
@@ -165,10 +153,22 @@ bool PhysicsManager::Initialize()
     MyBodyActivationListener* body_activation_listener = new MyBodyActivationListener();
     m_physics_system->SetBodyActivationListener(body_activation_listener);
 
-    // 初始化动态地面物理系统
-    cout << "初始化动态地面物理系统..." << endl;
     m_active_physics_bodies.clear();
-    m_last_character_grid_pos = {-999, -999}; // 重置为无效位置，强制初始更新
+    m_last_character_grid_pos = {-999, -999};
+
+    // 计算角色初始位置
+    RVec3 character_position(0, 8, 0); // 默认位置
+    if (terrain_system)
+    {
+        // 根据地形高度设置角色位置
+        float terrain_height = terrain_system->GetTerrainHeightAtWorldPos(0.0f, 0.0f);
+        character_position = RVec3(0, terrain_height + m_character_config.half_height + m_character_config.terrain_height_offset, 0);
+        cout << "角色初始位置设置为地形高度: " << terrain_height << " + 角色半高度: " << m_character_config.half_height << " + 偏移: " << m_character_config.terrain_height_offset << " = " << character_position.GetY() << endl;
+    }
+    else
+    {
+        cout << "未提供地形系统，使用默认角色位置: " << character_position.GetY() << endl;
+    }
 
     // 创建角色控制器
     Ref<CharacterSettings> character_settings = new CharacterSettings();
@@ -178,10 +178,9 @@ bool PhysicsManager::Initialize()
     character_settings->mFriction = m_character_config.friction;
     character_settings->mSupportingVolume = Plane(Vec3::sAxisY(), -m_character_config.half_height);
 
-    m_character = new Character(character_settings, RVec3(0, 8, 0), Quat::sIdentity(), 0, m_physics_system);
+    m_character = new Character(character_settings, character_position, Quat::sIdentity(), 0, m_physics_system);
     m_character->AddToPhysicsSystem(EActivation::Activate);
 
-    cout << "Jolt Physics 初始化成功！" << endl;
     return true;
 }
 
@@ -238,6 +237,17 @@ void PhysicsManager::SetCharacterPosition(const RVec3& position)
     }
 }
 
+void PhysicsManager::SetCharacterPositionOnTerrain(float world_x, float world_z, TerrainSystem* terrain_system)
+{
+    if (m_character && terrain_system)
+    {
+        float terrain_height = terrain_system->GetTerrainHeightAtWorldPos(world_x, world_z);
+        RVec3 position(world_x, terrain_height + m_character_config.half_height + m_character_config.terrain_height_offset, world_z);
+        m_character->SetPosition(position);
+        cout << "角色位置设置到地形: (" << world_x << ", " << world_z << ") 高度: " << terrain_height << " 最终Y: " << position.GetY() << endl;
+    }
+}
+
 RVec3 PhysicsManager::GetCharacterPosition() const
 {
     if (m_character)
@@ -282,8 +292,6 @@ void PhysicsManager::UpdateDynamicGroundPhysics(const std::map<std::pair<int, in
     if (character_grid_pos == m_last_character_grid_pos)
         return; // 角色没有移动到新的网格位置，不需要更新
 
-    cout << "角色移动到网格位置: (" << character_grid_pos.first << ", " << character_grid_pos.second << ")" << endl;
-
     BodyInterface& body_interface = m_physics_system->GetBodyInterface();
 
     // 计算新的区域
@@ -303,7 +311,7 @@ void PhysicsManager::UpdateDynamicGroundPhysics(const std::map<std::pair<int, in
         }
     }
 
-    // 移除不再需要的物理体
+    // 移除不再需要的地面物理体
     auto it = m_active_physics_bodies.begin();
     while (it != m_active_physics_bodies.end())
     {
@@ -318,7 +326,27 @@ void PhysicsManager::UpdateDynamicGroundPhysics(const std::map<std::pair<int, in
         }
     }
 
-    // 添加新的物理体
+    // 移除不再需要的侧墙物理体
+    auto side_it = m_active_side_wall_bodies.begin();
+    while (side_it != m_active_side_wall_bodies.end())
+    {
+        // 从复合键中提取网格位置
+        int grid_x = side_it->first.first / 1000;
+        int grid_z = side_it->first.second;
+        std::pair<int, int> grid_pos = {grid_x, grid_z};
+        
+        if (new_region.find(grid_pos) == new_region.end())
+        {
+            RemoveSideWallPhysicsBody(side_it->second, body_interface);
+            side_it = m_active_side_wall_bodies.erase(side_it);
+        }
+        else
+        {
+            ++side_it;
+        }
+    }
+
+    // 添加新的地面物理体
     for (const auto& grid_pos : new_region)
     {
         if (m_active_physics_bodies.find(grid_pos) == m_active_physics_bodies.end())
@@ -331,8 +359,27 @@ void PhysicsManager::UpdateDynamicGroundPhysics(const std::map<std::pair<int, in
         }
     }
 
+    // 添加新的侧墙物理体
+    for (const auto& grid_pos : new_region)
+    {
+        // 检查四个方向的侧墙
+        for (int side = 0; side < 4; ++side)
+        {
+            std::pair<int, int> side_key = {grid_pos.first * 1000 + side, grid_pos.second}; // 使用复合键
+            if (m_active_side_wall_bodies.find(side_key) == m_active_side_wall_bodies.end())
+            {
+                BodyID side_body = CreateSideWallPhysicsBody(grid_pos.first, grid_pos.second, side, body_interface, terrain_data);
+                if (!side_body.IsInvalid())
+                {
+                    m_active_side_wall_bodies[side_key] = side_body;
+                }
+            }
+        }
+    }
+
     m_last_character_grid_pos = character_grid_pos;
-    cout << "动态地面物理更新完成，当前激活物理体数量: " << m_active_physics_bodies.size() << endl;
+    cout << "动态地面物理更新完成，地面物理体: " << m_active_physics_bodies.size() 
+         << ", 侧墙物理体: " << m_active_side_wall_bodies.size() << endl;
 }
 
 std::pair<int, int> PhysicsManager::WorldToGrid(float world_x, float world_z) const
@@ -384,6 +431,109 @@ BodyID PhysicsManager::CreateGroundPhysicsBody(int grid_x, int grid_z, BodyInter
 }
 
 void PhysicsManager::RemoveGroundPhysicsBody(BodyID body_id, BodyInterface& body_interface)
+{
+    if (body_id.IsInvalid())
+        return;
+
+    body_interface.RemoveBody(body_id);
+    body_interface.DestroyBody(body_id);
+}
+
+BodyID PhysicsManager::CreateSideWallPhysicsBody(int grid_x, int grid_z, int side, BodyInterface& body_interface, const std::map<std::pair<int, int>, float>& terrain_data)
+{
+    // 检查地形数据是否存在
+    auto terrain_it = terrain_data.find({grid_x, grid_z});
+    if (terrain_it == terrain_data.end())
+        return BodyID(); // 地形数据不存在，不创建物理体
+
+    float height = terrain_it->second;
+    float height_bottom = m_terrain_config.base_height;
+    
+    // 如果高度差太小，不需要创建侧墙碰撞体
+    if (height - height_bottom < 0.1f)
+        return BodyID();
+
+    // 计算世界位置
+    float world_x = (grid_x + 0.5f - m_terrain_config.grid_size / 2.0f) * m_terrain_config.tile_size;
+    float world_z = (grid_z + 0.5f - m_terrain_config.grid_size / 2.0f) * m_terrain_config.tile_size;
+
+    // 检查相邻地形的高度，决定是否需要侧墙
+    float adjacent_height = height_bottom;
+    float wall_center_x = world_x;
+    float wall_center_z = world_z;
+    float wall_center_y = (height + height_bottom) / 2.0f;
+    
+    // 根据侧墙方向调整位置和检查相邻高度
+    switch (side)
+    {
+        case 0: // 左面 (-X)
+        {
+            auto left_it = terrain_data.find({grid_x - 1, grid_z});
+            adjacent_height = (left_it != terrain_data.end()) ? left_it->second : height_bottom;
+            wall_center_x = world_x - m_terrain_config.tile_size / 2.0f;
+            break;
+        }
+        case 1: // 右面 (+X)
+        {
+            auto right_it = terrain_data.find({grid_x + 1, grid_z});
+            adjacent_height = (right_it != terrain_data.end()) ? right_it->second : height_bottom;
+            wall_center_x = world_x + m_terrain_config.tile_size / 2.0f;
+            break;
+        }
+        case 2: // 前面 (-Z)
+        {
+            auto front_it = terrain_data.find({grid_x, grid_z - 1});
+            adjacent_height = (front_it != terrain_data.end()) ? front_it->second : height_bottom;
+            wall_center_z = world_z - m_terrain_config.tile_size / 2.0f;
+            break;
+        }
+        case 3: // 后面 (+Z)
+        {
+            auto back_it = terrain_data.find({grid_x, grid_z + 1});
+            adjacent_height = (back_it != terrain_data.end()) ? back_it->second : height_bottom;
+            wall_center_z = world_z + m_terrain_config.tile_size / 2.0f;
+            break;
+        }
+    }
+
+    // 如果高度差太小，不需要创建侧墙碰撞体
+    if (abs(height - adjacent_height) < 0.1f)
+        return BodyID();
+
+    // 创建侧墙碰撞体
+    float wall_thickness = 0.1f; // 侧墙厚度
+    float wall_height = abs(height - adjacent_height);
+    float wall_width = m_terrain_config.tile_size;
+    
+    Vec3 wall_half_extents;
+    if (side == 0 || side == 1) // 左右面
+    {
+        wall_half_extents = Vec3(wall_thickness / 2.0f, wall_height / 2.0f, wall_width / 2.0f);
+    }
+    else // 前后面
+    {
+        wall_half_extents = Vec3(wall_width / 2.0f, wall_height / 2.0f, wall_thickness / 2.0f);
+    }
+
+    BoxShapeSettings wall_shape_settings(wall_half_extents);
+    ShapeSettings::ShapeResult wall_shape_result = wall_shape_settings.Create();
+    ShapeRefC wall_shape = wall_shape_result.Get();
+
+    BodyCreationSettings wall_settings(
+        wall_shape,
+        RVec3(wall_center_x, wall_center_y, wall_center_z),
+        Quat::sIdentity(),
+        EMotionType::Static,
+        Layers::NON_MOVING
+    );
+
+    Body* wall = body_interface.CreateBody(wall_settings);
+    body_interface.AddBody(wall->GetID(), EActivation::DontActivate);
+
+    return wall->GetID();
+}
+
+void PhysicsManager::RemoveSideWallPhysicsBody(BodyID body_id, BodyInterface& body_interface)
 {
     if (body_id.IsInvalid())
         return;

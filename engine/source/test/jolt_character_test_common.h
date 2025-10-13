@@ -33,8 +33,6 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
-#include <random>
-#include <thread>
 
 using namespace JPH;
 
@@ -60,8 +58,18 @@ struct TerrainConfig
     int   grid_size = 50;      // 地形网格大小 (减少到50x50=2500个块)
     float tile_size = 1.0f;    // 每个瓦片的大小
     int   physics_radius = 5;  // 物理系统半径
-    int   terrain_radius = 20; // 地形生成半径
-    int   update_threshold = 10; // 更新阈值
+    int   terrain_radius = 30; // 地形生成半径
+    int   update_threshold = 15; // 更新阈值
+    
+    // 地形高度配置
+    float min_height = -10.0f;   // 最小高度
+    float max_height = 7.0f;   // 最大高度
+    float height_step = 1.0f;  // 高度步长（量化单位）
+    float base_height = -50.0f; // 基础高度（盒子底部）
+    
+    // 渲染配置
+    bool enable_frustum_culling = false; // 是否启用视锥剔除
+    float frustum_culling_tolerance = 0.1f; // 视锥剔除容错范围
 };
 
 // 角色配置
@@ -73,6 +81,7 @@ struct CharacterConfig
     float jump_speed = 4.0f;
     float max_slope_angle = 45.0f;
     float friction = 0.5f;
+    float terrain_height_offset = 0.1f; // 角色在地形上的高度偏移
 };
 
 // 摄像机配置
@@ -108,6 +117,7 @@ struct DebugOptions
 {
     bool debug_collision_mesh = false;
     bool debug_ground_collision_solid = false;
+    bool debug_side_wall_collision_solid = false;
     bool debug_character_collision = false;
 };
 

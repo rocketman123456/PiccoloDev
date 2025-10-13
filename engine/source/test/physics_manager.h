@@ -1,11 +1,9 @@
 #pragma once
 
 #include "jolt_character_test_common.h"
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/Physics/Collision/ObjectLayer.h>
-#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
-#include <Jolt/Physics/Body/BodyActivationListener.h>
-#include <Jolt/Physics/Character/Character.h>
+
+// 前向声明
+class TerrainSystem;
 
 // 对象层过滤器
 class ObjectLayerPairFilterImpl : public ObjectLayerPairFilter
@@ -62,12 +60,14 @@ public:
     ~PhysicsManager();
 
     bool Initialize();
+    bool Initialize(TerrainSystem* terrain_system);
     void Update(float delta_time);
     void Shutdown();
 
     // 角色相关
     Character* GetCharacter() const { return m_character; }
     void SetCharacterPosition(const RVec3& position);
+    void SetCharacterPositionOnTerrain(float world_x, float world_z, TerrainSystem* terrain_system);
     RVec3 GetCharacterPosition() const;
     void SetCharacterVelocity(const Vec3& velocity);
     Vec3 GetCharacterVelocity() const;
@@ -76,6 +76,7 @@ public:
     // 地面物理体管理
     void UpdateDynamicGroundPhysics(const std::map<std::pair<int, int>, float>& terrain_data, const std::pair<int, int>& character_grid_pos);
     const std::map<std::pair<int, int>, BodyID>& GetActivePhysicsBodies() const { return m_active_physics_bodies; }
+    const std::map<std::pair<int, int>, BodyID>& GetActiveSideWallBodies() const { return m_active_side_wall_bodies; }
 
     // 工具函数
     std::pair<int, int> WorldToGrid(float world_x, float world_z) const;
@@ -89,6 +90,7 @@ private:
     
     // 动态地面物理系统
     std::map<std::pair<int, int>, BodyID> m_active_physics_bodies;
+    std::map<std::pair<int, int>, BodyID> m_active_side_wall_bodies; // 侧墙碰撞体
     std::pair<int, int> m_last_character_grid_pos;
     
     // 配置
@@ -98,4 +100,6 @@ private:
     // 内部方法
     BodyID CreateGroundPhysicsBody(int grid_x, int grid_z, BodyInterface& body_interface, const std::map<std::pair<int, int>, float>& terrain_data);
     void RemoveGroundPhysicsBody(BodyID body_id, BodyInterface& body_interface);
+    BodyID CreateSideWallPhysicsBody(int grid_x, int grid_z, int side, BodyInterface& body_interface, const std::map<std::pair<int, int>, float>& terrain_data);
+    void RemoveSideWallPhysicsBody(BodyID body_id, BodyInterface& body_interface);
 };

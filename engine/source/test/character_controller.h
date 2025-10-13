@@ -1,8 +1,9 @@
 #pragma once
 
 #include "jolt_character_test_common.h"
-#include "physics_manager.h"
-#include <Jolt/Physics/Character/Character.h>
+
+// 前向声明
+class PhysicsManager;
 
 // 角色控制器
 class CharacterController

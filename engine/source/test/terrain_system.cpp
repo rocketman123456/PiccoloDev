@@ -8,21 +8,56 @@
 using namespace std;
 
 // PerlinNoise 实现
-PerlinNoise::PerlinNoise()
+PerlinNoise::PerlinNoise(unsigned int seed)
+    : m_seed(seed)
 {
-    // 初始化排列表
-    p = {151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225, 140, 36,  103, 30,  69,  142, 8,   99,  37,  240, 21,  10,  23,
-         190, 6,   148, 247, 120, 234, 75,  0,   26,  197, 62,  94,  252, 219, 203, 117, 35,  11,  32,  57,  177, 33,  88,  237, 149, 56,  87,  174, 20,
-         125, 136, 171, 168, 68,  175, 74,  165, 71,  134, 139, 48,  27,  166, 77,  146, 158, 231, 83,  111, 229, 122, 60,  211, 133, 230, 220, 105, 92,
-         41,  55,  46,  245, 40,  244, 102, 143, 54,  65,  25,  63,  161, 1,   216, 80,  73,  209, 76,  132, 187, 208, 89,  18,  169, 200, 196, 135, 130,
-         116, 188, 159, 86,  164, 100, 109, 198, 173, 186, 3,   64,  52,  217, 226, 250, 124, 123, 5,   202, 38,  147, 118, 126, 255, 82,  85,  212, 207,
-         206, 59,  227, 47,  16,  58,  17,  182, 189, 28,  42,  223, 183, 170, 213, 119, 248, 152, 2,   44,  154, 163, 70,  221, 153, 101, 155, 167, 43,
-         172, 9,   129, 22,  39,  253, 19,  98,  108, 110, 79,  113, 224, 232, 178, 185, 112, 104, 218, 246, 97,  228, 251, 34,  242, 193, 238, 210, 144,
-         12,  191, 179, 162, 241, 81,  51,  145, 235, 249, 14,  239, 107, 49,  192, 214, 31,  181, 199, 106, 157, 184, 84,  204, 176, 115, 121, 50,  45,
-         127, 4,   150, 254, 138, 236, 205, 93,  222, 114, 67,  29,  24,  72,  243, 141, 128, 195, 78,  66,  215, 61,  156, 180};
+    generatePermutationTable();
+}
 
-    // 复制排列表
-    p.insert(p.end(), p.begin(), p.end());
+void PerlinNoise::setSeed(unsigned int seed)
+{
+    m_seed = seed;
+    generatePermutationTable();
+}
+
+void PerlinNoise::generatePermutationTable()
+{
+    // 清空并重新初始化排列表
+    p.clear();
+    p.reserve(512); // 256 + 256 复制
+    
+    // 首先创建0-255的序列
+    std::vector<int> temp(256);
+    for (int i = 0; i < 256; ++i)
+    {
+        temp[i] = i;
+    }
+    
+    // 使用种子进行洗牌
+    unsigned int state = m_seed;
+    for (int i = 255; i > 0; --i)
+    {
+        // 简单的线性同余生成器
+        state = state * 1103515245 + 12345;
+        int j = state % (i + 1);
+        std::swap(temp[i], temp[j]);
+    }
+    
+    // 将洗牌后的序列添加到排列表
+    p.insert(p.end(), temp.begin(), temp.end());
+    // 复制一份以简化索引计算
+    p.insert(p.end(), temp.begin(), temp.end());
+}
+
+unsigned int PerlinNoise::simpleHash(unsigned int x)
+{
+    // 简单的哈希函数，用于生成伪随机数
+    x ^= x >> 16;
+    x *= 0x85ebca6b;
+    x ^= x >> 13;
+    x *= 0xc2b2ae35;
+    x ^= x >> 16;
+    return x;
 }
 
 double PerlinNoise::fade(double t)
@@ -82,6 +117,7 @@ TerrainSystem::TerrainSystem()
     , m_ground_vertex_count(0)
     , m_ground_texture(0)
     , m_last_terrain_center(-999, -999)
+    , m_noise_generator(0) // 使用固定种子确保可重现的地形
 {
 }
 
@@ -92,18 +128,9 @@ TerrainSystem::~TerrainSystem()
 
 bool TerrainSystem::Initialize()
 {
-    cout << "初始化地形系统..." << endl;
-    
-    // 生成地形高度数据
     GenerateTerrainHeights();
-    
-    // 创建棋盘格纹理
     CreateCheckerboardTexture();
-    
-    // 创建初始地面几何体
     UpdateGroundGeometry();
-    
-    cout << "地形系统初始化完成" << endl;
     return true;
 }
 
@@ -123,7 +150,6 @@ void TerrainSystem::Update(const std::pair<int, int>& character_grid_pos)
             return;
     }
 
-    cout << "更新地形，角色位置: (" << character_grid_pos.first << ", " << character_grid_pos.second << ")" << endl;
 
     // 计算新的区域
     std::set<std::pair<int, int>> new_terrain_region;
@@ -165,7 +191,6 @@ void TerrainSystem::Update(const std::pair<int, int>& character_grid_pos)
 
     m_last_terrain_center = current_terrain_center;
 
-    cout << "地形更新完成，新增地形块: " << new_terrain_count << "，总地形块: " << m_generated_terrain.size() << endl;
 
     // 地形更新后，更新地面几何体
     UpdateGroundGeometry();
@@ -184,8 +209,8 @@ void TerrainSystem::GenerateTerrainHeights()
 
     // 噪声参数
     float scale = 0.05f; // 控制噪声频率
-    float amplitude = 5.0f; // 控制高度变化幅度
-    float base_height = 2.0f; // 基础高度
+    float height_range = m_config.max_height - m_config.min_height; // 高度变化范围
+    float base_height = (m_config.min_height + m_config.max_height) * 0.5f; // 基础高度（中点）
 
     for (int z = 0; z < m_config.grid_size; ++z)
     {
@@ -196,20 +221,11 @@ void TerrainSystem::GenerateTerrainHeights()
             // 计算噪声值
             double noise_value = m_noise_generator.noise(x * scale, z * scale, 0.0);
 
-            // 将噪声值转换为高度（范围约 1.0 到 3.0）
-            float height = base_height + noise_value * amplitude;
+            // 将噪声值转换为高度（范围在 min_height 到 max_height 之间）
+            float height = base_height + noise_value * height_range * 0.5f;
 
-            // 量化为整数高度：1.0, 2.0, 3.0
-            if (height < 1.5f)
-                height = 1.0f;
-            else if (height < 2.5f)
-                height = 2.0f;
-            else if (height < 3.5f)
-                height = 3.0f;
-            else if (height < 4.5f)
-                height = 4.0f;
-            else
-                height = 5.0f;
+            // 量化为配置的高度步长
+            height = QuantizeHeight(height);
 
             m_terrain_heights[index] = height;
             
@@ -218,7 +234,6 @@ void TerrainSystem::GenerateTerrainHeights()
         }
     }
     
-    cout << "生成了 " << m_generated_terrain.size() << " 个地形块" << endl;
 }
 
 float TerrainSystem::GenerateTerrainHeight(int grid_x, int grid_z)
@@ -228,16 +243,62 @@ float TerrainSystem::GenerateTerrainHeight(int grid_x, int grid_z)
     float noise2 = sin(grid_x * 0.05f) * cos(grid_z * 0.05f) * 0.5f;
     float noise3 = sin(grid_x * 0.02f) * cos(grid_z * 0.02f) * 0.25f;
 
-    float height = (noise1 + noise2 + noise3) * 2.0f + 3.0f; // 基础高度3.0，变化范围约±3.0
+    float height_range = m_config.max_height - m_config.min_height;
+    float base_height = (m_config.min_height + m_config.max_height) * 0.5f;
+    float height = (noise1 + noise2 + noise3) * height_range * 0.5f + base_height;
 
-    // 量化为整数高度
-    return floor(height);
+    // 量化为配置的高度步长
+    return QuantizeHeight(height);
+}
+
+float TerrainSystem::QuantizeHeight(float height)
+{
+    // 确保高度在配置范围内
+    height = std::max(m_config.min_height, std::min(m_config.max_height, height));
+    
+    // 量化为配置的高度步长
+    float quantized_height = m_config.min_height + 
+        std::round((height - m_config.min_height) / m_config.height_step) * m_config.height_step;
+    
+    // 确保量化后的高度仍在范围内
+    return std::max(m_config.min_height, std::min(m_config.max_height, quantized_height));
+}
+
+float TerrainSystem::GetTerrainHeightAtWorldPos(float world_x, float world_z) const
+{
+    // 将世界坐标转换为网格坐标
+    int grid_x = static_cast<int>(std::round(world_x / m_config.tile_size + m_config.grid_size / 2.0f));
+    int grid_z = static_cast<int>(std::round(world_z / m_config.tile_size + m_config.grid_size / 2.0f));
+    
+    // 优先使用动态生成的地形数据
+    auto terrain_it = m_generated_terrain.find({grid_x, grid_z});
+    if (terrain_it != m_generated_terrain.end())
+    {
+        return terrain_it->second;
+    }
+    
+    // 如果动态数据中没有，尝试使用固定地形数据
+    if (grid_x >= 0 && grid_x < m_config.grid_size && grid_z >= 0 && grid_z < m_config.grid_size)
+    {
+        int tile_idx = grid_z * m_config.grid_size + grid_x;
+        if (tile_idx >= 0 && tile_idx < static_cast<int>(m_terrain_heights.size()))
+        {
+            return m_terrain_heights[tile_idx];
+        }
+    }
+    
+    // 如果都没有，使用默认高度
+    return m_config.min_height;
 }
 
 void TerrainSystem::UpdateGroundGeometry()
 {
-    cout << "更新地面几何体（基于动态地形）..." << endl;
+    // 调用不带视锥剔除的版本
+    UpdateGroundGeometry(glm::mat4(1.0f));
+}
 
+void TerrainSystem::UpdateGroundGeometry(const glm::mat4& view_proj_matrix)
+{
     // 删除旧的几何体（但保留纹理）
     if (m_ground_vao != 0)
     {
@@ -251,12 +312,7 @@ void TerrainSystem::UpdateGroundGeometry()
     }
     m_ground_vertex_count = 0;
 
-    // 计算需要渲染的地形区域（基于生成的地形数据）
-    if (m_generated_terrain.empty())
-    {
-        cout << "没有生成的地形数据，跳过地面几何体创建" << endl;
-        return;
-    }
+    if (m_generated_terrain.empty()) return;
 
     // 找到地形数据的边界
     int min_x = INT_MAX, max_x = INT_MIN;
@@ -272,7 +328,6 @@ void TerrainSystem::UpdateGroundGeometry()
         max_z = std::max(max_z, z);
     }
 
-    cout << "地形数据范围: X[" << min_x << ", " << max_x << "], Z[" << min_z << ", " << max_z << "]" << endl;
 
     // 估算顶点数量
     int estimated_vertices = 0;
@@ -326,6 +381,10 @@ void TerrainSystem::UpdateGroundGeometry()
             if (terrain_it == m_generated_terrain.end())
                 continue;
 
+            // 视锥剔除检查
+            if (m_config.enable_frustum_culling && !IsTerrainTileVisible(x, z, view_proj_matrix))
+                continue;
+
             float height = terrain_it->second;
 
             // 计算世界坐标
@@ -335,7 +394,7 @@ void TerrainSystem::UpdateGroundGeometry()
             float world_z2 = (z + 1 - m_config.grid_size / 2.0f) * m_config.tile_size;
 
             float height_top = height;
-            float height_bottom = height - 1.0f;
+            float height_bottom = m_config.base_height;
 
             // 顶面（总是渲染）
             AddQuadUltraFast(vertices,
@@ -346,9 +405,19 @@ void TerrainSystem::UpdateGroundGeometry()
                 0.0f, 1.0f, 0.0f
             );
 
+            // 底面（总是渲染）
+            AddQuadUltraFast(vertices,
+                world_x1, height_bottom, world_z1,
+                world_x1, height_bottom, world_z2,
+                world_x2, height_bottom, world_z2,
+                world_x2, height_bottom, world_z1,
+                0.0f, -1.0f, 0.0f
+            );
+
             // 左面 (-X) - 只在高度变化时渲染
             auto left_it = m_generated_terrain.find({x - 1, z});
-            if (left_it == m_generated_terrain.end() || left_it->second < height_top)
+            float left_height = (left_it != m_generated_terrain.end()) ? left_it->second : m_config.base_height;
+            if (left_height != height_top)
             {
                 AddQuadUltraFast(vertices,
                     world_x1, height_bottom, world_z1,
@@ -361,7 +430,8 @@ void TerrainSystem::UpdateGroundGeometry()
 
             // 右面 (+X) - 只在高度变化时渲染
             auto right_it = m_generated_terrain.find({x + 1, z});
-            if (right_it == m_generated_terrain.end() || right_it->second < height_top)
+            float right_height = (right_it != m_generated_terrain.end()) ? right_it->second : m_config.base_height;
+            if (right_height != height_top)
             {
                 AddQuadUltraFast(vertices,
                     world_x2, height_bottom, world_z1,
@@ -374,7 +444,8 @@ void TerrainSystem::UpdateGroundGeometry()
 
             // 前面 (-Z) - 只在高度变化时渲染
             auto front_it = m_generated_terrain.find({x, z - 1});
-            if (front_it == m_generated_terrain.end() || front_it->second < height_top)
+            float front_height = (front_it != m_generated_terrain.end()) ? front_it->second : m_config.base_height;
+            if (front_height != height_top)
             {
                 AddQuadUltraFast(vertices,
                     world_x1, height_bottom, world_z1,
@@ -387,7 +458,8 @@ void TerrainSystem::UpdateGroundGeometry()
 
             // 后面 (+Z) - 只在高度变化时渲染
             auto back_it = m_generated_terrain.find({x, z + 1});
-            if (back_it == m_generated_terrain.end() || back_it->second < height_top)
+            float back_height = (back_it != m_generated_terrain.end()) ? back_it->second : m_config.base_height;
+            if (back_height != height_top)
             {
                 AddQuadUltraFast(vertices,
                     world_x1, height_bottom, world_z2,
@@ -398,13 +470,7 @@ void TerrainSystem::UpdateGroundGeometry()
                 );
             }
 
-            // 进度显示
             processed_tiles++;
-            if (processed_tiles % (total_tiles / 10) == 0)
-            {
-                int progress = (processed_tiles * 100) / total_tiles;
-                cout << "进度: " << progress << "% (" << processed_tiles << "/" << total_tiles << ")" << endl;
-            }
         }
     }
 
@@ -446,10 +512,27 @@ bool TerrainSystem::IsTerrainTileVisible(int x, int z, const glm::mat4& view_pro
     float world_z1 = (z - m_config.grid_size / 2.0f) * m_config.tile_size;
     float world_z2 = (z + 1 - m_config.grid_size / 2.0f) * m_config.tile_size;
 
-    // 获取地形块高度
-    int tile_idx = z * m_config.grid_size + x;
-    float height_top = m_terrain_heights[tile_idx];
-    float height_bottom = height_top - 1.0f;
+    // 获取地形块高度 - 优先使用动态生成的地形数据
+    float height_top;
+    auto terrain_it = m_generated_terrain.find({x, z});
+    if (terrain_it != m_generated_terrain.end())
+    {
+        height_top = terrain_it->second;
+    }
+    else
+    {
+        // 如果动态数据中没有，尝试使用固定地形数据
+        int tile_idx = z * m_config.grid_size + x;
+        if (tile_idx >= 0 && tile_idx < static_cast<int>(m_terrain_heights.size()))
+        {
+            height_top = m_terrain_heights[tile_idx];
+        }
+        else
+        {
+            height_top = m_config.min_height; // 使用默认高度
+        }
+    }
+    float height_bottom = m_config.base_height;
 
     // 地形块的8个角点
     glm::vec4 corners[8] = {
@@ -464,22 +547,24 @@ bool TerrainSystem::IsTerrainTileVisible(int x, int z, const glm::mat4& view_pro
     };
 
     // 将角点变换到裁剪空间
-    bool all_outside = true;
+    bool any_inside = false;
     for (int i = 0; i < 8; ++i)
     {
         glm::vec4 clip_pos = view_proj_matrix * corners[i];
 
         // 检查是否在视锥内（-w < x,y,z < w）
-        if (clip_pos.x >= -clip_pos.w && clip_pos.x <= clip_pos.w && 
-            clip_pos.y >= -clip_pos.w && clip_pos.y <= clip_pos.w && 
-            clip_pos.z >= -clip_pos.w && clip_pos.z <= clip_pos.w)
+        // 使用配置的容错范围以避免边界问题
+        float tolerance = m_config.frustum_culling_tolerance;
+        if (clip_pos.x >= -clip_pos.w - tolerance && clip_pos.x <= clip_pos.w + tolerance && 
+            clip_pos.y >= -clip_pos.w - tolerance && clip_pos.y <= clip_pos.w + tolerance && 
+            clip_pos.z >= -clip_pos.w - tolerance && clip_pos.z <= clip_pos.w + tolerance)
         {
-            all_outside = false;
+            any_inside = true;
             break;
         }
     }
 
-    return !all_outside;
+    return any_inside;
 }
 
 void TerrainSystem::CreateCheckerboardTexture()

@@ -1,4 +1,5 @@
 #include "input_manager.h"
+#include "camera.h"
 #include "terrain_system.h"
 #include "physics_manager.h"
 #include <iostream>

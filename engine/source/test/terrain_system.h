@@ -1,6 +1,7 @@
 #pragma once
 
 #include "jolt_character_test_common.h"
+
 #include <vector>
 
 // Perlin噪声生成器
@@ -8,15 +9,19 @@ class PerlinNoise
 {
 private:
     std::vector<int> p;
+    unsigned int m_seed;
 
 public:
-    PerlinNoise();
+    PerlinNoise(unsigned int seed = 0);
     double noise(double x, double y, double z);
+    void setSeed(unsigned int seed);
 
 private:
     double fade(double t);
     double lerp(double t, double a, double b);
     double grad(int hash, double x, double y, double z);
+    void generatePermutationTable();
+    unsigned int simpleHash(unsigned int x);
 };
 
 // 地形系统
@@ -33,13 +38,22 @@ public:
     // 地形生成
     void GenerateTerrainHeights();
     float GenerateTerrainHeight(int grid_x, int grid_z);
+    float QuantizeHeight(float height);
+    
+    // 地形高度查询
+    float GetTerrainHeightAtWorldPos(float world_x, float world_z) const;
     
     // 地形数据访问
     const std::map<std::pair<int, int>, float>& GetGeneratedTerrain() const { return m_generated_terrain; }
     const std::vector<float>& GetTerrainHeights() const { return m_terrain_heights; }
     
+    // 配置管理
+    void SetConfig(const TerrainConfig& config) { m_config = config; }
+    const TerrainConfig& GetConfig() const { return m_config; }
+    
     // 几何体管理
     void UpdateGroundGeometry();
+    void UpdateGroundGeometry(const glm::mat4& view_proj_matrix);
     void CreateGroundGeometry();
     
     // OpenGL资源

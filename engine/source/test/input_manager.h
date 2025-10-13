@@ -1,12 +1,11 @@
 #pragma once
 
 #include "jolt_character_test_common.h"
-#include "camera.h"
-#include <GLFW/glfw3.h>
 
 // 前向声明
 class TerrainSystem;
 class PhysicsManager;
+class Camera;
 
 // 输入管理器
 class InputManager

@@ -1,6 +1,9 @@
 #include "renderer.h"
 #include "shader_manager.h"
 #include "physics_manager.h"
+#include "camera.h"
+#include "character_controller.h"
+#include "terrain_system.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -89,7 +92,8 @@ void Renderer::Render(const Camera& camera, const TerrainSystem& terrain_system,
     glUniform3f(view_pos_loc, cam_pos.x, cam_pos.y, cam_pos.z);
 
     // 渲染地形
-    RenderTerrain(camera, terrain_system);
+    glm::mat4 view_proj = projection * view;
+    RenderTerrain(camera, terrain_system, view_proj);
 
     // 渲染角色
     RenderCharacter(camera, character_controller);
@@ -104,6 +108,12 @@ void Renderer::Render(const Camera& camera, const TerrainSystem& terrain_system,
     if (debug_options.debug_ground_collision_solid)
     {
         RenderGroundCollisionSolid(camera, terrain_system);
+    }
+
+    // 渲染侧墙碰撞体实心盒子（绿色实心）
+    if (debug_options.debug_side_wall_collision_solid)
+    {
+        RenderSideWallCollisionSolid(camera);
     }
 
     // 渲染角色碰撞体调试网格（红色线框）
@@ -617,12 +627,16 @@ void Renderer::SetupOpenGLState()
 {
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+    glFrontFace(GL_CCW); // 明确设置逆时针为正面
     glCullFace(GL_BACK);
     glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
-void Renderer::RenderTerrain(const Camera& camera, const TerrainSystem& terrain_system)
+void Renderer::RenderTerrain(const Camera& camera, const TerrainSystem& terrain_system, const glm::mat4& view_proj_matrix)
 {
+    // 使用视锥剔除更新几何体
+    const_cast<TerrainSystem&>(terrain_system).UpdateGroundGeometry(view_proj_matrix);
+    
     GLuint ground_vao = terrain_system.GetGroundVAO();
     int ground_vertex_count = terrain_system.GetGroundVertexCount();
     GLuint ground_texture = terrain_system.GetGroundTexture();
@@ -713,11 +727,15 @@ void Renderer::RenderGroundCollisionSolid(const Camera& camera, const TerrainSys
     GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
     
     // 保存当前渲染状态
-    GLboolean polygon_offset_enabled = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+    GLboolean depth_test_enabled = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean cull_face_enabled = glIsEnabled(GL_CULL_FACE);
+    GLint depth_func;
+    glGetIntegerv(GL_DEPTH_FUNC, &depth_func);
     
-    // 稍微偏移深度，确保蓝色盒子在地形之上显示
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
+    // 确保渲染所有6个面：禁用面剔除，使用正常的深度测试
+    glDisable(GL_CULL_FACE);  // 禁用面剔除，确保所有面都被渲染
+    glEnable(GL_DEPTH_TEST);  // 保持深度测试启用
+    glDepthFunc(GL_LESS);     // 使用正常的深度测试
     
     glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
     glUniform3f(object_color_loc, 1.0f, 1.0f, 1.0f); // 白色（使用纹理）
@@ -737,10 +755,17 @@ void Renderer::RenderGroundCollisionSolid(const Camera& camera, const TerrainSys
     glDrawArrays(GL_TRIANGLES, 0, m_ground_collision_vertex_count);
     
     // 恢复之前的渲染状态
-    if (polygon_offset_enabled)
-        glEnable(GL_POLYGON_OFFSET_FILL);
+    if (depth_test_enabled)
+        glEnable(GL_DEPTH_TEST);
     else
-        glDisable(GL_POLYGON_OFFSET_FILL);
+        glDisable(GL_DEPTH_TEST);
+    
+    glDepthFunc(depth_func);  // 恢复之前的深度函数
+    
+    if (cull_face_enabled)
+        glEnable(GL_CULL_FACE);
+    else
+        glDisable(GL_CULL_FACE);
 }
 
 void Renderer::RenderCharacterDebug(const Camera& camera, const CharacterController& character_controller)
@@ -803,6 +828,14 @@ void Renderer::CleanupOpenGLResources()
         m_ground_collision_vao = 0;
         m_ground_collision_vbo = 0;
     }
+    
+    if (m_side_wall_collision_vao != 0)
+    {
+        glDeleteVertexArrays(1, &m_side_wall_collision_vao);
+        glDeleteBuffers(1, &m_side_wall_collision_vbo);
+        m_side_wall_collision_vao = 0;
+        m_side_wall_collision_vbo = 0;
+    }
 }
 
 void Renderer::AddQuadUltraFast(std::vector<float>& vertices, float x1, float y1, float z1, 
@@ -847,5 +880,214 @@ void Renderer::CreateCollisionCheckerboardTexture(GLuint& texture_id)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+}
+
+void Renderer::CreateSideWallCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_side_wall_bodies,
+                                               const std::map<std::pair<int, int>, float>& terrain_data)
+{
+    // 删除旧的几何体
+    if (m_side_wall_collision_vao != 0)
+    {
+        glDeleteVertexArrays(1, &m_side_wall_collision_vao);
+        glDeleteBuffers(1, &m_side_wall_collision_vbo);
+        m_side_wall_collision_vao = 0;
+        m_side_wall_collision_vbo = 0;
+        m_side_wall_collision_vertex_count = 0;
+    }
+    
+    // 重新创建几何体
+    std::vector<float> vertices;
+    
+    const float half_tile_size = 0.5f;
+    const float wall_thickness = 0.1f;
+    
+    for (const auto& body_pair : active_side_wall_bodies)
+    {
+        // 从复合键中提取网格位置和侧墙方向
+        int grid_x = body_pair.first.first / 1000;
+        int side = body_pair.first.first % 1000;
+        int grid_z = body_pair.first.second;
+        
+        auto terrain_it = terrain_data.find({grid_x, grid_z});
+        if (terrain_it == terrain_data.end())
+            continue;
+        
+        float height = terrain_it->second;
+        float height_bottom = -50.0f; // base_height
+        
+        // 计算世界位置
+        float world_x = (grid_x + 0.5f - 25.0f) * 1.0f;
+        float world_z = (grid_z + 0.5f - 25.0f) * 1.0f;
+        
+        // 检查相邻地形的高度
+        float adjacent_height = height_bottom;
+        float wall_center_x = world_x;
+        float wall_center_z = world_z;
+        float wall_center_y = (height + height_bottom) / 2.0f;
+        
+        switch (side)
+        {
+            case 0: // 左面 (-X)
+            {
+                auto left_it = terrain_data.find({grid_x - 1, grid_z});
+                adjacent_height = (left_it != terrain_data.end()) ? left_it->second : height_bottom;
+                wall_center_x = world_x - half_tile_size;
+                break;
+            }
+            case 1: // 右面 (+X)
+            {
+                auto right_it = terrain_data.find({grid_x + 1, grid_z});
+                adjacent_height = (right_it != terrain_data.end()) ? right_it->second : height_bottom;
+                wall_center_x = world_x + half_tile_size;
+                break;
+            }
+            case 2: // 前面 (-Z)
+            {
+                auto front_it = terrain_data.find({grid_x, grid_z - 1});
+                adjacent_height = (front_it != terrain_data.end()) ? front_it->second : height_bottom;
+                wall_center_z = world_z - half_tile_size;
+                break;
+            }
+            case 3: // 后面 (+Z)
+            {
+                auto back_it = terrain_data.find({grid_x, grid_z + 1});
+                adjacent_height = (back_it != terrain_data.end()) ? back_it->second : height_bottom;
+                wall_center_z = world_z + half_tile_size;
+                break;
+            }
+        }
+        
+        // 如果高度差太小，跳过
+        if (abs(height - adjacent_height) < 0.1f)
+            continue;
+        
+        float wall_height = abs(height - adjacent_height);
+        float wall_width = 1.0f; // tile_size
+        
+        // 计算侧墙的8个角点
+        float x1, x2, y1, y2, z1, z2;
+        if (side == 0 || side == 1) // 左右面
+        {
+            x1 = wall_center_x - wall_thickness / 2.0f;
+            x2 = wall_center_x + wall_thickness / 2.0f;
+            z1 = wall_center_z - wall_width / 2.0f;
+            z2 = wall_center_z + wall_width / 2.0f;
+        }
+        else // 前后面
+        {
+            x1 = wall_center_x - wall_width / 2.0f;
+            x2 = wall_center_x + wall_width / 2.0f;
+            z1 = wall_center_z - wall_thickness / 2.0f;
+            z2 = wall_center_z + wall_thickness / 2.0f;
+        }
+        y1 = wall_center_y - wall_height / 2.0f;
+        y2 = wall_center_y + wall_height / 2.0f;
+        
+        // 添加侧墙的6个面（每个面2个三角形，每个三角形3个顶点）
+        // 每个顶点包含：位置(3) + 法线(3) + 纹理坐标(2) = 8个float
+        
+        // 顶面 (Y = y2, 法线向上)
+        vertices.insert(vertices.end(), {x1, y2, z1, 0, 1, 0, 0, 0});
+        vertices.insert(vertices.end(), {x1, y2, z2, 0, 1, 0, 0, 1});
+        vertices.insert(vertices.end(), {x2, y2, z2, 0, 1, 0, 1, 1});
+        vertices.insert(vertices.end(), {x1, y2, z1, 0, 1, 0, 0, 0});
+        vertices.insert(vertices.end(), {x2, y2, z2, 0, 1, 0, 1, 1});
+        vertices.insert(vertices.end(), {x2, y2, z1, 0, 1, 0, 1, 0});
+        
+        // 底面 (Y = y1, 法线向下)
+        vertices.insert(vertices.end(), {x1, y1, z1, 0, -1, 0, 0, 0});
+        vertices.insert(vertices.end(), {x2, y1, z2, 0, -1, 0, 1, 1});
+        vertices.insert(vertices.end(), {x1, y1, z2, 0, -1, 0, 0, 1});
+        vertices.insert(vertices.end(), {x1, y1, z1, 0, -1, 0, 0, 0});
+        vertices.insert(vertices.end(), {x2, y1, z1, 0, -1, 0, 1, 0});
+        vertices.insert(vertices.end(), {x2, y1, z2, 0, -1, 0, 1, 1});
+        
+        // 前面 (Z = z1, 法线向前)
+        vertices.insert(vertices.end(), {x1, y1, z1, 0, 0, -1, 0, 0});
+        vertices.insert(vertices.end(), {x1, y2, z1, 0, 0, -1, 0, 1});
+        vertices.insert(vertices.end(), {x2, y2, z1, 0, 0, -1, 1, 1});
+        vertices.insert(vertices.end(), {x1, y1, z1, 0, 0, -1, 0, 0});
+        vertices.insert(vertices.end(), {x2, y2, z1, 0, 0, -1, 1, 1});
+        vertices.insert(vertices.end(), {x2, y1, z1, 0, 0, -1, 1, 0});
+        
+        // 后面 (Z = z2, 法线向后)
+        vertices.insert(vertices.end(), {x1, y1, z2, 0, 0, 1, 0, 0});
+        vertices.insert(vertices.end(), {x2, y2, z2, 0, 0, 1, 1, 1});
+        vertices.insert(vertices.end(), {x1, y2, z2, 0, 0, 1, 0, 1});
+        vertices.insert(vertices.end(), {x1, y1, z2, 0, 0, 1, 0, 0});
+        vertices.insert(vertices.end(), {x2, y1, z2, 0, 0, 1, 1, 0});
+        vertices.insert(vertices.end(), {x2, y2, z2, 0, 0, 1, 1, 1});
+        
+        // 左面 (X = x1, 法线向左)
+        vertices.insert(vertices.end(), {x1, y1, z1, -1, 0, 0, 0, 0});
+        vertices.insert(vertices.end(), {x1, y2, z2, -1, 0, 0, 1, 1});
+        vertices.insert(vertices.end(), {x1, y2, z1, -1, 0, 0, 0, 1});
+        vertices.insert(vertices.end(), {x1, y1, z1, -1, 0, 0, 0, 0});
+        vertices.insert(vertices.end(), {x1, y1, z2, -1, 0, 0, 1, 0});
+        vertices.insert(vertices.end(), {x1, y2, z2, -1, 0, 0, 1, 1});
+        
+        // 右面 (X = x2, 法线向右)
+        vertices.insert(vertices.end(), {x2, y1, z1, 1, 0, 0, 0, 0});
+        vertices.insert(vertices.end(), {x2, y2, z1, 1, 0, 0, 0, 1});
+        vertices.insert(vertices.end(), {x2, y2, z2, 1, 0, 0, 1, 1});
+        vertices.insert(vertices.end(), {x2, y1, z1, 1, 0, 0, 0, 0});
+        vertices.insert(vertices.end(), {x2, y2, z2, 1, 0, 0, 1, 1});
+        vertices.insert(vertices.end(), {x2, y1, z2, 1, 0, 0, 1, 0});
+    }
+    
+    if (vertices.empty())
+        return;
+    
+    // 创建VAO和VBO
+    glGenVertexArrays(1, &m_side_wall_collision_vao);
+    glGenBuffers(1, &m_side_wall_collision_vbo);
+    
+    glBindVertexArray(m_side_wall_collision_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_side_wall_collision_vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    
+    // 位置属性 (location = 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    // 法线属性 (location = 1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    // 纹理坐标属性 (location = 2)
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    
+    glBindVertexArray(0);
+    
+    m_side_wall_collision_vertex_count = vertices.size() / 8;
+}
+
+void Renderer::UpdateSideWallCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_side_wall_bodies,
+                                               const std::map<std::pair<int, int>, float>& terrain_data)
+{
+    CreateSideWallCollisionGeometry(active_side_wall_bodies, terrain_data);
+}
+
+void Renderer::RenderSideWallCollisionSolid(const Camera& camera)
+{
+    if (m_side_wall_collision_vao == 0 || m_side_wall_collision_vertex_count == 0)
+        return;
+        
+    GLuint shader_program = m_shader_manager->GetShaderProgram();
+    
+    GLint model_loc = glGetUniformLocation(shader_program, "model");
+    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
+    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
+    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
+    
+    glm::mat4 side_wall_model = glm::mat4(1.0f);
+    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(side_wall_model));
+    glUniform3f(object_color_loc, 0.0f, 1.0f, 0.0f); // 绿色
+    glUniform1i(use_texture_loc, 0);
+    glUniform1i(use_alpha_loc, 0);
+    
+    glBindVertexArray(m_side_wall_collision_vao);
+    glDrawArrays(GL_TRIANGLES, 0, m_side_wall_collision_vertex_count);
 }
 

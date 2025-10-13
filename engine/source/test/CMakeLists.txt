@@ -22,7 +22,7 @@ target_link_libraries(reflection_test_2 PRIVATE reflectcpp::reflectcpp)
 auto_install_target(reflection_test_2 ${BINARY_ROOT_DIR})
 
 # 原始版本（保留作为备份）
-add_executable(jolt_character_test jolt_character_test.cpp)
+add_executable(jolt_character_test lib_test/jolt_character_test.cpp)
 target_link_libraries(jolt_character_test PRIVATE glfw)
 target_link_libraries(jolt_character_test PRIVATE Jolt::Jolt)
 target_link_libraries(jolt_character_test PRIVATE glm::glm)
