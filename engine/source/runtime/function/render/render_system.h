@@ -111,6 +111,7 @@ namespace Piccolo
          * @return 渲染通道智能指针
          */
         std::shared_ptr<GPURenderPass> getRenderPass() const { return m_render_pass; }
+        const std::vector<VkImageView>& getDepthImageViews() const { return m_depth_image_views; }
 
         /**
          * @brief 获取命令池
@@ -161,6 +162,7 @@ namespace Piccolo
          */
         VkBuffer getVertexBuffer() const { return m_vertex_buffer.getBuffer(); }
         VkBuffer getIndexBuffer() const { return m_index_buffer.getBuffer(); }
+        uint32_t getIndexCount() const { return m_index_count; }
 
         // ========== ImGui 接口 ==========
         // 开始新的 ImGui 帧（由渲染系统在每帧开始时调用）
@@ -256,6 +258,10 @@ namespace Piccolo
          */
         void recreateSwapChain();
 
+        // 深度资源管理
+        void createDepthResources();
+        void destroyDepthResources();
+
         // ========== 成员变量 ==========
 
         // 核心GPU组件
@@ -274,6 +280,7 @@ namespace Piccolo
         // 渲染资源
         GPUBuffer m_vertex_buffer; ///< 顶点缓冲区 @todo 移至资源管理器
         GPUBuffer m_index_buffer;  ///< 索引缓冲区 @todo 移至资源管理器
+        uint32_t m_index_count {0};
 
         // 相机与输入
         std::unique_ptr<class RenderCamera> m_camera;
@@ -288,6 +295,12 @@ namespace Piccolo
         // 状态标志
         bool     m_framebuffer_resized = false; ///< 帧缓冲区调整大小标志
         uint32_t m_current_frame       = 0;     ///< 当前帧索引
+
+        // 深度资源
+        VkFormat              m_depth_format {VK_FORMAT_UNDEFINED};
+        std::vector<VkImage>  m_depth_images;
+        std::vector<VkDeviceMemory> m_depth_memories;
+        std::vector<VkImageView>    m_depth_image_views;
 
         // ImGui 相关
         VkDescriptorPool m_imgui_descriptor_pool {VK_NULL_HANDLE};

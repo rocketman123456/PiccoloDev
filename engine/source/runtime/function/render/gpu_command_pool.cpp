@@ -82,9 +82,11 @@ namespace Piccolo
         render_pass_info.renderArea.offset = {0, 0};
         render_pass_info.renderArea.extent = extent;
 
-        VkClearValue clear_color         = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-        render_pass_info.clearValueCount = 1;
-        render_pass_info.pClearValues    = &clear_color;
+        VkClearValue clear_values[2];
+        clear_values[0].color        = {{0.02f, 0.02f, 0.05f, 1.0f}};
+        clear_values[1].depthStencil = {1.0f, 0};
+        render_pass_info.clearValueCount = 2;
+        render_pass_info.pClearValues    = clear_values;
 
         // 开始渲染通道性能分析
         profiler->beginTimestamp(command_buffer, current_frame, "Render Pass");
@@ -135,7 +137,9 @@ namespace Piccolo
             // 开始绘制性能分析
             profiler->beginTimestamp(command_buffer, current_frame, "Draw Call");
             // vkCmdDraw(command_buffer, 3, 1, 0, 0);
-            vkCmdDrawIndexed(command_buffer, 6, 1, 0, 0, 0);
+            uint32_t index_count = g_runtime_global_context.m_render_system->getIndexCount();
+            if (index_count == 0) index_count = 6;
+            vkCmdDrawIndexed(command_buffer, index_count, 1, 0, 0, 0);
             profiler->endTimestamp(command_buffer, current_frame);
 
             // 记录 ImGui 绘制（需要处在 render pass 内）

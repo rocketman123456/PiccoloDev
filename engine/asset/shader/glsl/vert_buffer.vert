@@ -11,6 +11,7 @@ layout(location = 2) out vec3 vAlbedo;
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 proj;
+    vec4 camPos;
 } uCamera;
 
 void main() {

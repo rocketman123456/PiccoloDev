@@ -13,6 +13,7 @@
 #include "runtime/function/render/utils/gpu_buffer_utils.h"
 #include "runtime/function/render/utils/gpu_pipeline_builder.h"
 #include "runtime/function/render/utils/gpu_render_pass_builder.h"
+#include "runtime/function/render/utils/gpu_render_utils.h"
 #include "runtime/function/render/window_system.h"
 
 #include "runtime/function/input/input_manager.h"
@@ -60,7 +61,8 @@ namespace Piccolo
         {{-50.0f, 0.0f,  50.0f}, {0.0f, 1.0f, 0.0f}, {0.3f, 0.7f, 0.3f}},
     };
 
-    const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+    // Indices will be combined ground + capsule; initialized with ground quad
+    std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
     void RenderSystem::initialize()
     {
@@ -93,6 +95,13 @@ namespace Piccolo
         m_camera        = std::make_unique<RenderCamera>();
         m_input_manager = std::make_unique<InputManager>();
         m_input_manager->initialize(g_runtime_global_context.m_window_system.get(), m_camera.get());
+
+        // 更新相机宽高比与投影
+        {
+            auto extent = m_swap_chain->getExtent();
+            float aspect = extent.height > 0 ? (float)extent.width / (float)extent.height : (16.0f/9.0f);
+            m_camera->setAspect(aspect);
+        }
 
         // ========== 第五阶段：初始化 ImGui ==========
         LOG_INFO("准备初始化 ImGui...");
@@ -162,6 +171,9 @@ namespace Piccolo
         m_pipeline.reset();
         m_render_pass.reset();
 
+        // 清理深度资源
+        destroyDepthResources();
+
         // 清理交换链
         LOG_INFO("清理交换链...");
         m_swap_chain.reset();
@@ -174,7 +186,7 @@ namespace Piccolo
         LOG_INFO("渲染系统清理完成");
     }
 
-    void RenderSystem::tick(float /*dt*/)
+    void RenderSystem::tick(float dt)
     {
         // 开始新帧的性能分析
         auto cpu_profiler = g_runtime_global_context.m_cpu_profiler;
@@ -193,8 +205,8 @@ namespace Piccolo
             return; // 获取图像失败或需要重建交换链
         }
 
-        // 更新相机与输入
-        updateCameraAndInput(0.0f);
+        // 更新相机与输入（使用真实帧间隔）
+        updateCameraAndInput(dt);
 
         // ========== 第二阶段：记录渲染命令 ==========
         if (!recordRenderCommands(command_buffer, image_index))
@@ -227,6 +239,9 @@ namespace Piccolo
         // 创建默认渲染通道
         createDefaultRenderPass();
 
+        // 创建深度资源
+        createDepthResources();
+
         // 创建渲染资源（包括相机 UBO 和顶点/索引缓冲）
         createRenderResource();
 
@@ -236,10 +251,11 @@ namespace Piccolo
 
     void RenderSystem::createDefaultRenderPass()
     {
-        // 使用新的工厂方法创建基础颜色渲染通道
+        // 使用深度+颜色渲染通道
         auto color_format = m_swap_chain->getImageFormat();
+        m_depth_format    = GPURenderUtils::findBestDepthFormat(m_device->getPhysicalDevice());
 
-        auto config   = GPURenderPassConfigFactory::createBasicColorPass(color_format);
+        auto config   = GPURenderPassConfigFactory::createDepthColorPass(color_format, m_depth_format);
         m_render_pass = std::make_shared<GPURenderPass>(m_device->getDevice(), config);
     }
 
@@ -255,9 +271,141 @@ namespace Piccolo
 
     void RenderSystem::createRenderResource()
     {
+        // 生成地面+胶囊（近似：拉伸球体）网格
+        std::vector<Vertex>   local_vertices;
+        std::vector<uint16_t> local_indices;
+
+        // Ground plane
+        auto add_ground = [&]() {
+            uint16_t base = static_cast<uint16_t>(local_vertices.size());
+            local_vertices.push_back({{-50.0f, 0.0f, -50.0f}, {0.0f, 1.0f, 0.0f}, {0.3f, 0.6f, 0.3f}});
+            local_vertices.push_back({{ 50.0f, 0.0f, -50.0f}, {0.0f, 1.0f, 0.0f}, {0.3f, 0.7f, 0.3f}});
+            local_vertices.push_back({{ 50.0f, 0.0f,  50.0f}, {0.0f, 1.0f, 0.0f}, {0.3f, 0.8f, 0.3f}});
+            local_vertices.push_back({{-50.0f, 0.0f,  50.0f}, {0.0f, 1.0f, 0.0f}, {0.3f, 0.7f, 0.3f}});
+            local_indices.push_back(base + 0);
+            local_indices.push_back(base + 1);
+            local_indices.push_back(base + 2);
+            local_indices.push_back(base + 2);
+            local_indices.push_back(base + 3);
+            local_indices.push_back(base + 0);
+        };
+
+        // Capsule geometry using provided program logic (cylinder + upper/lower hemispheres), triangle list
+        auto add_capsule_like = [&]() {
+            const int   latitude_segments  = 16;
+            const int   longitude_segments = 32;
+            const float radius             = 0.5f;
+            const float half_height        = 1.0f;
+            const float y_offset           = radius + half_height + 0.01f; // sit on ground with small epsilon
+            const glm::vec3 color          = {0.85f, 0.85f, 0.9f};
+
+            auto push_tri = [&](const glm::vec3& p0, const glm::vec3& n0,
+                                 const glm::vec3& p1, const glm::vec3& n1,
+                                 const glm::vec3& p2, const glm::vec3& n2) {
+                uint16_t base = static_cast<uint16_t>(local_vertices.size());
+                local_vertices.push_back({p0, glm::normalize(n0), color});
+                local_vertices.push_back({p1, glm::normalize(n1), color});
+                local_vertices.push_back({p2, glm::normalize(n2), color});
+                local_indices.push_back(base + 0);
+                local_indices.push_back(base + 1);
+                local_indices.push_back(base + 2);
+            };
+
+            // Cylinder side
+            for (int i = 0; i < longitude_segments; ++i)
+            {
+                float theta1 = (static_cast<float>(i) / longitude_segments) * glm::two_pi<float>();
+                float theta2 = (static_cast<float>(i + 1) / longitude_segments) * glm::two_pi<float>();
+
+                float x1 = radius * cosf(theta1);
+                float z1 = radius * sinf(theta1);
+                float x2 = radius * cosf(theta2);
+                float z2 = radius * sinf(theta2);
+
+                glm::vec3 n1 {cosf(theta1), 0.0f, sinf(theta1)};
+                glm::vec3 n2 {cosf(theta2), 0.0f, sinf(theta2)};
+
+                glm::vec3 p1a {x1, -half_height + y_offset, z1};
+                glm::vec3 p2a {x2, -half_height + y_offset, z2};
+                glm::vec3 p2b {x2,  half_height + y_offset, z2};
+                glm::vec3 p1b {x1,  half_height + y_offset, z1};
+
+                // two triangles per quad
+                push_tri(p1a, n1, p2a, n2, p2b, n2);
+                push_tri(p1a, n1, p2b, n2, p1b, n1);
+            }
+
+            // Upper hemisphere
+            for (int j = 0; j < latitude_segments / 2; ++j)
+            {
+                float phi1 = (static_cast<float>(j) / latitude_segments) * glm::pi<float>();
+                float phi2 = (static_cast<float>(j + 1) / latitude_segments) * glm::pi<float>();
+
+                for (int i = 0; i < longitude_segments; ++i)
+                {
+                    float theta1 = (static_cast<float>(i) / longitude_segments) * glm::two_pi<float>();
+                    float theta2 = (static_cast<float>(i + 1) / longitude_segments) * glm::two_pi<float>();
+
+                    // first triangle
+                    glm::vec3 p1 {radius * sinf(phi1) * cosf(theta1), radius * cosf(phi1) + half_height + y_offset, radius * sinf(phi1) * sinf(theta1)};
+                    glm::vec3 p2 {radius * sinf(phi1) * cosf(theta2), radius * cosf(phi1) + half_height + y_offset, radius * sinf(phi1) * sinf(theta2)};
+                    glm::vec3 p3 {radius * sinf(phi2) * cosf(theta2), radius * cosf(phi2) + half_height + y_offset, radius * sinf(phi2) * sinf(theta2)};
+
+                    glm::vec3 n1 {sinf(phi1) * cosf(theta1), cosf(phi1), sinf(phi1) * sinf(theta1)};
+                    glm::vec3 n2 {sinf(phi1) * cosf(theta2), cosf(phi1), sinf(phi1) * sinf(theta2)};
+                    glm::vec3 n3 {sinf(phi2) * cosf(theta2), cosf(phi2), sinf(phi2) * sinf(theta2)};
+
+                    // reverse order to maintain CCW on upper cap as well
+                    push_tri(p1, n1, p3, n3, p2, n2);
+
+                    // second triangle
+                    glm::vec3 p4 {radius * sinf(phi2) * cosf(theta1), radius * cosf(phi2) + half_height + y_offset, radius * sinf(phi2) * sinf(theta1)};
+                    glm::vec3 n4 {sinf(phi2) * cosf(theta1), cosf(phi2), sinf(phi2) * sinf(theta1)};
+
+                    // reverse order to maintain CCW
+                    push_tri(p1, n1, p4, n4, p3, n3);
+                }
+            }
+
+            // Lower hemisphere (reverse winding to keep CCW front face)
+            for (int j = latitude_segments / 2; j < latitude_segments; ++j)
+            {
+                float phi1 = (static_cast<float>(j) / latitude_segments) * glm::pi<float>();
+                float phi2 = (static_cast<float>(j + 1) / latitude_segments) * glm::pi<float>();
+
+                for (int i = 0; i < longitude_segments; ++i)
+                {
+                    float theta1 = (static_cast<float>(i) / longitude_segments) * glm::two_pi<float>();
+                    float theta2 = (static_cast<float>(i + 1) / longitude_segments) * glm::two_pi<float>();
+
+                    glm::vec3 p1 {radius * sinf(phi1) * cosf(theta1), radius * cosf(phi1) - half_height + y_offset, radius * sinf(phi1) * sinf(theta1)};
+                    glm::vec3 p2 {radius * sinf(phi1) * cosf(theta2), radius * cosf(phi1) - half_height + y_offset, radius * sinf(phi1) * sinf(theta2)};
+                    glm::vec3 p3 {radius * sinf(phi2) * cosf(theta2), radius * cosf(phi2) - half_height + y_offset, radius * sinf(phi2) * sinf(theta2)};
+
+                    glm::vec3 n1 {sinf(phi1) * cosf(theta1), cosf(phi1), sinf(phi1) * sinf(theta1)};
+                    glm::vec3 n2 {sinf(phi1) * cosf(theta2), cosf(phi1), sinf(phi1) * sinf(theta2)};
+                    glm::vec3 n3 {sinf(phi2) * cosf(theta2), cosf(phi2), sinf(phi2) * sinf(theta2)};
+
+                    // reverse order to maintain CCW
+                    push_tri(p1, n1, p3, n3, p2, n2);
+
+                    glm::vec3 p4 {radius * sinf(phi2) * cosf(theta1), radius * cosf(phi2) - half_height + y_offset, radius * sinf(phi2) * sinf(theta1)};
+                    glm::vec3 n4 {sinf(phi2) * cosf(theta1), cosf(phi2), sinf(phi2) * sinf(theta1)};
+
+                    // reverse order to maintain CCW
+                    push_tri(p1, n1, p4, n4, p3, n3);
+                }
+            }
+        };
+
+        add_ground();
+        add_capsule_like();
+
+        m_index_count = static_cast<uint32_t>(local_indices.size());
+
         // 使用新的GPUBuffer类创建顶点缓冲区
-        size_t buffer_size = sizeof(vertices[0]) * vertices.size();
-        size_t index_size  = sizeof(indices[0]) * indices.size();
+        size_t buffer_size = sizeof(local_vertices[0]) * local_vertices.size();
+        size_t index_size  = sizeof(local_indices[0]) * local_indices.size();
 
         // 初始化顶点缓冲区（使用设备本地内存以获得更好的性能）
         if (!m_vertex_buffer.initialize(
@@ -290,7 +438,7 @@ namespace Piccolo
                 m_device->getPhysicalDevice(),
                 m_command_pool->getCommandPool(),
                 m_device->getGraphicsQueue(),
-                const_cast<void*>(static_cast<const void*>(vertices.data())),
+                const_cast<void*>(static_cast<const void*>(local_vertices.data())),
                 buffer_size
             ))
         {
@@ -303,7 +451,7 @@ namespace Piccolo
                 m_device->getPhysicalDevice(),
                 m_command_pool->getCommandPool(),
                 m_device->getGraphicsQueue(),
-                const_cast<void*>(static_cast<const void*>(indices.data())),
+                const_cast<void*>(static_cast<const void*>(local_indices.data())),
                 index_size
             ))
         {
@@ -320,7 +468,7 @@ namespace Piccolo
             binding.binding            = 0;
             binding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             binding.descriptorCount    = 1;
-            binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+            binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             binding.pImmutableSamplers = nullptr;
 
             std::vector<VkDescriptorSetLayoutBinding> bindings {binding};
@@ -329,7 +477,7 @@ namespace Piccolo
 
         // 2) 创建相机 UBO（主机可见，直接更新）
         {
-            const size_t camera_size = sizeof(glm::mat4) * 2;
+            const size_t camera_size = sizeof(glm::mat4) * 2 + sizeof(glm::vec4);
             if (!m_camera_ubo.initialize(
                     m_device->getDevice(),
                     m_device->getPhysicalDevice(),
@@ -721,9 +869,18 @@ namespace Piccolo
         // 重建交换链
         m_swap_chain->recreateSwapChain();
 
-        // 重建帧缓冲区
+        // 重建帧缓冲区与深度资源
         m_pipeline->destroyFramebuffers();
+        destroyDepthResources();
+        createDepthResources();
         m_pipeline->createFramebuffers();
+
+        // 更新相机宽高比
+        {
+            auto extent = m_swap_chain->getExtent();
+            float aspect = extent.height > 0 ? (float)extent.width / (float)extent.height : (16.0f/9.0f);
+            m_camera->setAspect(aspect);
+        }
 
         cpu_profiler->endTimestamp("Recreate Swap Chain");
 
@@ -744,9 +901,107 @@ namespace Piccolo
             {
                 glm::mat4 view;
                 glm::mat4 proj;
-            } camera_data {m_camera->getView(), m_camera->getProj()};
+                glm::vec4 camPos;
+            } camera_data {m_camera->getView(), m_camera->getProj(), glm::vec4(m_camera->getPosition(), 1.0f)};
 
             m_camera_ubo.uploadDataDirect(m_device->getDevice(), &camera_data, sizeof(CameraData));
         }
+    }
+
+    void RenderSystem::createDepthResources()
+    {
+        if (m_depth_format == VK_FORMAT_UNDEFINED)
+        {
+            m_depth_format = GPURenderUtils::findBestDepthFormat(m_device->getPhysicalDevice());
+        }
+
+        auto extent = m_swap_chain->getExtent();
+        size_t count = m_swap_chain->getImageViews().size();
+
+        m_depth_images.resize(count);
+        m_depth_memories.resize(count);
+        m_depth_image_views.resize(count);
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            VkImageCreateInfo image_info {};
+            image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            image_info.imageType     = VK_IMAGE_TYPE_2D;
+            image_info.extent.width  = extent.width;
+            image_info.extent.height = extent.height;
+            image_info.extent.depth  = 1;
+            image_info.mipLevels     = 1;
+            image_info.arrayLayers   = 1;
+            image_info.format        = m_depth_format;
+            image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+            image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            image_info.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+            image_info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+
+            if (vkCreateImage(m_device->getDevice(), &image_info, nullptr, &m_depth_images[i]) != VK_SUCCESS)
+            {
+                LOG_ERROR("Failed to create depth image");
+                continue;
+            }
+
+            VkMemoryRequirements mem_req;
+            vkGetImageMemoryRequirements(m_device->getDevice(), m_depth_images[i], &mem_req);
+
+            VkMemoryAllocateInfo alloc_info {};
+            alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            alloc_info.allocationSize  = mem_req.size;
+            alloc_info.memoryTypeIndex = find_memory_type(m_device->getPhysicalDevice(), mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+            if (vkAllocateMemory(m_device->getDevice(), &alloc_info, nullptr, &m_depth_memories[i]) != VK_SUCCESS)
+            {
+                LOG_ERROR("Failed to allocate depth image memory");
+                continue;
+            }
+
+            vkBindImageMemory(m_device->getDevice(), m_depth_images[i], m_depth_memories[i], 0);
+
+            VkImageViewCreateInfo view_info {};
+            view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            view_info.image                           = m_depth_images[i];
+            view_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+            view_info.format                          = m_depth_format;
+            view_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
+            view_info.subresourceRange.baseMipLevel   = 0;
+            view_info.subresourceRange.levelCount     = 1;
+            view_info.subresourceRange.baseArrayLayer = 0;
+            view_info.subresourceRange.layerCount     = 1;
+
+            if (vkCreateImageView(m_device->getDevice(), &view_info, nullptr, &m_depth_image_views[i]) != VK_SUCCESS)
+            {
+                LOG_ERROR("Failed to create depth image view");
+                continue;
+            }
+        }
+    }
+
+    void RenderSystem::destroyDepthResources()
+    {
+        for (size_t i = 0; i < m_depth_image_views.size(); ++i)
+        {
+            if (m_depth_image_views[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(m_device->getDevice(), m_depth_image_views[i], nullptr);
+            }
+        }
+        for (size_t i = 0; i < m_depth_images.size(); ++i)
+        {
+            if (m_depth_images[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyImage(m_device->getDevice(), m_depth_images[i], nullptr);
+            }
+            if (i < m_depth_memories.size() && m_depth_memories[i] != VK_NULL_HANDLE)
+            {
+                vkFreeMemory(m_device->getDevice(), m_depth_memories[i], nullptr);
+            }
+        }
+        m_depth_image_views.clear();
+        m_depth_images.clear();
+        m_depth_memories.clear();
     }
 } // namespace Piccolo

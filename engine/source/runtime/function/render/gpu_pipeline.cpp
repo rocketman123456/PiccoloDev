@@ -181,12 +181,14 @@ namespace Piccolo
         m_swap_chain_framebuffers.resize(image_views.size());
         for (size_t i = 0; i < image_views.size(); i++)
         {
-            VkImageView attachments[] = {image_views[i]};
+            // Color + Depth attachments
+            const auto& depth_views = g_runtime_global_context.m_render_system->getDepthImageViews();
+            VkImageView attachments[] = {image_views[i], depth_views[i]};
 
             VkFramebufferCreateInfo framebufferInfo {};
             framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.renderPass      = render_pass;
-            framebufferInfo.attachmentCount = 1;
+            framebufferInfo.attachmentCount = 2;
             framebufferInfo.pAttachments    = attachments;
             framebufferInfo.width           = extent.width;
             framebufferInfo.height          = extent.height;

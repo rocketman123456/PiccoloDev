@@ -56,11 +56,11 @@ namespace Piccolo
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(dev, nullptr, &extensionCount, availableExtensions.data());
 
-        LOG_DEBUG("support extensions:")
-        for (const auto& ext : availableExtensions)
-        {
-            LOG_DEBUG("  {}", ext.extensionName);
-        }
+        // LOG_DEBUG("support extensions:")
+        // for (const auto& ext : availableExtensions)
+        // {
+        //     LOG_DEBUG("  {}", ext.extensionName);
+        // }
 
         std::set<std::string> required(m_device_extensions.begin(), m_device_extensions.end());
 

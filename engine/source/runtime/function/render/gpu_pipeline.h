@@ -30,6 +30,8 @@ namespace Piccolo
         VkPipeline                 getPipeline() const { return m_pipeline; }
         VkPipelineLayout           getPipelineLayout() const { return m_pipeline_layout; }
         std::vector<VkFramebuffer> getSwapChainFramebuffers() const { return m_swap_chain_framebuffers; }
+        
+        // 供帧缓冲创建时访问渲染通道中的深度视图
 
         void createFramebuffers();
         void destroyFramebuffers();

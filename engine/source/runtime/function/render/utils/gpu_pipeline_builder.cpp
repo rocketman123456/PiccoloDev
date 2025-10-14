@@ -371,7 +371,7 @@ namespace Piccolo
         m_config.input_assembly.topology           = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         m_config.rasterization.polygon_mode        = VK_POLYGON_MODE_FILL;
         m_config.rasterization.cull_mode           = VK_CULL_MODE_BACK_BIT;
-        m_config.rasterization.front_face          = VK_FRONT_FACE_CLOCKWISE;
+        m_config.rasterization.front_face          = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         m_config.multisample.rasterization_samples = VK_SAMPLE_COUNT_1_BIT;
         m_config.depth_stencil.depth_test_enable   = true;
         m_config.depth_stencil.depth_write_enable  = true;
