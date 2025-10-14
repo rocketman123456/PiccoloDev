@@ -45,15 +45,15 @@ set(IMGUI_BACKEND_SOURCES
 )
 
 add_executable(jolt_character_test_new 
-    jolt_character_test_new.cpp
-    jolt_character_test_app.cpp
-    physics_manager.cpp
-    terrain_system.cpp
-    character_controller.cpp
-    camera.cpp
-    input_manager.cpp
-    shader_manager.cpp
-    renderer.cpp
+    jolt_test/jolt_character_test_new.cpp
+    jolt_test/jolt_character_test_app.cpp
+    jolt_test/physics_manager.cpp
+    jolt_test/terrain_system.cpp
+    jolt_test/character_controller.cpp
+    jolt_test/camera.cpp
+    jolt_test/input_manager.cpp
+    jolt_test/shader_manager.cpp
+    jolt_test/renderer.cpp
     ${IMGUI_BACKEND_SOURCES}
 )
 target_link_libraries(jolt_character_test_new PRIVATE glfw)
@@ -69,3 +69,25 @@ elseif(WIN32)
     target_link_libraries(jolt_character_test_new PRIVATE opengl32)
 endif()
 auto_install_target(jolt_character_test_new ${BINARY_ROOT_DIR})
+
+# Vulkan renderer test (refactored with separate Renderer, AssetManager, SceneManager)
+add_executable(vulkan_renderer_test 
+    vulkan_render_test.cpp
+    renderer.cpp
+    asset_manager.cpp
+    scene_manager.cpp
+    input_manager.cpp
+)
+target_link_libraries(vulkan_renderer_test PRIVATE glfw)
+target_link_libraries(vulkan_renderer_test PRIVATE glm::glm)
+target_link_libraries(vulkan_renderer_test PRIVATE volk::volk)
+target_link_libraries(vulkan_renderer_test PRIVATE tinyobjloader::tinyobjloader)
+if(APPLE)
+    # On macOS, we need to link against MoltenVK
+    target_link_libraries(vulkan_renderer_test PRIVATE "-framework Metal")
+    target_link_libraries(vulkan_renderer_test PRIVATE "-framework MetalKit")
+    target_link_libraries(vulkan_renderer_test PRIVATE "-framework Cocoa")
+    target_link_libraries(vulkan_renderer_test PRIVATE "-framework IOKit")
+    target_link_libraries(vulkan_renderer_test PRIVATE "-framework CoreFoundation")
+endif()
+auto_install_target(vulkan_renderer_test ${BINARY_ROOT_DIR})

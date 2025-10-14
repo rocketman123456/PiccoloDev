@@ -1,1093 +1,1593 @@
 #include "renderer.h"
-#include "shader_manager.h"
-#include "physics_manager.h"
-#include "camera.h"
-#include "character_controller.h"
-#include "terrain_system.h"
-#include <glad/glad.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Body/Body.h>
+#include "asset_manager.h"
+#include "scene_manager.h"
+
 #include <iostream>
-#include <cmath>
+#include <stdexcept>
+#include <set>
+#include <algorithm>
+#include <cstring>
+#include <limits>
+#include <fstream>
 
-using namespace std;
-using namespace JPH;
+// Validation layers and extensions
+const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-Renderer::Renderer()
-    : m_shader_manager(nullptr)
-    , m_capsule_vao(0)
-    , m_capsule_vbo(0)
-    , m_capsule_vertex_count(0)
-    , m_debug_vao(0)
-    , m_debug_vbo(0)
-    , m_debug_vertex_count(0)
-    , m_character_debug_vao(0)
-    , m_character_debug_vbo(0)
-    , m_character_debug_vertex_count(0)
-    , m_ground_collision_vao(0)
-    , m_ground_collision_vbo(0)
-    , m_ground_collision_vertex_count(0)
+#ifdef NDEBUG
+const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = false; // Disabled for now
+#endif
+
+// Debug messenger functions
+VkResult CreateDebugUtilsMessengerEXT(
+    VkInstance instance,
+    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkDebugUtilsMessengerEXT* pDebugMessenger
+)
+{
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr)
+    {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    }
+    else
+    {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
+{
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr)
+    {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
+// Renderer implementation
+Renderer::Renderer(GLFWwindow* window, uint32_t width, uint32_t height)
+    : m_window(window)
+    , m_width(width)
+    , m_height(height)
 {
 }
 
 Renderer::~Renderer()
 {
-    Shutdown();
+    cleanup();
 }
 
-bool Renderer::Initialize()
+void Renderer::initialize()
 {
-    // 创建着色器管理器
-    m_shader_manager = new ShaderManager();
-    if (!m_shader_manager->Initialize())
+    // Initialize Volk
+    auto result = volkInitialize();
+    if (result != VK_SUCCESS)
     {
-        cerr << "着色器管理器初始化失败" << endl;
-        return false;
+        throw std::runtime_error("Failed to initialize Volk!");
+    }
+
+    // Set up Vulkan environment variables for macOS
+#if defined(__MACH__)
+    setenv("VK_LAYER_PATH", "/Users/rocketsky/Program/PiccoloDev/engine/3rdparty/VulkanSDK/bin/MacOS", 1);
+    setenv("VK_ICD_FILENAMES", "/Users/rocketsky/Program/PiccoloDev/engine/3rdparty/VulkanSDK/bin/MacOS/MoltenVK_icd.json", 1);
+#endif
+
+    createInstance();
+    volkLoadInstance(m_instance);
+    setupDebugMessenger();
+    createSurface();
+    pickPhysicalDevice();
+    createLogicalDevice();
+    volkLoadDevice(m_device);
+    createSwapChain();
+    createImageViews();
+    createRenderPass();
+    createDescriptorSetLayout();
+    createGraphicsPipeline();
+    createCommandPool();
+    createColorResources();
+    createDepthResources();
+    createFramebuffers();
+    createUniformBuffers();
+    createDescriptorPool();
+    createDescriptorSets();
+    createCommandBuffers();
+    createSyncObjects();
+}
+
+void Renderer::cleanup()
+{
+    if (m_device == VK_NULL_HANDLE)
+        return;
+
+    vkDeviceWaitIdle(m_device);
+
+    cleanupSwapChain();
+
+    // Cleanup mesh buffers
+    for (auto& pair : m_meshBuffers)
+    {
+        if (pair.second.vertexBuffer != VK_NULL_HANDLE)
+            vkDestroyBuffer(m_device, pair.second.vertexBuffer, nullptr);
+        if (pair.second.vertexBufferMemory != VK_NULL_HANDLE)
+            vkFreeMemory(m_device, pair.second.vertexBufferMemory, nullptr);
+        if (pair.second.indexBuffer != VK_NULL_HANDLE)
+            vkDestroyBuffer(m_device, pair.second.indexBuffer, nullptr);
+        if (pair.second.indexBufferMemory != VK_NULL_HANDLE)
+            vkFreeMemory(m_device, pair.second.indexBufferMemory, nullptr);
+    }
+    m_meshBuffers.clear();
+
+    if (m_graphicsPipeline != VK_NULL_HANDLE)
+        vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
+    if (m_pipelineLayout != VK_NULL_HANDLE)
+        vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    if (m_renderPass != VK_NULL_HANDLE)
+        vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        if (m_uniformBuffers[i] != VK_NULL_HANDLE)
+            vkDestroyBuffer(m_device, m_uniformBuffers[i], nullptr);
+        if (m_uniformBuffersMemory[i] != VK_NULL_HANDLE)
+            vkFreeMemory(m_device, m_uniformBuffersMemory[i], nullptr);
+    }
+
+    if (m_descriptorPool != VK_NULL_HANDLE)
+        vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
+    if (m_descriptorSetLayout != VK_NULL_HANDLE)
+        vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, nullptr);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        if (m_renderFinishedSemaphores[i] != VK_NULL_HANDLE)
+            vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
+        if (m_imageAvailableSemaphores[i] != VK_NULL_HANDLE)
+            vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
+        if (m_inFlightFences[i] != VK_NULL_HANDLE)
+            vkDestroyFence(m_device, m_inFlightFences[i], nullptr);
+    }
+
+    if (m_commandPool != VK_NULL_HANDLE)
+        vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+
+    if (m_device != VK_NULL_HANDLE)
+        vkDestroyDevice(m_device, nullptr);
+
+    if (enableValidationLayers && m_debugMessenger != VK_NULL_HANDLE)
+    {
+        DestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
+    }
+
+    if (m_surface != VK_NULL_HANDLE)
+        vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+    if (m_instance != VK_NULL_HANDLE)
+        vkDestroyInstance(m_instance, nullptr);
+}
+
+void Renderer::beginFrame()
+{
+    vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+
+    VkResult result = vkAcquireNextImageKHR(m_device, m_swapChain, UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame], VK_NULL_HANDLE, &m_imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        recreateSwapChain();
+        return;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    {
+        throw std::runtime_error("Failed to acquire swap chain image!");
+    }
+
+    vkResetFences(m_device, 1, &m_inFlightFences[m_currentFrame]);
+    vkResetCommandBuffer(m_commandBuffers[m_currentFrame], 0);
+}
+
+void Renderer::endFrame()
+{
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffers[m_currentFrame];
+
+    VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[m_currentFrame]};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {m_swapChain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &m_imageIndex;
+
+    VkResult result = vkQueuePresentKHR(m_presentQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferResized)
+    {
+        m_framebufferResized = false;
+        recreateSwapChain();
+    }
+    else if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to present swap chain image!");
+    }
+
+    m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void Renderer::drawScene(SceneManager& sceneManager, AssetManager& assetManager)
+{
+    recordCommandBuffer(m_commandBuffers[m_currentFrame], m_imageIndex, sceneManager, assetManager);
+}
+
+void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, SceneManager& sceneManager, AssetManager& assetManager)
+{
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to begin recording command buffer!");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = m_renderPass;
+    renderPassInfo.framebuffer = m_swapChainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = m_swapChainExtent;
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)m_swapChainExtent.width;
+    viewport.height = (float)m_swapChainExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = m_swapChainExtent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    // Draw all scene objects
+    float aspectRatio = m_swapChainExtent.width / (float)m_swapChainExtent.height;
+    for (const auto& object : sceneManager.getObjects())
+    {
+        if (!object->enabled || !object->mesh || !object->texture)
+            continue;
+
+        // Update uniform buffer for this object
+        UniformBufferObject ubo = sceneManager.getUBO(*object, aspectRatio);
+        memcpy(m_uniformBuffersMapped[m_currentFrame], &ubo, sizeof(ubo));
+
+        // Update descriptor set with texture
+        updateDescriptorSetWithTexture(m_currentFrame, object->texture.get());
+
+        // Get or create mesh buffers
+        auto& meshBuffers = getOrCreateMeshBuffers(object->mesh.get());
+
+        // Bind vertex and index buffers
+        VkBuffer vertexBuffers[] = {meshBuffers.vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, meshBuffers.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        // Bind descriptor sets
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descriptorSets[m_currentFrame], 0, nullptr);
+
+        // Draw
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(object->mesh->indices.size()), 1, 0, 0, 0);
+    }
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to record command buffer!");
+    }
+}
+
+void Renderer::updateUniformBuffer(uint32_t currentImage, const SceneObject& object, float aspectRatio)
+{
+    // Note: The SceneManager should pass the UBO to us, not calculated here
+    // This is a placeholder - we'll get the proper UBO from SceneManager in drawScene
+    UniformBufferObject ubo{};
+    ubo.model = object.transform.getMatrix();
+    // View and projection will be set externally
+    
+    memcpy(m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
+void Renderer::updateDescriptorSetWithTexture(uint32_t frameIndex, Texture* texture)
+{
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = m_uniformBuffers[frameIndex];
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = texture->imageView;
+    imageInfo.sampler = texture->sampler;
+
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = m_descriptorSets[frameIndex];
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = m_descriptorSets[frameIndex];
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
+Renderer::MeshBuffers& Renderer::getOrCreateMeshBuffers(Mesh* mesh)
+{
+    auto it = m_meshBuffers.find(mesh);
+    if (it != m_meshBuffers.end())
+    {
+        return it->second;
+    }
+
+    // Create new buffers
+    MeshBuffers buffers;
+    createVertexBuffer(mesh, buffers);
+    createIndexBuffer(mesh, buffers);
+    m_meshBuffers[mesh] = buffers;
+    return m_meshBuffers[mesh];
+}
+
+void Renderer::createVertexBuffer(Mesh* mesh, MeshBuffers& buffers)
+{
+    VkDeviceSize bufferSize = sizeof(Vertex) * mesh->vertices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer,
+        stagingBufferMemory
+    );
+
+    void* data;
+    vkMapMemory(m_device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, mesh->vertices.data(), (size_t)bufferSize);
+    vkUnmapMemory(m_device, stagingBufferMemory);
+
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        buffers.vertexBuffer,
+        buffers.vertexBufferMemory
+    );
+
+    copyBuffer(stagingBuffer, buffers.vertexBuffer, bufferSize);
+
+    vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+    vkFreeMemory(m_device, stagingBufferMemory, nullptr);
+}
+
+void Renderer::createIndexBuffer(Mesh* mesh, MeshBuffers& buffers)
+{
+    VkDeviceSize bufferSize = sizeof(uint32_t) * mesh->indices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer,
+        stagingBufferMemory
+    );
+
+    void* data;
+    vkMapMemory(m_device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, mesh->indices.data(), (size_t)bufferSize);
+    vkUnmapMemory(m_device, stagingBufferMemory);
+
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        buffers.indexBuffer,
+        buffers.indexBufferMemory
+    );
+
+    copyBuffer(stagingBuffer, buffers.indexBuffer, bufferSize);
+
+    vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+    vkFreeMemory(m_device, stagingBufferMemory, nullptr);
+}
+
+// Continue with all the initialization methods...
+void Renderer::createInstance()
+{
+    if (enableValidationLayers && !checkValidationLayerSupport())
+    {
+        throw std::runtime_error("Validation layers requested, but not available!");
+    }
+
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "Vulkan Renderer";
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.pEngineName = "No Engine";
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_0;
+
+    VkInstanceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pApplicationInfo = &appInfo;
+
+    auto extensions = getRequiredExtensions();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    createInfo.ppEnabledExtensionNames = extensions.data();
+
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+    if (enableValidationLayers)
+    {
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+
+        populateDebugMessengerCreateInfo(debugCreateInfo);
+        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
+    }
+    else
+    {
+        createInfo.enabledLayerCount = 0;
+        createInfo.pNext = nullptr;
+    }
+
+    if (vkCreateInstance(&createInfo, nullptr, &m_instance) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create instance!");
+    }
+}
+
+void Renderer::setupDebugMessenger()
+{
+    if (!enableValidationLayers)
+        return;
+
+    VkDebugUtilsMessengerCreateInfoEXT createInfo;
+    populateDebugMessengerCreateInfo(createInfo);
+
+    if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to set up debug messenger!");
+    }
+}
+
+void Renderer::createSurface()
+{
+    if (glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create window surface!");
+    }
+}
+
+void Renderer::pickPhysicalDevice()
+{
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(m_instance, &deviceCount, nullptr);
+
+    if (deviceCount == 0)
+    {
+        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+    }
+
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
+
+    for (const auto& device : devices)
+    {
+        if (isDeviceSuitable(device))
+        {
+            m_physicalDevice = device;
+            m_msaaSamples = getMaxUsableSampleCount();
+            break;
+        }
+    }
+
+    if (m_physicalDevice == VK_NULL_HANDLE)
+    {
+        throw std::runtime_error("Failed to find a suitable GPU!");
+    }
+}
+
+void Renderer::createLogicalDevice()
+{
+    QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+    float queuePriority = 1.0f;
+    for (uint32_t queueFamily : uniqueQueueFamilies)
+    {
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = queueFamily;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
+
+    VkPhysicalDeviceFeatures deviceFeatures{};
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
+
+    VkDeviceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+    if (enableValidationLayers)
+    {
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+    }
+    else
+    {
+        createInfo.enabledLayerCount = 0;
+    }
+
+    if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create logical device!");
+    }
+
+    vkGetDeviceQueue(m_device, indices.graphicsFamily.value(), 0, &m_graphicsQueue);
+    vkGetDeviceQueue(m_device, indices.presentFamily.value(), 0, &m_presentQueue);
+}
+
+void Renderer::createSwapChain()
+{
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(m_physicalDevice);
+
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
+    {
+        imageCount = swapChainSupport.capabilities.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = m_surface;
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+    createInfo.imageExtent = extent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+    uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+    if (indices.graphicsFamily != indices.presentFamily)
+    {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    }
+    else
+    {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode = presentMode;
+    createInfo.clipped = VK_TRUE;
+
+    if (vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &m_swapChain) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create swap chain!");
+    }
+
+    vkGetSwapchainImagesKHR(m_device, m_swapChain, &imageCount, nullptr);
+    m_swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(m_device, m_swapChain, &imageCount, m_swapChainImages.data());
+
+    m_swapChainImageFormat = surfaceFormat.format;
+    m_swapChainExtent = extent;
+}
+
+void Renderer::createImageViews()
+{
+    m_swapChainImageViews.resize(m_swapChainImages.size());
+
+    for (uint32_t i = 0; i < m_swapChainImages.size(); i++)
+    {
+        m_swapChainImageViews[i] = createImageView(m_swapChainImages[i], m_swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    }
+}
+
+void Renderer::createRenderPass()
+{
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = m_swapChainImageFormat;
+    colorAttachment.samples = m_msaaSamples;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentDescription depthAttachment{};
+    depthAttachment.format = findDepthFormat();
+    depthAttachment.samples = m_msaaSamples;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentDescription colorAttachmentResolve{};
+    colorAttachmentResolve.format = m_swapChainImageFormat;
+    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef{};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentResolveRef{};
+    colorAttachmentResolveRef.attachment = 2;
+    colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+    subpass.pResolveAttachments = &colorAttachmentResolveRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+    std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, colorAttachmentResolve};
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    renderPassInfo.pAttachments = attachments.data();
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPass) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create render pass!");
+    }
+}
+
+void Renderer::createDescriptorSetLayout()
+{
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create descriptor set layout!");
+    }
+}
+
+void Renderer::createGraphicsPipeline()
+{
+        // Load shader code directly (could also be done via AssetManager)
+        std::ifstream vertFile("shaders/vert.spv", std::ios::ate | std::ios::binary);
+        std::ifstream fragFile("shaders/frag.spv", std::ios::ate | std::ios::binary);
+    
+    if (!vertFile.is_open() || !fragFile.is_open())
+    {
+        throw std::runtime_error("Failed to open shader files!");
     }
     
-    // 创建角色胶囊体几何体
-    CreateCapsuleGeometry(0.3f, 0.4f); // 半径0.3m，半高度0.4m
+    size_t vertFileSize = (size_t)vertFile.tellg();
+    size_t fragFileSize = (size_t)fragFile.tellg();
     
-    // 创建角色调试几何体
-    CreateCharacterDebugGeometry();
+    std::vector<char> vertShaderCode(vertFileSize);
+    std::vector<char> fragShaderCode(fragFileSize);
     
-    cout << "渲染器初始化成功" << endl;
+    vertFile.seekg(0);
+    vertFile.read(vertShaderCode.data(), vertFileSize);
+    vertFile.close();
+    
+    fragFile.seekg(0);
+    fragFile.read(fragShaderCode.data(), fragFileSize);
+    fragFile.close();
+
+    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = m_msaaSamples;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.blendConstants[0] = 0.0f;
+    colorBlending.blendConstants[1] = 0.0f;
+    colorBlending.blendConstants[2] = 0.0f;
+    colorBlending.blendConstants[3] = 0.0f;
+
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
+
+    if (vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create pipeline layout!");
+    }
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_pipelineLayout;
+    pipelineInfo.renderPass = m_renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create graphics pipeline!");
+    }
+
+    vkDestroyShaderModule(m_device, fragShaderModule, nullptr);
+    vkDestroyShaderModule(m_device, vertShaderModule, nullptr);
+}
+
+void Renderer::createCommandPool()
+{
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(m_physicalDevice);
+
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    if (vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create graphics command pool!");
+    }
+}
+
+void Renderer::createColorResources()
+{
+    VkFormat colorFormat = m_swapChainImageFormat;
+
+    createImage(
+        m_swapChainExtent.width,
+        m_swapChainExtent.height,
+        1,
+        m_msaaSamples,
+        colorFormat,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        m_colorImage,
+        m_colorImageMemory
+    );
+    m_colorImageView = createImageView(m_colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+}
+
+void Renderer::createDepthResources()
+{
+    VkFormat depthFormat = findDepthFormat();
+
+    createImage(
+        m_swapChainExtent.width,
+        m_swapChainExtent.height,
+        1,
+        m_msaaSamples,
+        depthFormat,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        m_depthImage,
+        m_depthImageMemory
+    );
+    m_depthImageView = createImageView(m_depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+}
+
+void Renderer::createFramebuffers()
+{
+    m_swapChainFramebuffers.resize(m_swapChainImageViews.size());
+
+    for (size_t i = 0; i < m_swapChainImageViews.size(); i++)
+    {
+        std::array<VkImageView, 3> attachments = {m_colorImageView, m_depthImageView, m_swapChainImageViews[i]};
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = m_renderPass;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data();
+        framebufferInfo.width = m_swapChainExtent.width;
+        framebufferInfo.height = m_swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(m_device, &framebufferInfo, nullptr, &m_swapChainFramebuffers[i]) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create framebuffer!");
+        }
+    }
+}
+
+void Renderer::createUniformBuffers()
+{
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    m_uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    m_uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        createBuffer(
+            bufferSize,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            m_uniformBuffers[i],
+            m_uniformBuffersMemory[i]
+        );
+
+        vkMapMemory(m_device, m_uniformBuffersMemory[i], 0, bufferSize, 0, &m_uniformBuffersMapped[i]);
+    }
+}
+
+void Renderer::createDescriptorPool()
+{
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+    if (vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create descriptor pool!");
+    }
+}
+
+void Renderer::createDescriptorSets()
+{
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_descriptorPool;
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.pSetLayouts = layouts.data();
+
+    m_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    if (vkAllocateDescriptorSets(m_device, &allocInfo, m_descriptorSets.data()) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate descriptor sets!");
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = m_uniformBuffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(UniformBufferObject);
+
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = m_descriptorSets[i];
+        descriptorWrite.dstBinding = 0;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(m_device, 1, &descriptorWrite, 0, nullptr);
+    }
+}
+
+void Renderer::createCommandBuffers()
+{
+    m_commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = m_commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = (uint32_t)m_commandBuffers.size();
+
+    if (vkAllocateCommandBuffers(m_device, &allocInfo, m_commandBuffers.data()) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate command buffers!");
+    }
+}
+
+void Renderer::createSyncObjects()
+{
+    m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        if (vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create synchronization objects for a frame!");
+        }
+    }
+}
+
+void Renderer::recreateSwapChain()
+{
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(m_window, &width, &height);
+    while (width == 0 || height == 0)
+    {
+        glfwGetFramebufferSize(m_window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(m_device);
+
+    cleanupSwapChain();
+
+    createSwapChain();
+    createImageViews();
+    createColorResources();
+    createDepthResources();
+    createFramebuffers();
+}
+
+void Renderer::cleanupSwapChain()
+{
+    if (m_depthImageView != VK_NULL_HANDLE)
+        vkDestroyImageView(m_device, m_depthImageView, nullptr);
+    if (m_depthImage != VK_NULL_HANDLE)
+        vkDestroyImage(m_device, m_depthImage, nullptr);
+    if (m_depthImageMemory != VK_NULL_HANDLE)
+        vkFreeMemory(m_device, m_depthImageMemory, nullptr);
+
+    if (m_colorImageView != VK_NULL_HANDLE)
+        vkDestroyImageView(m_device, m_colorImageView, nullptr);
+    if (m_colorImage != VK_NULL_HANDLE)
+        vkDestroyImage(m_device, m_colorImage, nullptr);
+    if (m_colorImageMemory != VK_NULL_HANDLE)
+        vkFreeMemory(m_device, m_colorImageMemory, nullptr);
+
+    for (auto framebuffer : m_swapChainFramebuffers)
+    {
+        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    }
+
+    for (auto imageView : m_swapChainImageViews)
+    {
+        vkDestroyImageView(m_device, imageView, nullptr);
+    }
+
+    if (m_swapChain != VK_NULL_HANDLE)
+        vkDestroySwapchainKHR(m_device, m_swapChain, nullptr);
+}
+
+// Helper methods
+void Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+{
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(m_device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(m_device, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(m_device, buffer, bufferMemory, 0);
+}
+
+void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+{
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkBufferCopy copyRegion{};
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+VkCommandBuffer Renderer::beginSingleTimeCommands()
+{
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = m_commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(m_device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    return commandBuffer;
+}
+
+void Renderer::endSingleTimeCommands(VkCommandBuffer commandBuffer)
+{
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_graphicsQueue);
+
+    vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
+}
+
+uint32_t Renderer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("Failed to find suitable memory type!");
+}
+
+void Renderer::createImage(
+    uint32_t width,
+    uint32_t height,
+    uint32_t mipLevels,
+    VkSampleCountFlagBits numSamples,
+    VkFormat format,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkMemoryPropertyFlags properties,
+    VkImage& image,
+    VkDeviceMemory& imageMemory
+)
+{
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = mipLevels;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = numSamples;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateImage(m_device, &imageInfo, nullptr, &image) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create image!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(m_device, image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate image memory!");
+    }
+
+    vkBindImageMemory(m_device, image, imageMemory, 0);
+}
+
+VkImageView Renderer::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels)
+{
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(m_device, &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create image view!");
+    }
+
+    return imageView;
+}
+
+VkFormat Renderer::findDepthFormat()
+{
+    return findSupportedFormat(
+        {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+    );
+}
+
+VkFormat Renderer::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
+{
+    for (VkFormat format : candidates)
+    {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(m_physicalDevice, format, &props);
+
+        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
+        {
+            return format;
+        }
+        else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
+        {
+            return format;
+        }
+    }
+
+    throw std::runtime_error("Failed to find supported format!");
+}
+
+bool Renderer::hasStencilComponent(VkFormat format)
+{
+    return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+VkSampleCountFlagBits Renderer::getMaxUsableSampleCount()
+{
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &physicalDeviceProperties);
+
+    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+    if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+    if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+    if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+    if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+    if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+    return VK_SAMPLE_COUNT_1_BIT;
+}
+
+VkShaderModule Renderer::createShaderModule(const std::vector<char>& code)
+{
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+    VkShaderModule shaderModule;
+    if (vkCreateShaderModule(m_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create shader module!");
+    }
+
+    return shaderModule;
+}
+
+VkSurfaceFormatKHR Renderer::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
+{
+    for (const auto& availableFormat : availableFormats)
+    {
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        {
+            return availableFormat;
+        }
+    }
+
+    return availableFormats[0];
+}
+
+VkPresentModeKHR Renderer::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
+{
+    for (const auto& availablePresentMode : availablePresentModes)
+    {
+        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+        {
+            return availablePresentMode;
+        }
+    }
+
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D Renderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
+{
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+    {
+        return capabilities.currentExtent;
+    }
+    else
+    {
+        int width, height;
+        glfwGetFramebufferSize(m_window, &width, &height);
+
+        VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+
+        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+        return actualExtent;
+    }
+}
+
+SwapChainSupportDetails Renderer::querySwapChainSupport(VkPhysicalDevice device)
+{
+    SwapChainSupportDetails details;
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_surface, &details.capabilities);
+
+    uint32_t formatCount;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, nullptr);
+
+    if (formatCount != 0)
+    {
+        details.formats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, details.formats.data());
+    }
+
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, nullptr);
+
+    if (presentModeCount != 0)
+    {
+        details.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, details.presentModes.data());
+    }
+
+    return details;
+}
+
+bool Renderer::isDeviceSuitable(VkPhysicalDevice device)
+{
+    QueueFamilyIndices indices = findQueueFamilies(device);
+
+    bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+    bool swapChainAdequate = false;
+    if (extensionsSupported)
+    {
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+        swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+    }
+
+    VkPhysicalDeviceFeatures supportedFeatures;
+    vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+    return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+}
+
+bool Renderer::checkDeviceExtensionSupport(VkPhysicalDevice device)
+{
+    uint32_t extensionCount;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+    for (const auto& extension : availableExtensions)
+    {
+        requiredExtensions.erase(extension.extensionName);
+    }
+
+    return requiredExtensions.empty();
+}
+
+QueueFamilyIndices Renderer::findQueueFamilies(VkPhysicalDevice device)
+{
+    QueueFamilyIndices indices;
+
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+    int i = 0;
+    for (const auto& queueFamily : queueFamilies)
+    {
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        {
+            indices.graphicsFamily = i;
+        }
+
+        VkBool32 presentSupport = false;
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &presentSupport);
+
+        if (presentSupport)
+        {
+            indices.presentFamily = i;
+        }
+
+        if (indices.isComplete())
+        {
+            break;
+        }
+
+        i++;
+    }
+
+    return indices;
+}
+
+bool Renderer::checkValidationLayerSupport()
+{
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    for (const char* layerName : validationLayers)
+    {
+        bool layerFound = false;
+
+        for (const auto& layerProperties : availableLayers)
+        {
+            if (strcmp(layerName, layerProperties.layerName) == 0)
+            {
+                layerFound = true;
+                break;
+            }
+        }
+
+        if (!layerFound)
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 
-void Renderer::Render(const Camera& camera, const TerrainSystem& terrain_system, 
-                      const CharacterController& character_controller, const PhysicsManager& physics_manager,
-                      const DebugOptions& debug_options, float aspect_ratio)
+std::vector<const char*> Renderer::getRequiredExtensions()
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions;
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    // 设置OpenGL状态
-    SetupOpenGLState();
+    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-    // 使用着色器程序
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    glUseProgram(shader_program);
-
-    // 设置矩阵
-    glm::mat4 projection = camera.GetProjectionMatrix(aspect_ratio);
-    glm::mat4 view = camera.GetViewMatrix();
-
-    GLint proj_loc = glGetUniformLocation(shader_program, "projection");
-    GLint view_loc = glGetUniformLocation(shader_program, "view");
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint light_pos_loc = glGetUniformLocation(shader_program, "lightPos");
-    GLint view_pos_loc = glGetUniformLocation(shader_program, "viewPos");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-
-    glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(projection));
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-    glUniform3f(light_pos_loc, 10.0f, 20.0f, 10.0f);
-    
-    glm::vec3 cam_pos = camera.GetPosition();
-    glUniform3f(view_pos_loc, cam_pos.x, cam_pos.y, cam_pos.z);
-
-    // 渲染地形
-    glm::mat4 view_proj = projection * view;
-    RenderTerrain(camera, terrain_system, view_proj);
-
-    // 渲染角色
-    RenderCharacter(camera, character_controller);
-
-    // 渲染调试碰撞网格（绿色线框）
-    if (debug_options.debug_collision_mesh)
+    if (enableValidationLayers)
     {
-        RenderDebugCollisionMesh(camera);
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
-    // 渲染地面碰撞体实心盒子（蓝色实心）
-    if (debug_options.debug_ground_collision_solid)
-    {
-        RenderGroundCollisionSolid(camera, terrain_system);
-    }
-
-    // 渲染侧墙碰撞体实心盒子（绿色实心）
-    if (debug_options.debug_side_wall_collision_solid)
-    {
-        RenderSideWallCollisionSolid(camera);
-    }
-
-    // 渲染角色碰撞体调试网格（红色线框）
-    if (debug_options.debug_character_collision)
-    {
-        RenderCharacterDebug(camera, character_controller);
-    }
-
-    glBindVertexArray(0);
+    return extensions;
 }
 
-void Renderer::Shutdown()
+void Renderer::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 {
-    CleanupOpenGLResources();
-    
-    if (m_shader_manager)
-    {
-        delete m_shader_manager;
-        m_shader_manager = nullptr;
-    }
+    createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = debugCallback;
 }
 
-void Renderer::CreateCapsuleGeometry(float radius, float half_height)
+VKAPI_ATTR VkBool32 VKAPI_CALL Renderer::debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData
+)
 {
-    std::vector<float> vertices;
-    
-    // 胶囊体由三部分组成：
-    // 1. 圆柱体（中间部分）
-    // 2. 上半球（顶部）
-    // 3. 下半球（底部）
-    
-    int latitude_segments = 16;
-    int longitude_segments = 32;
-    
-    // 圆柱体部分
-    for (int i = 0; i < longitude_segments; ++i)
-    {
-        float theta1 = (float)i / longitude_segments * 2.0f * M_PI;
-        float theta2 = (float)(i + 1) / longitude_segments * 2.0f * M_PI;
-        
-        float x1 = radius * cosf(theta1);
-        float z1 = radius * sinf(theta1);
-        float x2 = radius * cosf(theta2);
-        float z2 = radius * sinf(theta2);
-        
-        // 法线
-        float nx1 = cosf(theta1);
-        float nz1 = sinf(theta1);
-        float nx2 = cosf(theta2);
-        float nz2 = sinf(theta2);
-        
-        // 添加两个三角形组成一个四边形
-        // 三角形1
-        vertices.insert(vertices.end(), {x1, -half_height, z1, nx1, 0.0f, nz1, 0.0f, 0.0f});
-        vertices.insert(vertices.end(), {x2, -half_height, z2, nx2, 0.0f, nz2, 1.0f, 0.0f});
-        vertices.insert(vertices.end(), {x2, half_height, z2, nx2, 0.0f, nz2, 1.0f, 1.0f});
-        
-        // 三角形2
-        vertices.insert(vertices.end(), {x1, -half_height, z1, nx1, 0.0f, nz1, 0.0f, 0.0f});
-        vertices.insert(vertices.end(), {x2, half_height, z2, nx2, 0.0f, nz2, 1.0f, 1.0f});
-        vertices.insert(vertices.end(), {x1, half_height, z1, nx1, 0.0f, nz1, 0.0f, 1.0f});
-    }
-    
-    // 上半球
-    for (int j = 0; j < latitude_segments / 2; ++j)
-    {
-        float phi1 = (float)j / latitude_segments * M_PI;
-        float phi2 = (float)(j + 1) / latitude_segments * M_PI;
-        
-        for (int i = 0; i < longitude_segments; ++i)
-        {
-            float theta1 = (float)i / longitude_segments * 2.0f * M_PI;
-            float theta2 = (float)(i + 1) / longitude_segments * 2.0f * M_PI;
-            
-            // 第一个三角形
-            float x1 = radius * sinf(phi1) * cosf(theta1);
-            float y1 = radius * cosf(phi1) + half_height;
-            float z1 = radius * sinf(phi1) * sinf(theta1);
-            
-            float x2 = radius * sinf(phi1) * cosf(theta2);
-            float y2 = radius * cosf(phi1) + half_height;
-            float z2 = radius * sinf(phi1) * sinf(theta2);
-            
-            float x3 = radius * sinf(phi2) * cosf(theta2);
-            float y3 = radius * cosf(phi2) + half_height;
-            float z3 = radius * sinf(phi2) * sinf(theta2);
-            
-            // 法线（球面法线）
-            float nx1 = sinf(phi1) * cosf(theta1);
-            float ny1 = cosf(phi1);
-            float nz1 = sinf(phi1) * sinf(theta1);
-            
-            float nx2 = sinf(phi1) * cosf(theta2);
-            float ny2 = cosf(phi1);
-            float nz2 = sinf(phi1) * sinf(theta2);
-            
-            float nx3 = sinf(phi2) * cosf(theta2);
-            float ny3 = cosf(phi2);
-            float nz3 = sinf(phi2) * sinf(theta2);
-            
-            vertices.insert(vertices.end(), {x1, y1, z1, nx1, ny1, nz1, 0.0f, 0.0f});
-            vertices.insert(vertices.end(), {x2, y2, z2, nx2, ny2, nz2, 1.0f, 0.0f});
-            vertices.insert(vertices.end(), {x3, y3, z3, nx3, ny3, nz3, 1.0f, 1.0f});
-            
-            // 第二个三角形
-            float x4 = radius * sinf(phi2) * cosf(theta1);
-            float y4 = radius * cosf(phi2) + half_height;
-            float z4 = radius * sinf(phi2) * sinf(theta1);
-            
-            float nx4 = sinf(phi2) * cosf(theta1);
-            float ny4 = cosf(phi2);
-            float nz4 = sinf(phi2) * sinf(theta1);
-            
-            vertices.insert(vertices.end(), {x1, y1, z1, nx1, ny1, nz1, 0.0f, 0.0f});
-            vertices.insert(vertices.end(), {x3, y3, z3, nx3, ny3, nz3, 1.0f, 1.0f});
-            vertices.insert(vertices.end(), {x4, y4, z4, nx4, ny4, nz4, 0.0f, 1.0f});
-        }
-    }
-    
-    // 下半球
-    for (int j = latitude_segments / 2; j < latitude_segments; ++j)
-    {
-        float phi1 = (float)j / latitude_segments * M_PI;
-        float phi2 = (float)(j + 1) / latitude_segments * M_PI;
-        
-        for (int i = 0; i < longitude_segments; ++i)
-        {
-            float theta1 = (float)i / longitude_segments * 2.0f * M_PI;
-            float theta2 = (float)(i + 1) / longitude_segments * 2.0f * M_PI;
-            
-            float x1 = radius * sinf(phi1) * cosf(theta1);
-            float y1 = radius * cosf(phi1) - half_height;
-            float z1 = radius * sinf(phi1) * sinf(theta1);
-            
-            float x2 = radius * sinf(phi1) * cosf(theta2);
-            float y2 = radius * cosf(phi1) - half_height;
-            float z2 = radius * sinf(phi1) * sinf(theta2);
-            
-            float x3 = radius * sinf(phi2) * cosf(theta2);
-            float y3 = radius * cosf(phi2) - half_height;
-            float z3 = radius * sinf(phi2) * sinf(theta2);
-            
-            float nx1 = sinf(phi1) * cosf(theta1);
-            float ny1 = cosf(phi1);
-            float nz1 = sinf(phi1) * sinf(theta1);
-            
-            float nx2 = sinf(phi1) * cosf(theta2);
-            float ny2 = cosf(phi1);
-            float nz2 = sinf(phi1) * sinf(theta2);
-            
-            float nx3 = sinf(phi2) * cosf(theta2);
-            float ny3 = cosf(phi2);
-            float nz3 = sinf(phi2) * sinf(theta2);
-            
-            vertices.insert(vertices.end(), {x1, y1, z1, nx1, ny1, nz1, 0.0f, 0.0f});
-            vertices.insert(vertices.end(), {x2, y2, z2, nx2, ny2, nz2, 1.0f, 0.0f});
-            vertices.insert(vertices.end(), {x3, y3, z3, nx3, ny3, nz3, 1.0f, 1.0f});
-            
-            float x4 = radius * sinf(phi2) * cosf(theta1);
-            float y4 = radius * cosf(phi2) - half_height;
-            float z4 = radius * sinf(phi2) * sinf(theta1);
-            
-            float nx4 = sinf(phi2) * cosf(theta1);
-            float ny4 = cosf(phi2);
-            float nz4 = sinf(phi2) * sinf(theta1);
-            
-            vertices.insert(vertices.end(), {x1, y1, z1, nx1, ny1, nz1, 0.0f, 0.0f});
-            vertices.insert(vertices.end(), {x3, y3, z3, nx3, ny3, nz3, 1.0f, 1.0f});
-            vertices.insert(vertices.end(), {x4, y4, z4, nx4, ny4, nz4, 0.0f, 1.0f});
-        }
-    }
-    
-    // 创建OpenGL缓冲区
-    glGenVertexArrays(1, &m_capsule_vao);
-    glGenBuffers(1, &m_capsule_vbo);
-    
-    glBindVertexArray(m_capsule_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_capsule_vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    
-    // 位置属性
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // 法线属性
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // 纹理坐标属性
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    
-    glBindVertexArray(0);
-    
-    m_capsule_vertex_count = vertices.size() / 8;
-    cout << "胶囊体几何体创建完成: " << m_capsule_vertex_count << " 个顶点" << endl;
-}
-
-void Renderer::CreateDebugCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
-                                           const std::map<std::pair<int, int>, float>& terrain_data)
-{
-    // 创建调试碰撞几何体
-    UpdateDebugCollisionGeometry(active_bodies, terrain_data);
-}
-
-void Renderer::CreateCharacterDebugGeometry()
-{
-    cout << "创建角色碰撞体调试几何体..." << endl;
-    
-    std::vector<float> vertices;
-    
-    // 创建胶囊体的线框
-    float capsule_radius = 0.3f;
-    float capsule_half_height = 0.4f;
-    int segments = 16;
-    
-    // 胶囊体圆柱部分
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = (float)i / segments * 2.0f * M_PI;
-        float angle2 = (float)(i + 1) / segments * 2.0f * M_PI;
-        
-        float x1 = capsule_radius * cosf(angle1);
-        float z1 = capsule_radius * sinf(angle1);
-        float x2 = capsule_radius * cosf(angle2);
-        float z2 = capsule_radius * sinf(angle2);
-        
-        // 圆柱底部边
-        vertices.insert(vertices.end(), {x1, -capsule_half_height, z1, x2, -capsule_half_height, z2});
-        // 圆柱顶部边
-        vertices.insert(vertices.end(), {x1, capsule_half_height, z1, x2, capsule_half_height, z2});
-        // 圆柱垂直边
-        vertices.insert(vertices.end(), {x1, -capsule_half_height, z1, x1, capsule_half_height, z1});
-    }
-    
-    // 上半球（经线）
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle = (float)i / segments * 2.0f * M_PI;
-        
-        for (int j = 0; j < segments / 2; ++j)
-        {
-            float phi1 = (float)j / segments * M_PI;
-            float phi2 = (float)(j + 1) / segments * M_PI;
-            
-            float x1 = capsule_radius * sinf(phi1) * cosf(angle);
-            float y1 = capsule_radius * cosf(phi1) + capsule_half_height;
-            float z1 = capsule_radius * sinf(phi1) * sinf(angle);
-            
-            float x2 = capsule_radius * sinf(phi2) * cosf(angle);
-            float y2 = capsule_radius * cosf(phi2) + capsule_half_height;
-            float z2 = capsule_radius * sinf(phi2) * sinf(angle);
-            
-            vertices.insert(vertices.end(), {x1, y1, z1, x2, y2, z2});
-        }
-    }
-    
-    // 下半球（经线）
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle = (float)i / segments * 2.0f * M_PI;
-        
-        for (int j = segments / 2; j < segments; ++j)
-        {
-            float phi1 = (float)j / segments * M_PI;
-            float phi2 = (float)(j + 1) / segments * M_PI;
-            
-            float x1 = capsule_radius * sinf(phi1) * cosf(angle);
-            float y1 = capsule_radius * cosf(phi1) - capsule_half_height;
-            float z1 = capsule_radius * sinf(phi1) * sinf(angle);
-            
-            float x2 = capsule_radius * sinf(phi2) * cosf(angle);
-            float y2 = capsule_radius * cosf(phi2) - capsule_half_height;
-            float z2 = capsule_radius * sinf(phi2) * sinf(angle);
-            
-            vertices.insert(vertices.end(), {x1, y1, z1, x2, y2, z2});
-        }
-    }
-    
-    // 创建OpenGL缓冲区
-    glGenVertexArrays(1, &m_character_debug_vao);
-    glGenBuffers(1, &m_character_debug_vbo);
-    
-    glBindVertexArray(m_character_debug_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_character_debug_vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    
-    // 只设置位置属性（线框不需要法线和纹理坐标）
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    glBindVertexArray(0);
-    
-    m_character_debug_vertex_count = vertices.size() / 3; // 每个顶点3个float
-    
-    cout << "角色碰撞体调试几何体创建完成: " << m_character_debug_vertex_count << " 个顶点" << endl;
-}
-
-void Renderer::CreateGroundCollisionSolidGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
-                                                  const std::map<std::pair<int, int>, float>& terrain_data)
-{
-    // 创建地面碰撞实心几何体
-    UpdateGroundCollisionSolidGeometry(active_bodies, terrain_data);
-}
-
-void Renderer::UpdateDebugCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
-                                           const std::map<std::pair<int, int>, float>& terrain_data)
-{
-    // 删除旧的几何体
-    if (m_debug_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_debug_vao);
-        glDeleteBuffers(1, &m_debug_vbo);
-        m_debug_vao = 0;
-        m_debug_vbo = 0;
-        m_debug_vertex_count = 0;
-    }
-    
-    // 重新创建几何体
-    std::vector<float> vertices;
-    
-    const float half_tile_size = 0.5f;  // terrain_tile_size / 2
-    const float half_height = 0.5f;
-    
-    for (const auto& body_pair : active_bodies)
-    {
-        int grid_x = body_pair.first.first;
-        int grid_z = body_pair.first.second;
-        
-        auto terrain_it = terrain_data.find({grid_x, grid_z});
-        if (terrain_it == terrain_data.end())
-            continue;
-        
-        float height = terrain_it->second;
-        
-        // 计算世界位置
-        float world_x = (grid_x + 0.5f - 25.0f) * 1.0f;  // grid_size / 2 = 25
-        float world_z = (grid_z + 0.5f - 25.0f) * 1.0f;
-        
-        float physics_center_y = height - half_height;
-        float x1 = world_x - half_tile_size;
-        float x2 = world_x + half_tile_size;
-        float y1 = physics_center_y - half_height;
-        float y2 = physics_center_y + half_height;
-        float z1 = world_z - half_tile_size;
-        float z2 = world_z + half_tile_size;
-        
-        // 添加盒子的12条边
-        // 底面
-        vertices.insert(vertices.end(), {x1, y1, z1, x2, y1, z1});
-        vertices.insert(vertices.end(), {x2, y1, z1, x2, y1, z2});
-        vertices.insert(vertices.end(), {x2, y1, z2, x1, y1, z2});
-        vertices.insert(vertices.end(), {x1, y1, z2, x1, y1, z1});
-        
-        // 顶面
-        vertices.insert(vertices.end(), {x1, y2, z1, x2, y2, z1});
-        vertices.insert(vertices.end(), {x2, y2, z1, x2, y2, z2});
-        vertices.insert(vertices.end(), {x2, y2, z2, x1, y2, z2});
-        vertices.insert(vertices.end(), {x1, y2, z2, x1, y2, z1});
-        
-        // 垂直边
-        vertices.insert(vertices.end(), {x1, y1, z1, x1, y2, z1});
-        vertices.insert(vertices.end(), {x2, y1, z1, x2, y2, z1});
-        vertices.insert(vertices.end(), {x2, y1, z2, x2, y2, z2});
-        vertices.insert(vertices.end(), {x1, y1, z2, x1, y2, z2});
-    }
-    
-    if (vertices.empty())
-        return;
-    
-    // 创建OpenGL缓冲区
-    glGenVertexArrays(1, &m_debug_vao);
-    glGenBuffers(1, &m_debug_vbo);
-    
-    glBindVertexArray(m_debug_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_debug_vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    
-    // 设置顶点属性（只有位置）
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    glBindVertexArray(0);
-    
-    m_debug_vertex_count = vertices.size() / 3;
-}
-
-void Renderer::UpdateGroundCollisionSolidGeometry(const std::map<std::pair<int, int>, BodyID>& active_bodies,
-                                                  const std::map<std::pair<int, int>, float>& terrain_data)
-{
-    // 删除旧的几何体
-    if (m_ground_collision_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_ground_collision_vao);
-        glDeleteBuffers(1, &m_ground_collision_vbo);
-        m_ground_collision_vao = 0;
-        m_ground_collision_vbo = 0;
-        m_ground_collision_vertex_count = 0;
-    }
-    
-    // 重新创建几何体
-    std::vector<float> vertices;
-    
-    const float half_tile_size = 0.5f;
-    const float half_height = 0.5f;
-    
-    for (const auto& body_pair : active_bodies)
-    {
-        int grid_x = body_pair.first.first;
-        int grid_z = body_pair.first.second;
-        
-        auto terrain_it = terrain_data.find({grid_x, grid_z});
-        if (terrain_it == terrain_data.end())
-            continue;
-        
-        float height = terrain_it->second;
-        
-        // 计算世界位置
-        float world_x = (grid_x + 0.5f - 25.0f) * 1.0f;
-        float world_z = (grid_z + 0.5f - 25.0f) * 1.0f;
-        
-        float physics_center_y = height - half_height;
-        float x1 = world_x - half_tile_size;
-        float x2 = world_x + half_tile_size;
-        float y1 = physics_center_y - half_height;
-        float y2 = physics_center_y + half_height;
-        float z1 = world_z - half_tile_size;
-        float z2 = world_z + half_tile_size;
-        
-        // 添加盒子的6个面（每个面2个三角形，每个三角形3个顶点）
-        // 每个顶点包含：位置(3) + 法线(3) + 纹理坐标(2) = 8个float
-        // 所有面都使用逆时针（CCW）顶点顺序，确保法线朝外
-
-        // 顶面 (Y = y2, 法线向上) - 逆时针从上方看
-        vertices.insert(vertices.end(), {x1, y2, z1, 0, 1, 0, 0, 0}); // 左前
-        vertices.insert(vertices.end(), {x1, y2, z2, 0, 1, 0, 0, 1}); // 左后
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 1, 0, 1, 1}); // 右后
-        vertices.insert(vertices.end(), {x1, y2, z1, 0, 1, 0, 0, 0}); // 左前
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 1, 0, 1, 1}); // 右后
-        vertices.insert(vertices.end(), {x2, y2, z1, 0, 1, 0, 1, 0}); // 右前
-
-        // 底面 (Y = y1, 法线向下) - 逆时针从下方看
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, -1, 0, 0, 0}); // 左前
-        vertices.insert(vertices.end(), {x2, y1, z1, 0, -1, 0, 1, 0}); // 右前
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, -1, 0, 1, 1}); // 右后
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, -1, 0, 0, 0}); // 左前
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, -1, 0, 1, 1}); // 右后
-        vertices.insert(vertices.end(), {x1, y1, z2, 0, -1, 0, 0, 1}); // 左后
-
-        // 前面 (Z = z1, 法线向前-Z) - 逆时针从前方看
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, 0, -1, 0, 0}); // 左下
-        vertices.insert(vertices.end(), {x2, y1, z1, 0, 0, -1, 1, 0}); // 右下
-        vertices.insert(vertices.end(), {x2, y2, z1, 0, 0, -1, 1, 1}); // 右上
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, 0, -1, 0, 0}); // 左下
-        vertices.insert(vertices.end(), {x2, y2, z1, 0, 0, -1, 1, 1}); // 右上
-        vertices.insert(vertices.end(), {x1, y2, z1, 0, 0, -1, 0, 1}); // 左上
-
-        // 后面 (Z = z2, 法线向后+Z) - 逆时针从后方看
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, 0, 1, 0, 0}); // 右下（从后面看是左边）
-        vertices.insert(vertices.end(), {x1, y1, z2, 0, 0, 1, 1, 0}); // 左下（从后面看是右边）
-        vertices.insert(vertices.end(), {x1, y2, z2, 0, 0, 1, 1, 1}); // 左上（从后面看是右边）
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, 0, 1, 0, 0}); // 右下（从后面看是左边）
-        vertices.insert(vertices.end(), {x1, y2, z2, 0, 0, 1, 1, 1}); // 左上（从后面看是右边）
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 0, 1, 0, 1}); // 右上（从后面看是左边）
-
-        // 左面 (X = x1, 法线向左-X) - 逆时针从左侧看
-        vertices.insert(vertices.end(), {x1, y1, z2, -1, 0, 0, 0, 0}); // 后下
-        vertices.insert(vertices.end(), {x1, y1, z1, -1, 0, 0, 1, 0}); // 前下
-        vertices.insert(vertices.end(), {x1, y2, z1, -1, 0, 0, 1, 1}); // 前上
-        vertices.insert(vertices.end(), {x1, y1, z2, -1, 0, 0, 0, 0}); // 后下
-        vertices.insert(vertices.end(), {x1, y2, z1, -1, 0, 0, 1, 1}); // 前上
-        vertices.insert(vertices.end(), {x1, y2, z2, -1, 0, 0, 0, 1}); // 后上
-
-        // 右面 (X = x2, 法线向右+X) - 逆时针从右侧看
-        vertices.insert(vertices.end(), {x2, y1, z1, 1, 0, 0, 0, 0}); // 前下
-        vertices.insert(vertices.end(), {x2, y1, z2, 1, 0, 0, 1, 0}); // 后下
-        vertices.insert(vertices.end(), {x2, y2, z2, 1, 0, 0, 1, 1}); // 后上
-        vertices.insert(vertices.end(), {x2, y1, z1, 1, 0, 0, 0, 0}); // 前下
-        vertices.insert(vertices.end(), {x2, y2, z2, 1, 0, 0, 1, 1}); // 后上
-        vertices.insert(vertices.end(), {x2, y2, z1, 1, 0, 0, 0, 1}); // 前上
-    }
-    
-    if (vertices.empty())
-        return;
-    
-    // 创建OpenGL缓冲区
-    glGenVertexArrays(1, &m_ground_collision_vao);
-    glGenBuffers(1, &m_ground_collision_vbo);
-    
-    glBindVertexArray(m_ground_collision_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_ground_collision_vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    
-    // 设置顶点属性
-    // 位置属性 (location = 0)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    // 法线属性 (location = 1)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    
-    // 纹理坐标属性 (location = 2)
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    
-    glBindVertexArray(0);
-    
-    m_ground_collision_vertex_count = vertices.size() / 8;
-}
-
-void Renderer::SetupOpenGLState()
-{
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glFrontFace(GL_CCW); // 明确设置逆时针为正面
-    glCullFace(GL_BACK);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-}
-
-void Renderer::RenderTerrain(const Camera& camera, const TerrainSystem& terrain_system, const glm::mat4& view_proj_matrix)
-{
-    // 使用视锥剔除更新几何体
-    const_cast<TerrainSystem&>(terrain_system).UpdateGroundGeometry(view_proj_matrix);
-    
-    GLuint ground_vao = terrain_system.GetGroundVAO();
-    int ground_vertex_count = terrain_system.GetGroundVertexCount();
-    GLuint ground_texture = terrain_system.GetGroundTexture();
-    
-    // 如果没有几何体，跳过渲染
-    if (ground_vao == 0 || ground_vertex_count == 0)
-        return;
-    
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-    
-    glm::mat4 ground_model = glm::mat4(1.0f);
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(ground_model));
-    glUniform3f(object_color_loc, 1.0f, 1.0f, 1.0f);
-    glUniform1i(use_texture_loc, 1);
-    glUniform1i(use_alpha_loc, 0);
-    
-    if (ground_texture != 0)
-    {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, ground_texture);
-        glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), 0);
-    }
-    
-    glBindVertexArray(ground_vao);
-    glDrawArrays(GL_TRIANGLES, 0, ground_vertex_count);
-}
-
-void Renderer::RenderCharacter(const Camera& camera, const CharacterController& character_controller)
-{
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-    
-    RVec3 char_pos = character_controller.GetPosition();
-    glm::mat4 capsule_model = glm::translate(glm::mat4(1.0f), 
-                                            glm::vec3((float)char_pos.GetX(), 
-                                                     (float)char_pos.GetY(), 
-                                                     (float)char_pos.GetZ()));
-    
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(capsule_model));
-    glUniform3f(object_color_loc, 0.4f, 0.4f, 1.0f); // 蓝色
-    glUniform1i(use_texture_loc, 0);
-    glUniform1i(use_alpha_loc, 0);
-    
-    glBindVertexArray(m_capsule_vao);
-    glDrawArrays(GL_TRIANGLES, 0, m_capsule_vertex_count);
-}
-
-void Renderer::RenderDebugCollisionMesh(const Camera& camera)
-{
-    if (m_debug_vao == 0 || m_debug_vertex_count == 0)
-        return;
-        
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-    
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
-    glUniform3f(object_color_loc, 0.0f, 1.0f, 0.0f); // 绿色
-    glUniform1i(use_texture_loc, 0);
-    glUniform1i(use_alpha_loc, 0);
-    
-    glBindVertexArray(m_debug_vao);
-    glDrawArrays(GL_LINES, 0, m_debug_vertex_count);
-}
-
-void Renderer::RenderGroundCollisionSolid(const Camera& camera, const TerrainSystem& terrain_system)
-{
-    if (m_ground_collision_vao == 0 || m_ground_collision_vertex_count == 0)
-        return;
-        
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-    
-    // 保存当前渲染状态
-    GLboolean depth_test_enabled = glIsEnabled(GL_DEPTH_TEST);
-    GLboolean cull_face_enabled = glIsEnabled(GL_CULL_FACE);
-    GLint depth_func;
-    glGetIntegerv(GL_DEPTH_FUNC, &depth_func);
-    
-    // 确保渲染所有6个面：禁用面剔除，使用正常的深度测试
-    glDisable(GL_CULL_FACE);  // 禁用面剔除，确保所有面都被渲染
-    glEnable(GL_DEPTH_TEST);  // 保持深度测试启用
-    glDepthFunc(GL_LESS);     // 使用正常的深度测试
-    
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
-    glUniform3f(object_color_loc, 1.0f, 1.0f, 1.0f); // 白色（使用纹理）
-    glUniform1i(use_texture_loc, 1); // 启用纹理
-    glUniform1i(use_alpha_loc, 0);
-    
-    // 绑定地形纹理
-    GLuint ground_texture = terrain_system.GetGroundTexture();
-    if (ground_texture != 0)
-    {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, ground_texture);
-        glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), 0);
-    }
-    
-    glBindVertexArray(m_ground_collision_vao);
-    glDrawArrays(GL_TRIANGLES, 0, m_ground_collision_vertex_count);
-    
-    // 恢复之前的渲染状态
-    if (depth_test_enabled)
-        glEnable(GL_DEPTH_TEST);
-    else
-        glDisable(GL_DEPTH_TEST);
-    
-    glDepthFunc(depth_func);  // 恢复之前的深度函数
-    
-    if (cull_face_enabled)
-        glEnable(GL_CULL_FACE);
-    else
-        glDisable(GL_CULL_FACE);
-}
-
-void Renderer::RenderCharacterDebug(const Camera& camera, const CharacterController& character_controller)
-{
-    if (m_character_debug_vao == 0 || m_character_debug_vertex_count == 0)
-        return;
-        
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-    
-    RVec3 char_pos = character_controller.GetPosition();
-    glm::mat4 character_debug_model = glm::translate(glm::mat4(1.0f), 
-                                                     glm::vec3((float)char_pos.GetX(), 
-                                                              (float)char_pos.GetY(), 
-                                                              (float)char_pos.GetZ()));
-    
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(character_debug_model));
-    glUniform3f(object_color_loc, 1.0f, 0.0f, 0.0f); // 红色
-    glUniform1i(use_texture_loc, 0);
-    glUniform1i(use_alpha_loc, 0);
-    
-    glBindVertexArray(m_character_debug_vao);
-    glDrawArrays(GL_LINES, 0, m_character_debug_vertex_count);
-}
-
-void Renderer::CleanupOpenGLResources()
-{
-    if (m_capsule_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_capsule_vao);
-        glDeleteBuffers(1, &m_capsule_vbo);
-        m_capsule_vao = 0;
-        m_capsule_vbo = 0;
-    }
-    
-    if (m_debug_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_debug_vao);
-        glDeleteBuffers(1, &m_debug_vbo);
-        m_debug_vao = 0;
-        m_debug_vbo = 0;
-    }
-    
-    if (m_character_debug_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_character_debug_vao);
-        glDeleteBuffers(1, &m_character_debug_vbo);
-        m_character_debug_vao = 0;
-        m_character_debug_vbo = 0;
-    }
-    
-    if (m_ground_collision_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_ground_collision_vao);
-        glDeleteBuffers(1, &m_ground_collision_vbo);
-        m_ground_collision_vao = 0;
-        m_ground_collision_vbo = 0;
-    }
-    
-    if (m_side_wall_collision_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_side_wall_collision_vao);
-        glDeleteBuffers(1, &m_side_wall_collision_vbo);
-        m_side_wall_collision_vao = 0;
-        m_side_wall_collision_vbo = 0;
-    }
-}
-
-void Renderer::AddQuadUltraFast(std::vector<float>& vertices, float x1, float y1, float z1, 
-                               float x2, float y2, float z2, float x3, float y3, float z3, 
-                               float x4, float y4, float z4, float nx, float ny, float nz)
-{
-    // 添加两个三角形组成一个四边形
-    // 三角形1: v1, v2, v3
-    vertices.insert(vertices.end(), {x1, y1, z1, nx, ny, nz, 0.0f, 0.0f});
-    vertices.insert(vertices.end(), {x2, y2, z2, nx, ny, nz, 1.0f, 0.0f});
-    vertices.insert(vertices.end(), {x3, y3, z3, nx, ny, nz, 1.0f, 1.0f});
-    
-    // 三角形2: v1, v3, v4
-    vertices.insert(vertices.end(), {x1, y1, z1, nx, ny, nz, 0.0f, 0.0f});
-    vertices.insert(vertices.end(), {x3, y3, z3, nx, ny, nz, 1.0f, 1.0f});
-    vertices.insert(vertices.end(), {x4, y4, z4, nx, ny, nz, 0.0f, 1.0f});
-}
-
-void Renderer::CreateCollisionCheckerboardTexture(GLuint& texture_id)
-{
-    // 创建一个简单的棋盘纹理
-    const int size = 16;
-    unsigned char data[size * size * 3];
-    
-    for (int i = 0; i < size; i++)
-    {
-        for (int j = 0; j < size; j++)
-        {
-            bool is_white = ((i / 4) + (j / 4)) % 2 == 0;
-            unsigned char color = is_white ? 255 : 128;
-            int idx = (i * size + j) * 3;
-            data[idx] = color;
-            data[idx + 1] = color;
-            data[idx + 2] = color;
-        }
-    }
-    
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size, size, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-}
-
-void Renderer::CreateSideWallCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_side_wall_bodies,
-                                               const std::map<std::pair<int, int>, float>& terrain_data)
-{
-    // 删除旧的几何体
-    if (m_side_wall_collision_vao != 0)
-    {
-        glDeleteVertexArrays(1, &m_side_wall_collision_vao);
-        glDeleteBuffers(1, &m_side_wall_collision_vbo);
-        m_side_wall_collision_vao = 0;
-        m_side_wall_collision_vbo = 0;
-        m_side_wall_collision_vertex_count = 0;
-    }
-    
-    // 重新创建几何体
-    std::vector<float> vertices;
-    
-    const float half_tile_size = 0.5f;
-    const float wall_thickness = 0.1f;
-    
-    for (const auto& body_pair : active_side_wall_bodies)
-    {
-        // 从复合键中提取网格位置和侧墙方向
-        int grid_x = body_pair.first.first / 1000;
-        int side = body_pair.first.first % 1000;
-        int grid_z = body_pair.first.second;
-        
-        auto terrain_it = terrain_data.find({grid_x, grid_z});
-        if (terrain_it == terrain_data.end())
-            continue;
-        
-        float height = terrain_it->second;
-        float height_bottom = -50.0f; // base_height
-        
-        // 计算世界位置
-        float world_x = (grid_x + 0.5f - 25.0f) * 1.0f;
-        float world_z = (grid_z + 0.5f - 25.0f) * 1.0f;
-        
-        // 检查相邻地形的高度
-        float adjacent_height = height_bottom;
-        float wall_center_x = world_x;
-        float wall_center_z = world_z;
-        float wall_center_y = (height + height_bottom) / 2.0f;
-        
-        switch (side)
-        {
-            case 0: // 左面 (-X)
-            {
-                auto left_it = terrain_data.find({grid_x - 1, grid_z});
-                adjacent_height = (left_it != terrain_data.end()) ? left_it->second : height_bottom;
-                wall_center_x = world_x - half_tile_size;
-                break;
-            }
-            case 1: // 右面 (+X)
-            {
-                auto right_it = terrain_data.find({grid_x + 1, grid_z});
-                adjacent_height = (right_it != terrain_data.end()) ? right_it->second : height_bottom;
-                wall_center_x = world_x + half_tile_size;
-                break;
-            }
-            case 2: // 前面 (-Z)
-            {
-                auto front_it = terrain_data.find({grid_x, grid_z - 1});
-                adjacent_height = (front_it != terrain_data.end()) ? front_it->second : height_bottom;
-                wall_center_z = world_z - half_tile_size;
-                break;
-            }
-            case 3: // 后面 (+Z)
-            {
-                auto back_it = terrain_data.find({grid_x, grid_z + 1});
-                adjacent_height = (back_it != terrain_data.end()) ? back_it->second : height_bottom;
-                wall_center_z = world_z + half_tile_size;
-                break;
-            }
-        }
-        
-        // 如果高度差太小，跳过
-        if (abs(height - adjacent_height) < 0.1f)
-            continue;
-        
-        float wall_height = abs(height - adjacent_height);
-        float wall_width = 1.0f; // tile_size
-        
-        // 计算侧墙的8个角点
-        float x1, x2, y1, y2, z1, z2;
-        if (side == 0 || side == 1) // 左右面
-        {
-            x1 = wall_center_x - wall_thickness / 2.0f;
-            x2 = wall_center_x + wall_thickness / 2.0f;
-            z1 = wall_center_z - wall_width / 2.0f;
-            z2 = wall_center_z + wall_width / 2.0f;
-        }
-        else // 前后面
-        {
-            x1 = wall_center_x - wall_width / 2.0f;
-            x2 = wall_center_x + wall_width / 2.0f;
-            z1 = wall_center_z - wall_thickness / 2.0f;
-            z2 = wall_center_z + wall_thickness / 2.0f;
-        }
-        y1 = wall_center_y - wall_height / 2.0f;
-        y2 = wall_center_y + wall_height / 2.0f;
-        
-        // 添加侧墙的6个面（每个面2个三角形，每个三角形3个顶点）
-        // 每个顶点包含：位置(3) + 法线(3) + 纹理坐标(2) = 8个float
-        
-        // 顶面 (Y = y2, 法线向上)
-        vertices.insert(vertices.end(), {x1, y2, z1, 0, 1, 0, 0, 0});
-        vertices.insert(vertices.end(), {x1, y2, z2, 0, 1, 0, 0, 1});
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 1, 0, 1, 1});
-        vertices.insert(vertices.end(), {x1, y2, z1, 0, 1, 0, 0, 0});
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 1, 0, 1, 1});
-        vertices.insert(vertices.end(), {x2, y2, z1, 0, 1, 0, 1, 0});
-        
-        // 底面 (Y = y1, 法线向下)
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, -1, 0, 0, 0});
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, -1, 0, 1, 1});
-        vertices.insert(vertices.end(), {x1, y1, z2, 0, -1, 0, 0, 1});
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, -1, 0, 0, 0});
-        vertices.insert(vertices.end(), {x2, y1, z1, 0, -1, 0, 1, 0});
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, -1, 0, 1, 1});
-        
-        // 前面 (Z = z1, 法线向前)
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, 0, -1, 0, 0});
-        vertices.insert(vertices.end(), {x1, y2, z1, 0, 0, -1, 0, 1});
-        vertices.insert(vertices.end(), {x2, y2, z1, 0, 0, -1, 1, 1});
-        vertices.insert(vertices.end(), {x1, y1, z1, 0, 0, -1, 0, 0});
-        vertices.insert(vertices.end(), {x2, y2, z1, 0, 0, -1, 1, 1});
-        vertices.insert(vertices.end(), {x2, y1, z1, 0, 0, -1, 1, 0});
-        
-        // 后面 (Z = z2, 法线向后)
-        vertices.insert(vertices.end(), {x1, y1, z2, 0, 0, 1, 0, 0});
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 0, 1, 1, 1});
-        vertices.insert(vertices.end(), {x1, y2, z2, 0, 0, 1, 0, 1});
-        vertices.insert(vertices.end(), {x1, y1, z2, 0, 0, 1, 0, 0});
-        vertices.insert(vertices.end(), {x2, y1, z2, 0, 0, 1, 1, 0});
-        vertices.insert(vertices.end(), {x2, y2, z2, 0, 0, 1, 1, 1});
-        
-        // 左面 (X = x1, 法线向左)
-        vertices.insert(vertices.end(), {x1, y1, z1, -1, 0, 0, 0, 0});
-        vertices.insert(vertices.end(), {x1, y2, z2, -1, 0, 0, 1, 1});
-        vertices.insert(vertices.end(), {x1, y2, z1, -1, 0, 0, 0, 1});
-        vertices.insert(vertices.end(), {x1, y1, z1, -1, 0, 0, 0, 0});
-        vertices.insert(vertices.end(), {x1, y1, z2, -1, 0, 0, 1, 0});
-        vertices.insert(vertices.end(), {x1, y2, z2, -1, 0, 0, 1, 1});
-        
-        // 右面 (X = x2, 法线向右)
-        vertices.insert(vertices.end(), {x2, y1, z1, 1, 0, 0, 0, 0});
-        vertices.insert(vertices.end(), {x2, y2, z1, 1, 0, 0, 0, 1});
-        vertices.insert(vertices.end(), {x2, y2, z2, 1, 0, 0, 1, 1});
-        vertices.insert(vertices.end(), {x2, y1, z1, 1, 0, 0, 0, 0});
-        vertices.insert(vertices.end(), {x2, y2, z2, 1, 0, 0, 1, 1});
-        vertices.insert(vertices.end(), {x2, y1, z2, 1, 0, 0, 1, 0});
-    }
-    
-    if (vertices.empty())
-        return;
-    
-    // 创建VAO和VBO
-    glGenVertexArrays(1, &m_side_wall_collision_vao);
-    glGenBuffers(1, &m_side_wall_collision_vbo);
-    
-    glBindVertexArray(m_side_wall_collision_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_side_wall_collision_vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    
-    // 位置属性 (location = 0)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    // 法线属性 (location = 1)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    
-    // 纹理坐标属性 (location = 2)
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    
-    glBindVertexArray(0);
-    
-    m_side_wall_collision_vertex_count = vertices.size() / 8;
-}
-
-void Renderer::UpdateSideWallCollisionGeometry(const std::map<std::pair<int, int>, BodyID>& active_side_wall_bodies,
-                                               const std::map<std::pair<int, int>, float>& terrain_data)
-{
-    CreateSideWallCollisionGeometry(active_side_wall_bodies, terrain_data);
-}
-
-void Renderer::RenderSideWallCollisionSolid(const Camera& camera)
-{
-    if (m_side_wall_collision_vao == 0 || m_side_wall_collision_vertex_count == 0)
-        return;
-        
-    GLuint shader_program = m_shader_manager->GetShaderProgram();
-    
-    GLint model_loc = glGetUniformLocation(shader_program, "model");
-    GLint object_color_loc = glGetUniformLocation(shader_program, "objectColor");
-    GLint use_texture_loc = glGetUniformLocation(shader_program, "useTexture");
-    GLint use_alpha_loc = glGetUniformLocation(shader_program, "useAlpha");
-    
-    glm::mat4 side_wall_model = glm::mat4(1.0f);
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(side_wall_model));
-    glUniform3f(object_color_loc, 0.0f, 1.0f, 0.0f); // 绿色
-    glUniform1i(use_texture_loc, 0);
-    glUniform1i(use_alpha_loc, 0);
-    
-    glBindVertexArray(m_side_wall_collision_vao);
-    glDrawArrays(GL_TRIANGLES, 0, m_side_wall_collision_vertex_count);
+    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    return VK_FALSE;
 }
 
