@@ -1,10 +1,15 @@
 #include "asset_manager.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+// STB image will be included via tinygltf below to avoid double inclusion
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+
+// Enable tinygltf & STB implementations in this translation unit
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <tiny_gltf.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
@@ -100,7 +105,159 @@ std::shared_ptr<Mesh> AssetManager::loadModel(const std::string& path)
         return it->second;
     }
 
-    // Load model
+    // Decide loader by file extension
+    auto toLower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+        return s;
+    };
+    std::string lowerPath = toLower(path);
+
+    // glTF loader (.gltf / .glb)
+    if (lowerPath.size() >= 5 && (lowerPath.rfind(".gltf") == lowerPath.size() - 5 || lowerPath.rfind(".glb") == lowerPath.size() - 4))
+    {
+        tinygltf::Model model;
+        tinygltf::TinyGLTF loader;
+        std::string warn;
+        std::string err;
+        bool loaded = false;
+        if (lowerPath.rfind(".glb") == lowerPath.size() - 4)
+        {
+            loaded = loader.LoadBinaryFromFile(&model, &err, &warn, path);
+        }
+        else
+        {
+            loaded = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+        }
+        if (!warn.empty()) {
+            // swallow warnings in test loader
+        }
+        if (!loaded || !err.empty())
+        {
+            throw std::runtime_error(std::string("Failed to load glTF: ") + (err.empty() ? "unknown error" : err));
+        }
+
+        auto mesh = std::make_shared<Mesh>();
+        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+        auto getBufferPtr = [&model](const tinygltf::Accessor& accessor) -> const unsigned char*
+        {
+            const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
+            const tinygltf::Buffer& buffer = model.buffers[view.buffer];
+            size_t offset = view.byteOffset + accessor.byteOffset;
+            return buffer.data.data() + offset;
+        };
+
+        for (const tinygltf::Mesh& m : model.meshes)
+        {
+            for (const tinygltf::Primitive& prim : m.primitives)
+            {
+                if (prim.mode != TINYGLTF_MODE_TRIANGLES)
+                {
+                    continue; // only support triangles in this test
+                }
+
+                auto findAttr = [&](const char* name) -> const tinygltf::Accessor* {
+                    auto itAttr = prim.attributes.find(name);
+                    if (itAttr == prim.attributes.end()) return nullptr;
+                    return &model.accessors[itAttr->second];
+                };
+
+                const tinygltf::Accessor* posAcc = findAttr("POSITION");
+                const tinygltf::Accessor* uvAcc = findAttr("TEXCOORD_0");
+                if (!posAcc || posAcc->bufferView < 0)
+                {
+                    continue; // skip primitives without valid positions
+                }
+                if (posAcc->componentType != TINYGLTF_COMPONENT_TYPE_FLOAT || posAcc->type != TINYGLTF_TYPE_VEC3)
+                {
+                    continue; // unsupported position format
+                }
+                const unsigned char* posPtr = getBufferPtr(*posAcc);
+                const unsigned char* uvPtr = nullptr;
+                if (uvAcc && uvAcc->bufferView >= 0 && uvAcc->componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && uvAcc->type == TINYGLTF_TYPE_VEC2)
+                {
+                    uvPtr = getBufferPtr(*uvAcc);
+                }
+
+                bool hasIndices = prim.indices >= 0;
+                tinygltf::Accessor idxAccLocal{};
+                const tinygltf::Accessor* idxAccPtr = nullptr;
+                const unsigned char* idxPtr = nullptr;
+                if (hasIndices)
+                {
+                    idxAccPtr = &model.accessors[prim.indices];
+                    if (!idxAccPtr || idxAccPtr->bufferView < 0)
+                    {
+                        hasIndices = false; // treat as non-indexed
+                    }
+                    else
+                    {
+                        idxAccLocal = *idxAccPtr;
+                        idxPtr = getBufferPtr(idxAccLocal);
+                    }
+                }
+
+                auto readIndex = [&](size_t i) -> uint32_t {
+                    switch (idxAccLocal.componentType)
+                    {
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                            return static_cast<uint32_t>(reinterpret_cast<const uint16_t*>(idxPtr)[i]);
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                            return reinterpret_cast<const uint32_t*>(idxPtr)[i];
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                            return static_cast<uint32_t>(reinterpret_cast<const uint8_t*>(idxPtr)[i]);
+                        default:
+                            throw std::runtime_error("Unsupported glTF index component type");
+                    }
+                };
+
+                // Strides (0 means tightly packed)
+                size_t posStride = model.bufferViews[posAcc->bufferView].byteStride ? model.bufferViews[posAcc->bufferView].byteStride : sizeof(float) * 3;
+                size_t uvStride = 0;
+                if (uvPtr && uvAcc)
+                {
+                    uvStride = model.bufferViews[uvAcc->bufferView].byteStride ? model.bufferViews[uvAcc->bufferView].byteStride : sizeof(float) * 2;
+                }
+
+                const size_t indexCount = hasIndices ? idxAccLocal.count : posAcc->count;
+                for (size_t i = 0; i < indexCount; ++i)
+                {
+                    uint32_t vi = hasIndices ? readIndex(i) : static_cast<uint32_t>(i);
+                    if (vi >= posAcc->count)
+                    {
+                        continue; // guard against bad data
+                    }
+
+                    const float* p = reinterpret_cast<const float*>(posPtr + static_cast<size_t>(vi) * posStride);
+                    glm::vec3 position = { p[0], p[1], p[2] };
+
+                    glm::vec2 texCoord = {0.0f, 0.0f};
+                    if (uvPtr && uvStride > 0)
+                    {
+                        const float* t = reinterpret_cast<const float*>(uvPtr + static_cast<size_t>(vi) * uvStride);
+                        texCoord = { t[0], 1.0f - t[1] }; // flip V like OBJ path
+                    }
+
+                    Vertex vertex{};
+                    vertex.pos = position;
+                    vertex.texCoord = texCoord;
+                    vertex.color = {1.0f, 1.0f, 1.0f};
+
+                    if (uniqueVertices.count(vertex) == 0)
+                    {
+                        uniqueVertices[vertex] = static_cast<uint32_t>(mesh->vertices.size());
+                        mesh->vertices.push_back(vertex);
+                    }
+                    mesh->indices.push_back(uniqueVertices[vertex]);
+                }
+            }
+        }
+
+        m_meshes[path] = mesh;
+        return mesh;
+    }
+
+    // Fallback: OBJ loader
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;

@@ -72,11 +72,11 @@ auto_install_target(jolt_character_test_new ${BINARY_ROOT_DIR})
 
 # Vulkan renderer test (refactored with separate Renderer, AssetManager, SceneManager)
 add_executable(vulkan_renderer_test 
-    vulkan_render_test.cpp
-    renderer.cpp
-    asset_manager.cpp
-    scene_manager.cpp
-    input_manager.cpp
+    vulkan_test/vulkan_render_test.cpp
+    vulkan_test/renderer.cpp
+    vulkan_test/asset_manager.cpp
+    vulkan_test/scene_manager.cpp
+    vulkan_test/input_manager.cpp
 )
 target_link_libraries(vulkan_renderer_test PRIVATE glfw)
 target_link_libraries(vulkan_renderer_test PRIVATE glm::glm)
@@ -90,4 +90,5 @@ if(APPLE)
     target_link_libraries(vulkan_renderer_test PRIVATE "-framework IOKit")
     target_link_libraries(vulkan_renderer_test PRIVATE "-framework CoreFoundation")
 endif()
+target_include_directories(vulkan_renderer_test PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 auto_install_target(vulkan_renderer_test ${BINARY_ROOT_DIR})

@@ -17,8 +17,12 @@
 const uint32_t WIDTH  = 800;
 const uint32_t HEIGHT = 600;
 
-const std::string MODEL_PATH   = "models/viking_room/viking_room.obj";
-const std::string TEXTURE_PATH = "models/viking_room/viking_room.png";
+// const std::string MODEL_PATH   = "models/viking_room/viking_room.obj";
+// const std::string TEXTURE_PATH = "models/viking_room/viking_room.png";
+// const std::string MODEL_PATH   = "models/Fox/glTF/Fox.gltf";
+// const std::string TEXTURE_PATH = "models/Fox/glTF/Texture.png";
+const std::string MODEL_PATH   = "models/Cube/glTF/Cube.gltf";
+const std::string TEXTURE_PATH = "models/Cube/glTF/Cube_BaseColor.png";
 
 // Forward declaration for framebuffer resize callback
 class VulkanApplication;
