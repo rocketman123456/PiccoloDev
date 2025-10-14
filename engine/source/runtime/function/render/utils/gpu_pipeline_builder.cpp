@@ -447,6 +447,7 @@ namespace Piccolo
         config.vertex_input.bindings.push_back(binding_description);
         config.vertex_input.attributes.push_back(attribute_descriptions[0]);
         config.vertex_input.attributes.push_back(attribute_descriptions[1]);
+        config.vertex_input.attributes.push_back(attribute_descriptions[2]);
 
         config.shader_stages = {
             {   ShaderType::VertexShader, "asset/shader/glsl/vert_buffer.vert", "main"},

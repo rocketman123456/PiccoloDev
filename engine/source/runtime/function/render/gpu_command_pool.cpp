@@ -121,11 +121,25 @@ namespace Piccolo
             VkDeviceSize index_offsets[] = {0};
             vkCmdBindIndexBuffer(command_buffer, index_buffers[0], index_offsets[0], VK_INDEX_TYPE_UINT16);
 
+            // 绑定相机描述符集（set=0）
+            if (auto pipeline = g_runtime_global_context.m_render_system->getPipeline())
+            {
+                VkPipelineLayout layout = pipeline->getPipelineLayout();
+                VkDescriptorSet  set    = g_runtime_global_context.m_render_system->getCameraDescriptorSet();
+                if (set != VK_NULL_HANDLE)
+                {
+                    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &set, 0, nullptr);
+                }
+            }
+
             // 开始绘制性能分析
             profiler->beginTimestamp(command_buffer, current_frame, "Draw Call");
             // vkCmdDraw(command_buffer, 3, 1, 0, 0);
             vkCmdDrawIndexed(command_buffer, 6, 1, 0, 0, 0);
             profiler->endTimestamp(command_buffer, current_frame);
+
+            // 记录 ImGui 绘制（需要处在 render pass 内）
+            g_runtime_global_context.m_render_system->recordImGuiDrawData(command_buffer);
         }
         vkCmdEndRenderPass(command_buffer);
 

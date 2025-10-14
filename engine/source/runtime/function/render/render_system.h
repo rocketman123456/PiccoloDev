@@ -1,5 +1,7 @@
 #pragma once
 
+#include "runtime/function/input/input_manager.h"
+#include "runtime/function/render/camera.h"
 #include "runtime/function/render/gpu_buffer.h"
 #include "runtime/function/render/utils/gpu_buffer_utils.h"
 
@@ -160,6 +162,19 @@ namespace Piccolo
         VkBuffer getVertexBuffer() const { return m_vertex_buffer.getBuffer(); }
         VkBuffer getIndexBuffer() const { return m_index_buffer.getBuffer(); }
 
+        // ========== ImGui 接口 ==========
+        // 开始新的 ImGui 帧（由渲染系统在每帧开始时调用）
+        void beginImGuiFrame();
+
+        // 在当前渲染通道中记录 ImGui 绘制数据（需在 render pass 内调用）
+        void recordImGuiDrawData(VkCommandBuffer command_buffer);
+
+        // ========== 相机与输入 ==========
+        void updateCameraAndInput(float dt);
+
+        // 相机描述符访问器
+        VkDescriptorSet getCameraDescriptorSet() const { return m_camera_descriptor_set; }
+
     private:
         // ========== 私有方法 ==========
 
@@ -190,6 +205,10 @@ namespace Piccolo
          * 创建顶点缓冲区等基础渲染资源
          */
         void createRenderResource();
+
+        // ========== ImGui 初始化/清理 ==========
+        void initializeImGui();
+        void destroyImGui();
 
         // ========== 渲染循环辅助方法 ==========
 
@@ -256,8 +275,22 @@ namespace Piccolo
         GPUBuffer m_vertex_buffer; ///< 顶点缓冲区 @todo 移至资源管理器
         GPUBuffer m_index_buffer;  ///< 索引缓冲区 @todo 移至资源管理器
 
+        // 相机与输入
+        std::unique_ptr<class RenderCamera> m_camera;
+        std::unique_ptr<class InputManager> m_input_manager;
+
+        // 相机 UBO 资源
+        GPUBuffer             m_camera_ubo;
+        VkDescriptorSetLayout m_camera_set_layout {VK_NULL_HANDLE};
+        VkDescriptorPool      m_camera_descriptor_pool {VK_NULL_HANDLE};
+        VkDescriptorSet       m_camera_descriptor_set {VK_NULL_HANDLE};
+
         // 状态标志
         bool     m_framebuffer_resized = false; ///< 帧缓冲区调整大小标志
         uint32_t m_current_frame       = 0;     ///< 当前帧索引
+
+        // ImGui 相关
+        VkDescriptorPool m_imgui_descriptor_pool {VK_NULL_HANDLE};
+        bool             m_imgui_initialized {false};
     };
 } // namespace Piccolo

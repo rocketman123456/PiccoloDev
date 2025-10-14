@@ -4,7 +4,15 @@
         "source": {
             "type": "git",
             "url": "https://github.com/KhronosGroup/glTF-Sample-Assets.git",
-            "revision": "517a5db6aa558f5c57faed8301ba40cd246a9d76"
+            "revision": "main"
+        }
+    },
+    {
+        "name": "glTF-Sample-Environments",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/KhronosGroup/glTF-Sample-Environments.git",
+            "revision": "main"
         }
     },
     {

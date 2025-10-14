@@ -9,6 +9,5 @@ file(GLOB imgui_impl CONFIGURE_DEPENDS
 add_library(imgui STATIC ${imgui_sources} ${imgui_impl})
 target_include_directories(imgui PUBLIC $<BUILD_INTERFACE:${imgui_SOURCE_DIR_}>)
 target_include_directories(imgui PUBLIC $<BUILD_INTERFACE:${vulkan_include}>)
-# target_link_libraries(imgui PUBLIC glfw ${vulkan_lib})
-target_link_libraries(imgui PUBLIC glfw Vulkan::Vulkan)
-# target_link_libraries(imgui PUBLIC glfw volk)
+target_compile_definitions(imgui PUBLIC VK_NO_PROTOTYPES)
+target_link_libraries(imgui PUBLIC glfw volk::volk)
