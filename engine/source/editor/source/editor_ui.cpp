@@ -31,27 +31,29 @@
 
 namespace Piccolo
 {
-    std::vector<std::pair<std::string, bool>> g_editor_node_state_array;
-    int                                       g_node_depth = -1;
-    void DrawVecControl(const std::string& label, Piccolo::Vector3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
-    void DrawVecControl(const std::string& label, Piccolo::Quaternion& values, float resetValue = 0.0f, float columnWidth = 100.0f);
-
     EditorUI::EditorUI()
     {
+        registerUICreators();
+    }
+
+    void EditorUI::registerUICreators()
+    {
         const auto& asset_folder            = g_runtime_global_context.m_config_manager->getAssetFolder();
-        m_editor_ui_creator["TreeNodePush"] = [this](const std::string& name, void* value_ptr) -> void {
+        
+        // Tree node management
+        m_editor_ui_creator["TreeNodePush"] = [this](const std::string& name, void* /*value_ptr*/) -> void {
             static ImGuiTableFlags flags      = ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings;
             bool                   node_state = false;
-            g_node_depth++;
-            if (g_node_depth > 0)
+            m_node_depth++;
+            if (m_node_depth > 0)
             {
-                if (g_editor_node_state_array[g_node_depth - 1].second)
+                if (m_editor_node_state_array[m_node_depth - 1].second)
                 {
                     node_state = ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
                 }
                 else
                 {
-                    g_editor_node_state_array.emplace_back(std::pair(name.c_str(), node_state));
+                    m_editor_node_state_array.emplace_back(std::pair(name.c_str(), node_state));
                     return;
                 }
             }
@@ -59,54 +61,73 @@ namespace Piccolo
             {
                 node_state = ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
             }
-            g_editor_node_state_array.emplace_back(std::pair(name.c_str(), node_state));
+            m_editor_node_state_array.emplace_back(std::pair(name.c_str(), node_state));
         };
-        m_editor_ui_creator["TreeNodePop"] = [this](const std::string& name, void* value_ptr) -> void {
-            if (g_editor_node_state_array[g_node_depth].second)
+        
+        m_editor_ui_creator["TreeNodePop"] = [this](const std::string& /*name*/, void* /*value_ptr*/) -> void {
+            if (m_node_depth >= 0 && m_node_depth < static_cast<int>(m_editor_node_state_array.size()))
             {
-                ImGui::TreePop();
+                if (m_editor_node_state_array[m_node_depth].second)
+                {
+                    ImGui::TreePop();
+                }
+                m_editor_node_state_array.pop_back();
             }
-            g_editor_node_state_array.pop_back();
-            g_node_depth--;
+            m_node_depth--;
         };
-        m_editor_ui_creator["Transform"] = [this](const std::string& name, void* value_ptr) -> void {
-            if (g_editor_node_state_array[g_node_depth].second)
+        // Transform UI creator with optimized rotation calculation
+        m_editor_ui_creator["Transform"] = [this](const std::string& /*name*/, void* value_ptr) -> void {
+            if (m_node_depth < 0 || m_node_depth >= static_cast<int>(m_editor_node_state_array.size()))
+                return;
+                
+            if (m_editor_node_state_array[m_node_depth].second)
             {
                 Transform* trans_ptr = static_cast<Transform*>(value_ptr);
 
                 Vector3 degrees_val;
+                Vector3 old_degrees_val;
 
-                degrees_val.x = trans_ptr->m_rotation.getPitch(false).valueDegrees();
-                degrees_val.y = trans_ptr->m_rotation.getRoll(false).valueDegrees();
-                degrees_val.z = trans_ptr->m_rotation.getYaw(false).valueDegrees();
+                // Get current rotation in degrees
+                old_degrees_val.x = degrees_val.x = trans_ptr->m_rotation.getPitch(false).valueDegrees();
+                old_degrees_val.y = degrees_val.y = trans_ptr->m_rotation.getRoll(false).valueDegrees();
+                old_degrees_val.z = degrees_val.z = trans_ptr->m_rotation.getYaw(false).valueDegrees();
 
-                DrawVecControl("Position", trans_ptr->m_position);
-                DrawVecControl("Rotation", degrees_val);
-                DrawVecControl("Scale", trans_ptr->m_scale);
+                drawVecControl("Position", trans_ptr->m_position);
+                drawVecControl("Rotation", degrees_val);
+                drawVecControl("Scale", trans_ptr->m_scale);
 
-                trans_ptr->m_rotation.w = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) +
-                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.x = Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) -
-                                          Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.y = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) +
-                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.z = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2)) -
-                                          Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
-                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2));
-                trans_ptr->m_rotation.normalise();
+                // Only recalculate quaternion if rotation changed
+                constexpr float epsilon = 0.001f;
+                if (std::abs(degrees_val.x - old_degrees_val.x) > epsilon ||
+                    std::abs(degrees_val.y - old_degrees_val.y) > epsilon ||
+                    std::abs(degrees_val.z - old_degrees_val.z) > epsilon)
+                {
+                    // Convert Euler angles to quaternion
+                    trans_ptr->m_rotation.w = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::cos(Math::degreesToRadians(degrees_val.z / 2)) +
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::sin(Math::degreesToRadians(degrees_val.z / 2));
+                    trans_ptr->m_rotation.x = Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::cos(Math::degreesToRadians(degrees_val.z / 2)) -
+                                              Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::sin(Math::degreesToRadians(degrees_val.z / 2));
+                    trans_ptr->m_rotation.y = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::cos(Math::degreesToRadians(degrees_val.z / 2)) +
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::sin(Math::degreesToRadians(degrees_val.z / 2));
+                    trans_ptr->m_rotation.z = Math::cos(Math::degreesToRadians(degrees_val.x / 2)) * Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::sin(Math::degreesToRadians(degrees_val.z / 2)) -
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2)) * Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                                  Math::cos(Math::degreesToRadians(degrees_val.z / 2));
+                    trans_ptr->m_rotation.normalise();
 
-                g_editor_global_context.m_scene_manager->drawSelectedEntityAxis();
+                    g_editor_global_context.m_scene_manager->drawSelectedEntityAxis();
+                }
             }
         };
+        // Basic type UI creators
         m_editor_ui_creator["bool"] = [this](const std::string& name, void* value_ptr) -> void {
-            if (g_node_depth == -1)
+            if (m_node_depth == -1)
             {
                 std::string label = "##" + name;
                 ImGui::Text("%s", name.c_str());
@@ -115,7 +136,8 @@ namespace Piccolo
             }
             else
             {
-                if (g_editor_node_state_array[g_node_depth].second)
+                if (m_node_depth < static_cast<int>(m_editor_node_state_array.size()) && 
+                    m_editor_node_state_array[m_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
                     ImGui::Text("%s", name.c_str());
@@ -124,7 +146,7 @@ namespace Piccolo
             }
         };
         m_editor_ui_creator["int"] = [this](const std::string& name, void* value_ptr) -> void {
-            if (g_node_depth == -1)
+            if (m_node_depth == -1)
             {
                 std::string label = "##" + name;
                 ImGui::Text("%s", name.c_str());
@@ -133,7 +155,8 @@ namespace Piccolo
             }
             else
             {
-                if (g_editor_node_state_array[g_node_depth].second)
+                if (m_node_depth < static_cast<int>(m_editor_node_state_array.size()) && 
+                    m_editor_node_state_array[m_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
                     ImGui::Text("%s", (name + ":").c_str());
@@ -142,7 +165,7 @@ namespace Piccolo
             }
         };
         m_editor_ui_creator["float"] = [this](const std::string& name, void* value_ptr) -> void {
-            if (g_node_depth == -1)
+            if (m_node_depth == -1)
             {
                 std::string label = "##" + name;
                 ImGui::Text("%s", name.c_str());
@@ -151,7 +174,8 @@ namespace Piccolo
             }
             else
             {
-                if (g_editor_node_state_array[g_node_depth].second)
+                if (m_node_depth < static_cast<int>(m_editor_node_state_array.size()) && 
+                    m_editor_node_state_array[m_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
                     ImGui::Text("%s", (name + ":").c_str());
@@ -162,7 +186,7 @@ namespace Piccolo
         m_editor_ui_creator["Vector3"] = [this](const std::string& name, void* value_ptr) -> void {
             Vector3* vec_ptr = static_cast<Vector3*>(value_ptr);
             float    val[3]  = {vec_ptr->x, vec_ptr->y, vec_ptr->z};
-            if (g_node_depth == -1)
+            if (m_node_depth == -1)
             {
                 std::string label = "##" + name;
                 ImGui::Text("%s", name.c_str());
@@ -171,7 +195,8 @@ namespace Piccolo
             }
             else
             {
-                if (g_editor_node_state_array[g_node_depth].second)
+                if (m_node_depth < static_cast<int>(m_editor_node_state_array.size()) && 
+                    m_editor_node_state_array[m_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
                     ImGui::Text("%s", (name + ":").c_str());
@@ -185,7 +210,7 @@ namespace Piccolo
         m_editor_ui_creator["Quaternion"] = [this](const std::string& name, void* value_ptr) -> void {
             Quaternion* qua_ptr = static_cast<Quaternion*>(value_ptr);
             float       val[4]  = {qua_ptr->x, qua_ptr->y, qua_ptr->z, qua_ptr->w};
-            if (g_node_depth == -1)
+            if (m_node_depth == -1)
             {
                 std::string label = "##" + name;
                 ImGui::Text("%s", name.c_str());
@@ -194,7 +219,8 @@ namespace Piccolo
             }
             else
             {
-                if (g_editor_node_state_array[g_node_depth].second)
+                if (m_node_depth < static_cast<int>(m_editor_node_state_array.size()) && 
+                    m_editor_node_state_array[m_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
                     ImGui::Text("%s", (name + ":").c_str());
@@ -207,7 +233,7 @@ namespace Piccolo
             qua_ptr->w = val[3];
         };
         m_editor_ui_creator["std::string"] = [this, &asset_folder](const std::string& name, void* value_ptr) -> void {
-            if (g_node_depth == -1)
+            if (m_node_depth == -1)
             {
                 std::string label = "##" + name;
                 ImGui::Text("%s", name.c_str());
@@ -216,7 +242,8 @@ namespace Piccolo
             }
             else
             {
-                if (g_editor_node_state_array[g_node_depth].second)
+                if (m_node_depth < static_cast<int>(m_editor_node_state_array.size()) && 
+                    m_editor_node_state_array[m_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
                     ImGui::Text("%s", (name + ":").c_str());
@@ -243,10 +270,10 @@ namespace Piccolo
     std::string EditorUI::getLeafUINodeParentLabel()
     {
         std::string parent_label;
-        int         array_size = g_editor_node_state_array.size();
+        int         array_size = m_editor_node_state_array.size();
         for (int index = 0; index < array_size; index++)
         {
-            parent_label += g_editor_node_state_array[index].first + "::";
+            parent_label += m_editor_node_state_array[index].first + "::";
         }
         return parent_label;
     }
@@ -270,7 +297,7 @@ namespace Piccolo
         const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(main_viewport->WorkPos, ImGuiCond_Always);
         std::array<int, 2> window_size = g_editor_global_context.m_window_system->getWindowSize();
-        ImGui::SetNextWindowSize(ImVec2((float)window_size[0], (float)window_size[1]), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(static_cast<float>(window_size[0]), static_cast<float>(window_size[1])), ImGuiCond_Always);
 
         ImGui::SetNextWindowViewport(main_viewport->ID);
 
@@ -282,18 +309,20 @@ namespace Piccolo
             ImGui::DockBuilderRemoveNode(main_docking_id);
 
             ImGui::DockBuilderAddNode(main_docking_id, dock_flags);
-            ImGui::DockBuilderSetNodePos(main_docking_id, ImVec2(main_viewport->WorkPos.x, main_viewport->WorkPos.y + 18.0f));
-            ImGui::DockBuilderSetNodeSize(main_docking_id, ImVec2((float)window_size[0], (float)window_size[1] - 18.0f));
+            // compute actual menu bar height dynamically to avoid hard-coded offset
+            float menu_height = ImGui::GetFrameHeight();
+            ImGui::DockBuilderSetNodePos(main_docking_id, ImVec2(main_viewport->WorkPos.x, main_viewport->WorkPos.y + menu_height));
+            ImGui::DockBuilderSetNodeSize(main_docking_id, ImVec2(static_cast<float>(window_size[0]), static_cast<float>(window_size[1]) - menu_height));
 
             ImGuiID center = main_docking_id;
             ImGuiID left;
-            ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.25f, nullptr, &left);
+            ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, k_right_panel_width_ratio, nullptr, &left);
 
             ImGuiID left_other;
-            ImGuiID left_file_content = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.30f, nullptr, &left_other);
+            ImGuiID left_file_content = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, k_bottom_panel_height_ratio, nullptr, &left_other);
 
             ImGuiID left_game_engine;
-            ImGuiID left_asset = ImGui::DockBuilderSplitNode(left_other, ImGuiDir_Left, 0.30f, nullptr, &left_game_engine);
+            ImGuiID left_asset = ImGui::DockBuilderSplitNode(left_other, ImGuiDir_Left, k_asset_panel_width_ratio, nullptr, &left_game_engine);
 
             ImGui::DockBuilderDockWindow("World Objects", left_asset);
             ImGui::DockBuilderDockWindow("Components Details", right);
@@ -369,9 +398,9 @@ namespace Piccolo
             if (ImGui::BeginMenu("Window"))
             {
                 ImGui::MenuItem("World Objects", nullptr, &m_asset_window_open);
-                ImGui::MenuItem("Game", nullptr, &m_game_engine_window_open);
+                ImGui::MenuItem("Game Engine", nullptr, &m_game_engine_window_open);
                 ImGui::MenuItem("File Content", nullptr, &m_file_content_window_open);
-                ImGui::MenuItem("Detail", nullptr, &m_detail_window_open);
+                ImGui::MenuItem("Components Details", nullptr, &m_detail_window_open);
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -395,12 +424,18 @@ namespace Piccolo
             return;
         }
 
+        // search filter
+        static char world_objects_filter[k_name_buffer_size] = {};
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputTextWithHint("##world_objects_filter", "Search objects...", world_objects_filter, IM_ARRAYSIZE(world_objects_filter));
+        ImGui::Separator();
+
         std::shared_ptr<Level> current_active_level = g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
         if (current_active_level == nullptr)
             return;
 
         const LevelObjectsMap& all_gobjects = current_active_level->getAllGObjects();
-        for (auto& id_object_pair : all_gobjects)
+        for (const auto& id_object_pair : all_gobjects)
         {
             const GObjectID          object_id = id_object_pair.first;
             std::shared_ptr<GObject> object    = id_object_pair.second;
@@ -408,6 +443,18 @@ namespace Piccolo
             const bool               is_active = object->isActive();
             if (name.size() > 0)
             {
+                // apply filter (case-insensitive substring)
+                bool show = true;
+                if (world_objects_filter[0] != '\0')
+                {
+                    std::string name_lower = name;
+                    std::string filter_str = world_objects_filter;
+                    std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+                    std::transform(filter_str.begin(), filter_str.end(), filter_str.begin(), ::tolower);
+                    show = name_lower.find(filter_str) != std::string::npos;
+                }
+                if (!show) { continue; }
+
                 bool selected = g_editor_global_context.m_scene_manager->getSelectedObjectID() == object_id;
                 if (ImGui::Selectable(name.c_str(), selected && is_active, 0, ImVec2(0, 0)))
                 {
@@ -464,7 +511,7 @@ namespace Piccolo
                         {
                             m_editor_ui_creator["TreeNodePush"]("[" + std::to_string(index) + "]", nullptr);
                             auto object_instance = Reflection::ReflectionInstance(
-                                Piccolo::Reflection::TypeMeta::newMetaFromName(item_type_meta_item.getTypeName().c_str()),
+                                Piccolo::Reflection::TypeMeta::newMetaFromName(item_type_meta_item.getTypeName()),
                                 array_accessor.get(index, field_instance)
                             );
                             createClassUI(object_instance);
@@ -535,42 +582,30 @@ namespace Piccolo
         }
 
         const std::string& name = selected_object->getName();
-        static char        cname[128];
-        memset(cname, 0, 128);
-        memcpy(cname, name.c_str(), name.size());
+        static char        cname[k_name_buffer_size];
+        memset(cname, 0, k_name_buffer_size);
+        memcpy(cname, name.data(), std::min(name.size(), k_name_buffer_size - 1));
 
         ImGui::Text("Name");
         ImGui::SameLine();
         ImGui::InputText("##Name", cname, IM_ARRAYSIZE(cname), ImGuiInputTextFlags_ReadOnly);
 
-        // active state
+        // active state (checkbox)
         bool is_active = selected_object->isActive();
-        if (is_active)
+        if (ImGui::Checkbox("Active", &is_active))
         {
-            if (ImGui::Button("Active"))
-            {
-                is_active = !is_active;
-                selected_object->setActive(is_active);
-            }
-        }
-        else
-        {
-            if (ImGui::Button("Inactive"))
-            {
-                is_active = !is_active;
-                selected_object->setActive(is_active);
-            }
+            selected_object->setActive(is_active);
         }
 
         static ImGuiTableFlags flags                      = ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings;
         auto&&                 selected_object_components = selected_object->getComponents();
         for (auto component_ptr : selected_object_components)
         {
-            m_editor_ui_creator["TreeNodePush"](("<" + component_ptr.getTypeName() + ">").c_str(), nullptr);
+            m_editor_ui_creator["TreeNodePush"]("<" + component_ptr.getTypeName() + ">", nullptr);
             auto object_instance =
-                Reflection::ReflectionInstance(Piccolo::Reflection::TypeMeta::newMetaFromName(component_ptr.getTypeName().c_str()), component_ptr.operator->());
+                Reflection::ReflectionInstance(Piccolo::Reflection::TypeMeta::newMetaFromName(component_ptr.getTypeName()), component_ptr.operator->());
             createClassUI(object_instance);
-            m_editor_ui_creator["TreeNodePop"](("<" + component_ptr.getTypeName() + ">").c_str(), nullptr);
+            m_editor_ui_creator["TreeNodePop"]("<" + component_ptr.getTypeName() + ">", nullptr);
         }
         ImGui::End();
     }
@@ -590,6 +625,12 @@ namespace Piccolo
             return;
         }
 
+        // search filter
+        static char file_content_filter[k_name_buffer_size] = {};
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputTextWithHint("##file_content_filter", "Search files...", file_content_filter, IM_ARRAYSIZE(file_content_filter));
+        ImGui::Separator();
+
         static ImGuiTableFlags flags =
             ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody;
 
@@ -599,16 +640,16 @@ namespace Piccolo
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableHeadersRow();
 
+            // Update file tree periodically (not every frame)
             auto current_time = std::chrono::steady_clock::now();
-            if (current_time - m_last_file_tree_update > std::chrono::seconds(1))
+            if (current_time - m_last_file_tree_update > std::chrono::seconds(k_file_tree_update_interval_seconds))
             {
                 m_editor_file_service.buildEngineFileTree();
                 m_last_file_tree_update = current_time;
             }
-            m_last_file_tree_update = current_time;
 
             EditorFileNode* editor_root_node = m_editor_file_service.getEditorRootNode();
-            buildEditorFileAssetsUITree(editor_root_node);
+            buildEditorFileAssetsUITree(editor_root_node, file_content_filter);
             ImGui::EndTable();
         }
 
@@ -661,16 +702,16 @@ namespace Piccolo
         if (ImGui::BeginMenuBar())
         {
             ImGui::Indent(10.f);
-            drawAxisToggleButton("Trans", trans_button_ckecked, (int)EditorAxisMode::TranslateMode);
+            drawAxisToggleButton("Trans", trans_button_ckecked, static_cast<int>(EditorAxisMode::TranslateMode));
             ImGui::Unindent();
 
             ImGui::SameLine();
 
-            drawAxisToggleButton("Rotate", rotate_button_ckecked, (int)EditorAxisMode::RotateMode);
+            drawAxisToggleButton("Rotate", rotate_button_ckecked, static_cast<int>(EditorAxisMode::RotateMode));
 
             ImGui::SameLine();
 
-            drawAxisToggleButton("Scale", scale_button_ckecked, (int)EditorAxisMode::ScaleMode);
+            drawAxisToggleButton("Scale", scale_button_ckecked, static_cast<int>(EditorAxisMode::ScaleMode));
 
             ImGui::SameLine();
 
@@ -683,7 +724,7 @@ namespace Piccolo
             glfwGetWindowContentScale(g_editor_global_context.m_window_system->getWindow(), &x_scale, &y_scale);
             float indent_scale = fmaxf(1.0f, fmaxf(x_scale, y_scale));
 #endif
-            indent_val = g_editor_global_context.m_input_manager->getEngineWindowSize().x - 100.0f * indent_scale;
+            indent_val = g_editor_global_context.m_input_manager->getEngineWindowSize().x - k_axis_button_area_width * indent_scale;
 
             ImGui::Indent(indent_val);
             if (g_is_editor_mode)
@@ -746,8 +787,7 @@ namespace Piccolo
         render_target_window_pos.x  = ImGui::GetWindowPos().x;
         render_target_window_pos.y  = menu_bar_rect.Max.y;
         render_target_window_size.x = ImGui::GetWindowSize().x;
-        render_target_window_size.y = (ImGui::GetWindowSize().y + ImGui::GetWindowPos().y) -
-                                      menu_bar_rect.Max.y; // coord of right bottom point of full window minus coord of right bottom point of menu bar window.
+        render_target_window_size.y = (ImGui::GetWindowSize().y + ImGui::GetWindowPos().y) - menu_bar_rect.Max.y;
 
         // if (new_window_pos != m_engine_window_pos || new_window_size != m_engine_window_size)
         {
@@ -792,32 +832,55 @@ namespace Piccolo
             if (ImGui::Button(string_id))
             {
                 check_state = true;
-                g_editor_global_context.m_scene_manager->setEditorAxisMode((EditorAxisMode)axis_mode);
+                g_editor_global_context.m_scene_manager->setEditorAxisMode(static_cast<EditorAxisMode>(axis_mode));
                 g_editor_global_context.m_scene_manager->drawSelectedEntityAxis();
             }
         }
     }
 
-    void EditorUI::buildEditorFileAssetsUITree(EditorFileNode* node)
+    void EditorUI::buildEditorFileAssetsUITree(EditorFileNode* node, const char* file_content_filter)
     {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         const bool is_folder = (node->m_child_nodes.size() > 0);
         if (is_folder)
         {
+            // folder matches if itself or children match filter
+            if (file_content_filter[0] != '\0')
+            {
+                bool any_child_matches = false;
+                for (const auto& child_node : node->m_child_nodes)
+                {
+                    if (fileNodeMatchesFilter(child_node.get(), file_content_filter))
+                    {
+                        any_child_matches = true;
+                        break;
+                    }
+                }
+                if (!any_child_matches && !fileNodeMatchesFilter(node, file_content_filter))
+                {
+                    return; // skip entire folder if no matches
+                }
+            }
+
             bool open = ImGui::TreeNodeEx(node->m_file_name.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(100.0f);
             ImGui::TextUnformatted(node->m_file_type.c_str());
             if (open)
             {
-                for (int child_n = 0; child_n < node->m_child_nodes.size(); child_n++)
-                    buildEditorFileAssetsUITree(node->m_child_nodes[child_n].get());
+                for (const auto& child_node : node->m_child_nodes)
+                    buildEditorFileAssetsUITree(child_node.get(), file_content_filter);
                 ImGui::TreePop();
             }
         }
         else
         {
+            // apply filter for files
+            if (file_content_filter && file_content_filter[0] != '\0' && !fileNodeMatchesFilter(node, file_content_filter))
+            {
+                return;
+            }
             ImGui::TreeNodeEx(node->m_file_name.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanFullWidth);
             if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
             {
@@ -827,6 +890,19 @@ namespace Piccolo
             ImGui::SetNextItemWidth(100.0f);
             ImGui::TextUnformatted(node->m_file_type.c_str());
         }
+    }
+
+    bool EditorUI::fileNodeMatchesFilter(EditorFileNode* node, const char* filter)
+    {
+        if (!node || !filter || filter[0] == '\0')
+        {
+            return true;
+        }
+        std::string name_lower = node->m_file_name;
+        std::string filter_str = filter;
+        std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+        std::transform(filter_str.begin(), filter_str.end(), filter_str.begin(), ::tolower);
+        return name_lower.find(filter_str) != std::string::npos;
     }
 
     void EditorUI::onFileContentItemClicked(EditorFileNode* node)
@@ -860,7 +936,7 @@ namespace Piccolo
         // TOOD: Reload fonts if DPI scale is larger than previous font loading DPI scale
     }
 
-    inline void windowContentScaleCallback(GLFWwindow* window, float x_scale, float y_scale) { windowContentScaleUpdate(fmaxf(x_scale, y_scale)); }
+    inline void windowContentScaleCallback(GLFWwindow* /*window*/, float x_scale, float y_scale) { windowContentScaleUpdate(fmaxf(x_scale, y_scale)); }
 
     void EditorUI::initialize(WindowUIInitInfo init_info)
     {
@@ -886,15 +962,20 @@ namespace Piccolo
         // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
         io.ConfigDockingAlwaysTabBar         = true;
         io.ConfigWindowsMoveFromTitleBarOnly = true;
-        io.Fonts->AddFontFromFileTTF(config_manager->getEditorFontPath().generic_string().data(), content_scale * 16, nullptr, nullptr);
+        io.Fonts->AddFontFromFileTTF(config_manager->getEditorFontPath().generic_string().c_str(), content_scale * k_font_size_scale, nullptr, nullptr);
         io.Fonts->Build();
 
         ImGuiStyle& style     = ImGui::GetStyle();
-        style.WindowPadding   = ImVec2(1.0, 0);
-        style.FramePadding    = ImVec2(14.0, 2.0f);
+        style.WindowPadding   = ImVec2(8.0f, 6.0f);
+        style.FramePadding    = ImVec2(8.0f, 6.0f);
+        style.ItemSpacing     = ImVec2(8.0f, 6.0f);
+        style.ItemInnerSpacing= ImVec2(6.0f, 4.0f);
         style.ChildBorderSize = 0.0f;
-        style.FrameRounding   = 5.0f;
-        style.FrameBorderSize = 1.5f;
+        style.FrameRounding   = 4.0f;
+        style.GrabRounding    = 4.0f;
+        style.WindowRounding  = 4.0f;
+        style.ScrollbarRounding = 4.0f;
+        style.FrameBorderSize = 1.0f;
 
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
         {
@@ -911,8 +992,8 @@ namespace Piccolo
         GLFWimage   window_icon[2];
         std::string big_icon_path_string   = config_manager->getEditorBigIconPath().generic_string();
         std::string small_icon_path_string = config_manager->getEditorSmallIconPath().generic_string();
-        window_icon[0].pixels              = stbi_load(big_icon_path_string.data(), &window_icon[0].width, &window_icon[0].height, 0, 4);
-        window_icon[1].pixels              = stbi_load(small_icon_path_string.data(), &window_icon[1].width, &window_icon[1].height, 0, 4);
+        window_icon[0].pixels              = stbi_load(big_icon_path_string.c_str(), &window_icon[0].width, &window_icon[0].height, nullptr, 4);
+        window_icon[1].pixels              = stbi_load(small_icon_path_string.c_str(), &window_icon[1].width, &window_icon[1].height, nullptr, 4);
         glfwSetWindowIcon(init_info.window_system->getWindow(), 2, window_icon);
         stbi_image_free(window_icon[0].pixels);
         stbi_image_free(window_icon[1].pixels);
@@ -985,7 +1066,7 @@ namespace Piccolo
 
     void EditorUI::preRender() { showEditorUI(); }
 
-    void DrawVecControl(const std::string& label, Piccolo::Vector3& values, float resetValue, float columnWidth)
+    void EditorUI::drawVecControl(const std::string& label, Vector3& values, float resetValue, float columnWidth)
     {
         ImGui::PushID(label.c_str());
 
@@ -997,13 +1078,13 @@ namespace Piccolo
         ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2 {0, 0});
 
-        float  lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-        ImVec2 buttonSize = {lineHeight + 3.0f, lineHeight};
+        float  line_height = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+        ImVec2 button_size = {line_height + 3.0f, line_height};
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.9f, 0.2f, 0.2f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
-        if (ImGui::Button("X", buttonSize))
+        if (ImGui::Button("X", button_size))
             values.x = resetValue;
         ImGui::PopStyleColor(3);
 
@@ -1015,7 +1096,7 @@ namespace Piccolo
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.3f, 0.55f, 0.3f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
-        if (ImGui::Button("Y", buttonSize))
+        if (ImGui::Button("Y", button_size))
             values.y = resetValue;
         ImGui::PopStyleColor(3);
 
@@ -1027,7 +1108,7 @@ namespace Piccolo
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.2f, 0.35f, 0.9f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
-        if (ImGui::Button("Z", buttonSize))
+        if (ImGui::Button("Z", button_size))
             values.z = resetValue;
         ImGui::PopStyleColor(3);
 
@@ -1041,7 +1122,7 @@ namespace Piccolo
         ImGui::PopID();
     }
 
-    void DrawVecControl(const std::string& label, Piccolo::Quaternion& values, float resetValue, float columnWidth)
+    void EditorUI::drawVecControl(const std::string& label, Quaternion& values, float resetValue, float columnWidth)
     {
         ImGui::PushID(label.c_str());
 
@@ -1053,13 +1134,13 @@ namespace Piccolo
         ImGui::PushMultiItemsWidths(4, ImGui::CalcItemWidth());
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2 {0, 0});
 
-        float  lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-        ImVec2 buttonSize = {lineHeight + 3.0f, lineHeight};
+        float  line_height = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+        ImVec2 button_size = {line_height + 3.0f, line_height};
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.9f, 0.2f, 0.2f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
-        if (ImGui::Button("X", buttonSize))
+        if (ImGui::Button("X", button_size))
             values.x = resetValue;
         ImGui::PopStyleColor(3);
 
@@ -1071,7 +1152,7 @@ namespace Piccolo
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.3f, 0.55f, 0.3f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
-        if (ImGui::Button("Y", buttonSize))
+        if (ImGui::Button("Y", button_size))
             values.y = resetValue;
         ImGui::PopStyleColor(3);
 
@@ -1083,7 +1164,7 @@ namespace Piccolo
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.2f, 0.35f, 0.9f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
-        if (ImGui::Button("Z", buttonSize))
+        if (ImGui::Button("Z", button_size))
             values.z = resetValue;
         ImGui::PopStyleColor(3);
 
@@ -1095,7 +1176,7 @@ namespace Piccolo
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.5f, 0.25f, 0.5f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.6f, 0.35f, 0.6f, 1.0f});
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.5f, 0.25f, 0.5f, 1.0f});
-        if (ImGui::Button("W", buttonSize))
+        if (ImGui::Button("W", button_size))
             values.w = resetValue;
         ImGui::PopStyleColor(3);
 
