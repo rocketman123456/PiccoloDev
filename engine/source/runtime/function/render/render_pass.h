@@ -6,7 +6,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include <memory>
 #include <vector>
 
 namespace Piccolo
@@ -100,6 +99,26 @@ namespace Piccolo
         virtual std::vector<RHIDescriptorSetLayout*> getDescriptorSetLayouts() const;
 
         static VisiableNodes m_visiable_nodes;
+
+    protected:
+        // Helpers to unify common render pass setup across passes
+        void createDescriptorSetLayout(uint32_t layout_index,
+                                       const std::vector<RHIDescriptorSetLayoutBinding>& bindings);
+
+        void createPipelineLayout(uint32_t pipeline_index,
+                                  const std::vector<RHIDescriptorSetLayout*>& set_layouts);
+
+        // Create a standard fullscreen-triangle graphics pipeline with common defaults.
+        // Optional overrides for depth-stencil and color blend state can be provided.
+        void createFullscreenTrianglePipeline(uint32_t                                       pipeline_index,
+                                              RHIShader*                                      vert_shader_module,
+                                              RHIShader*                                      frag_shader_module,
+                                              RHIRenderPass*                                  render_pass,
+                                              uint32_t                                        subpass_index,
+                                              const RHIPipelineDepthStencilStateCreateInfo*    depth_stencil_override = nullptr,
+                                              const RHIPipelineColorBlendStateCreateInfo*      color_blend_override   = nullptr);
+
+        void allocateDescriptorSet(uint32_t layout_index);
 
     private:
     };
